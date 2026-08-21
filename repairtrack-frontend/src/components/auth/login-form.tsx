@@ -2,6 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import Image from 'next/image'
+import { LoaderCircle, LogIn } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { authClient } from '@/lib/auth-client'
@@ -13,6 +15,7 @@ import { loginSchema, type LoginInput } from '@/features/auth/schemas'
 export function LoginForm() {
   const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
+  const [isGooglePending, setIsGooglePending] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   })
@@ -30,8 +33,12 @@ export function LoginForm() {
 
   async function signInWithGoogle() {
     setFormError(null)
+    setIsGooglePending(true)
     const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
-    if (result.error) setFormError('Google sign-in is unavailable right now.')
+    if (result.error) {
+      setFormError('Google sign-in is unavailable right now.')
+      setIsGooglePending(false)
+    }
   }
 
   return (
@@ -47,9 +54,9 @@ export function LoginForm() {
         <Input id="password" type="password" autoComplete="current-password" {...register('password')} />
         {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
       </div>
-      <Button type="submit" disabled={isSubmitting} className="w-full">{isSubmitting ? 'Signing in...' : 'Sign in'}</Button>
+      <Button type="submit" disabled={isSubmitting || isGooglePending} className="w-full gap-2">{isSubmitting ? <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> : <LogIn aria-hidden="true" className="h-4 w-4" />}{isSubmitting ? 'Signing in...' : 'Sign in'}</Button>
       <div className="relative flex items-center"><div className="h-px flex-1 bg-border" /><span className="px-3 text-xs text-muted-foreground">or</span><div className="h-px flex-1 bg-border" /></div>
-      <Button type="button" variant="outline" disabled={isSubmitting} onClick={signInWithGoogle} className="w-full">Continue with Google</Button>
+      <Button type="button" variant="outline" disabled={isSubmitting || isGooglePending} onClick={signInWithGoogle} className="w-full gap-2">{isGooglePending ? <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> : <Image aria-hidden="true" src="https://cdn-icons-png.flaticon.com/512/300/300221.png" alt="" width={16} height={16} />}{isGooglePending ? 'Opening Google...' : 'Continue with Google'}</Button>
     </form>
   )
 }
