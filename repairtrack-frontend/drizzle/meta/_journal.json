@@ -8,6 +8,20 @@
       "when": 1787281897473,
       "tag": "0000_nostalgic_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787285753233,
+      "tag": "0001_panoramic_excalibur",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787294214627,
+      "tag": "0002_free_next_avengers",
+      "breakpoints": true
     }
   ]
 }
