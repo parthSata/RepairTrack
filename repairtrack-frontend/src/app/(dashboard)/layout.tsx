@@ -13,6 +13,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const role = session.user.role ?? 'OWNER'
   const restricted = role === 'TECHNICIAN'
+  const owner = role === 'OWNER'
   const navClass = 'group flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground'
 
   return (
@@ -27,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <Link className={navClass} href="/repairs"><Wrench className="h-4 w-4" />Repairs</Link>
           <Link className={navClass} href="/customers"><Users className="h-4 w-4" />Customers</Link>
           <Link className={navClass} href="/devices"><Smartphone className="h-4 w-4" />Devices</Link>
-          {!restricted && <><Link className={navClass} href="/inventory"><Boxes className="h-4 w-4" />Inventory</Link><Link className={navClass} href="/invoices"><CircleDollarSign className="h-4 w-4" />Invoices</Link><Link className={navClass} href="/settings"><Settings className="h-4 w-4" />Settings</Link></>}
+          {!restricted && <><Link className={navClass} href="/inventory"><Boxes className="h-4 w-4" />Inventory</Link><Link className={navClass} href="/invoices"><CircleDollarSign className="h-4 w-4" />Invoices</Link>{owner && <Link className={navClass} href="/settings/shop"><Settings className="h-4 w-4" />Settings</Link>}</>}
         </nav>
         <div className="mx-4 mt-4 rounded-lg border border-border bg-muted p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">Workspace</p>

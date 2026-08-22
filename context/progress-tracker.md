@@ -6,7 +6,13 @@ Status: IN PROGRESS
 
 Current Sprint: Sprint 1 — MVP
 
-Overall Progress: 10%
+Overall Progress: 15%
+
+Current Task: Shop Management / Shop Profile completed
+
+Next: Dashboard data API and repair workflow
+
+Gmail API email service configured with OAuth2 refresh-token support.
 
 ---
 
@@ -77,6 +83,18 @@ Authentication
 - [x] Create loading states
 - [ ] Create error states
 - [ ] Create empty states
+
+---
+
+## 4b. Shop Management
+
+- [x] Create shop profile
+- [x] Shop name
+- [x] Phone
+- [x] Email
+- [x] Address
+- [x] Logo upload and replacement
+- [x] Business information
 
 ---
 

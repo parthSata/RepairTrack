@@ -2,6 +2,7 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { betterAuth } from 'better-auth'
 import { db } from '@/server/db'
 import { accounts, sessions, users, verifications } from '@/server/db/schema'
+import { sendEmail } from '@/server/services/gmail.service'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -24,7 +25,19 @@ export const auth = betterAuth({
       shopId: { type: 'string', required: false },
     },
   },
-  emailAndPassword: { enabled: true, requireEmailVerification: false },
+  emailAndPassword: { enabled: true, requireEmailVerification: true },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      const result = await sendEmail({
+        to: user.email,
+        subject: 'Verify your RepairTrack email',
+        html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
+      })
+      if (!result.sent) throw new Error('Gmail email service is not configured')
+    },
+  },
   socialProviders: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
