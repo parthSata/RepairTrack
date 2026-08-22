@@ -6,7 +6,13 @@ Status: IN PROGRESS
 
 Current Sprint: Sprint 1 — MVP
 
-Overall Progress: 10%
+Overall Progress: 15%
+
+Current Task: Shop Profile performance optimization completed (Server-side prefetching, React Query hydration, optimistic updates)
+
+Next: Dashboard data API and repair workflow
+
+Gmail API email service configured with OAuth2 refresh-token support.
 
 ---
 
@@ -44,11 +50,11 @@ Authentication
 
 ## 2. Database Foundation
 
-- [ ] Configure PostgreSQL
-- [ ] Configure Drizzle ORM
-- [ ] Configure migrations
-- [ ] Create users schema
-- [ ] Create shops schema
+- [x] Configure PostgreSQL
+- [x] Configure Drizzle ORM
+- [x] Configure migrations
+- [x] Create users schema
+- [x] Create shops schema
 - [ ] Create customers schema
 - [ ] Create devices schema
 - [ ] Create repairs schema
@@ -77,6 +83,18 @@ Authentication
 - [x] Create loading states
 - [ ] Create error states
 - [ ] Create empty states
+
+---
+
+## 4b. Shop Management
+
+- [x] Create shop profile
+- [x] Shop name
+- [x] Phone
+- [x] Email
+- [x] Address
+- [x] Logo upload and replacement
+- [x] Business information
 
 ---
 
@@ -307,7 +325,7 @@ None currently.
 
 # Current Task
 
-Workshop Precision UI refresh for Login, Register, and Dashboard completed.
+Database Foundation user shop_id requirement fixed.
 
 ---
 
@@ -318,6 +336,12 @@ Implement the dashboard data API and repair workflow.
 ---
 
 # Change Log
+
+## Database Foundation Fix
+
+- Made `users.shop_id` required in the Drizzle schema and generated migration `0004_reflective_whizzer`.
+- Updated Better Auth user creation to create and attach a shop before every user row is inserted.
+- Updated email and Google auth redirects so new users go directly to the dashboard after shop creation.
 
 ## Initial Setup
 
