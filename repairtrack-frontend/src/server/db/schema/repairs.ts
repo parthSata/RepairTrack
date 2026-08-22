@@ -15,6 +15,20 @@ export const repairStatusEnum = pgEnum('repair_status', [
   'CANCELLED',
 ])
 
+export const deviceTypeEnum = pgEnum('device_type', [
+  'PHONE',
+  'LAPTOP',
+  'TABLET',
+  'DESKTOP',
+  'OTHER',
+])
+
+export const deviceConditionEnum = pgEnum('device_condition', [
+  'GOOD',
+  'FAIR',
+  'POOR',
+])
+
 export const devices = pgTable(
   'devices',
   {
@@ -28,6 +42,9 @@ export const devices = pgTable(
     brand: text('brand').notNull(),
     model: text('model').notNull(),
     serialNumber: text('serial_number'),
+    deviceType: deviceTypeEnum('device_type').default('PHONE').notNull(),
+    condition: deviceConditionEnum('condition').default('GOOD').notNull(),
+    accessories: text('accessories'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
