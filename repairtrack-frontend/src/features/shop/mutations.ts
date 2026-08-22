@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { LogoUploadInput, ShopProfile } from './schemas'
+import type { LogoUploadInput, ShopProfile, ShopProfileResponse } from './schemas'
 import { shopKeys } from './queries'
 
 export function useUpdateShopProfile() {
@@ -11,7 +11,25 @@ export function useUpdateShopProfile() {
     mutationFn: async (profile: ShopProfile) => {
       await apiClient.patch('shops/me', profile)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: shopKeys.profile() }),
+    onMutate: async (newProfile: ShopProfile) => {
+      await queryClient.cancelQueries({ queryKey: shopKeys.profile() })
+      const previousProfile = queryClient.getQueryData<ShopProfileResponse>(shopKeys.profile())
+      if (previousProfile) {
+        queryClient.setQueryData<ShopProfileResponse>(shopKeys.profile(), {
+          ...previousProfile,
+          ...newProfile,
+        })
+      }
+      return { previousProfile }
+    },
+    onError: (_err, _newProfile, context) => {
+      if (context?.previousProfile) {
+        queryClient.setQueryData(shopKeys.profile(), context.previousProfile)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: shopKeys.profile() })
+    },
   })
 }
 

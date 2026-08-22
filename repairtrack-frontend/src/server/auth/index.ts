@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { betterAuth } from 'better-auth'
 import { db } from '@/server/db'
@@ -56,6 +57,55 @@ export const auth = betterAuth({
               role: 'OWNER',
               shopId,
             },
+          }
+        },
+      },
+    },
+    account: {
+      create: {
+        before: async (account) => {
+          const now = new Date()
+          const accessToken = account.accessToken ?? crypto.randomUUID()
+          const refreshToken = account.refreshToken ?? crypto.randomUUID()
+          const accessTokenExpiresAt = account.accessTokenExpiresAt ?? new Date(now.getTime() + 24 * 60 * 60 * 1000)
+          const refreshTokenExpiresAt = account.refreshTokenExpiresAt ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+          return {
+            data: {
+              ...account,
+              accessToken,
+              refreshToken,
+              accessTokenExpiresAt,
+              refreshTokenExpiresAt,
+            },
+          }
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session) => {
+          if (session.userId) {
+            const userAccounts = await db
+              .select()
+              .from(accounts)
+              .where(eq(accounts.userId, session.userId))
+
+            for (const account of userAccounts) {
+              if (!account.accessToken || !account.refreshToken) {
+                const now = new Date()
+                await db
+                  .update(accounts)
+                  .set({
+                    accessToken: account.accessToken ?? crypto.randomUUID(),
+                    refreshToken: account.refreshToken ?? crypto.randomUUID(),
+                    accessTokenExpiresAt: account.accessTokenExpiresAt ?? new Date(now.getTime() + 24 * 60 * 60 * 1000),
+                    refreshTokenExpiresAt: account.refreshTokenExpiresAt ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+                    updatedAt: now,
+                  })
+                  .where(eq(accounts.id, account.id))
+              }
+            }
           }
         },
       },

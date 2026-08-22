@@ -56,7 +56,7 @@ export function ShopLogoUploader({ previewUrl, onUploaded, onRemoved }: Props) {
   const isUploading = requestUpload.isPending || progress > 0 && progress < 100
   return <div className="space-y-4">
     <div className="flex h-44 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-muted/40">
-      {preview ? <Image src={preview} alt="Shop logo preview" width={176} height={176} unoptimized className="h-full w-full object-contain p-5" /> : <div className="text-center"><ImagePlus className="mx-auto h-8 w-8 text-steel" /><p className="mt-3 text-sm font-medium">Upload logo</p><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP up to 5MB</p></div>}
+      {preview ? <Image src={preview} alt="Shop logo preview" width={176} height={176} priority unoptimized className="h-full w-full object-contain p-5" /> : <div className="text-center"><ImagePlus className="mx-auto h-8 w-8 text-steel" /><p className="mt-3 text-sm font-medium">Upload logo</p><p className="mt-1 text-xs text-muted-foreground">JPEG, PNG, or WebP up to 5MB</p></div>}
     </div>
     {isUploading && <div aria-label={`Upload progress ${progress}%`} className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full bg-accent transition-[width] duration-200" style={{ width: `${progress}%` }} /></div>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}

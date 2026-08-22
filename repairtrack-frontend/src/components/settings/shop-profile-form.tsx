@@ -18,9 +18,9 @@ import { ShopLogoUploader } from './shop-logo-uploader'
 
 function FieldError({ message }: { message?: string }) { return message ? <p className="animate-in fade-in text-sm text-destructive">{message}</p> : null }
 
-export function ShopProfileForm() {
-  const shopQuery = useShopProfile()
-  if (shopQuery.isPending) return <ShopProfileSkeleton />
+export function ShopProfileForm({ initialData }: { initialData?: ShopProfileResponse | null }) {
+  const shopQuery = useShopProfile(initialData)
+  if (shopQuery.isPending && !initialData) return <ShopProfileSkeleton />
   if (shopQuery.isError || !shopQuery.data) return <Alert><div className="flex items-center justify-between gap-4"><span>We could not load your shop profile. Please try again.</span><Button type="button" variant="outline" onClick={() => void shopQuery.refetch()}>Retry</Button></div></Alert>
   return <ShopProfileEditor key={shopQuery.data.id} profile={shopQuery.data} />
 }
@@ -29,7 +29,7 @@ function ShopProfileEditor({ profile }: { profile: ShopProfileResponse }) {
   const updateShop = useUpdateShopProfile()
   const [saved, setSaved] = useState(false)
   const [logoPreview, setLogoPreview] = useState<string | null>(profile.logoPreviewUrl)
-  const { register, handleSubmit, setValue, formState: { errors, isDirty, isValid } } = useForm<ShopProfile>({ resolver: zodResolver(shopProfileSchema), mode: 'onChange', defaultValues: profile })
+  const { register, handleSubmit, setValue, formState: { errors, isDirty, isValid } } = useForm<ShopProfile>({ resolver: zodResolver(shopProfileSchema), mode: 'onBlur', defaultValues: profile })
   async function onSubmit(values: ShopProfile) {
     setSaved(false)
     try {
