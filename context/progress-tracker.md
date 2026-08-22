@@ -112,11 +112,11 @@ Authentication
 
 ## 6. Customer Management
 
-- [ ] Customer list
-- [ ] Customer search
-- [ ] Create customer
-- [ ] Customer details
-- [ ] Customer repair history
+- [x] Customer list
+- [x] Customer search
+- [x] Create customer
+- [x] Customer details
+- [x] Customer repair history
 
 ---
 
@@ -323,15 +323,10 @@ None currently.
 
 ---
 
-# Current Task
+# Current Task: Customer Management feature UI and backend implemented (Customer CRUD, search, TableCraft list, repair history, role protection)
 
-Database Foundation user shop_id requirement fixed.
+Next: Device management and Repair ticket creation workflow.
 
----
-
-# Next Recommended Task
-
-Implement the dashboard data API and repair workflow.
 
 ---
 
