@@ -21,10 +21,19 @@ export function CustomerPicker({
   error,
 }: CustomerPickerProps) {
   const [searchQuery, setSearchQuery] = React.useState('')
+  const [debouncedQuery, setDebouncedQuery] = React.useState('')
   const [selected, setSelected] = React.useState<LinkedCustomer | null>(initialCustomer ?? null)
   const [isOpen, setIsOpen] = React.useState(!initialCustomer && !value)
 
-  const { data, isLoading } = useCustomerSearch(searchQuery)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const { data, isLoading } = useCustomerSearch(debouncedQuery)
 
   const handleSelect = (customer: LinkedCustomer) => {
     setSelected(customer)
@@ -91,10 +100,14 @@ export function CustomerPicker({
           </div>
 
           <div className="max-h-48 overflow-y-auto rounded-md border border-border bg-card shadow-sm divide-y divide-border">
-            {isLoading ? (
+            {searchQuery.trim().length < 3 ? (
+              <div className="p-3 text-center text-xs text-muted-foreground">
+                Type at least 3 letters to see customer suggestions (up to 5).
+              </div>
+            ) : isLoading ? (
               <div className="p-3 text-center text-xs text-muted-foreground">Searching customers...</div>
             ) : data?.items && data.items.length > 0 ? (
-              data.items.map((customer) => (
+              data.items.slice(0, 5).map((customer) => (
                 <button
                   key={customer.id}
                   type="button"
@@ -114,13 +127,9 @@ export function CustomerPicker({
                   {value === customer.id && <Check className="h-4 w-4 text-accent shrink-0" />}
                 </button>
               ))
-            ) : searchQuery.trim().length > 0 ? (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                No customers found matching &quot;{searchQuery}&quot;.
-              </div>
             ) : (
               <div className="p-3 text-center text-xs text-muted-foreground">
-                Type a name or phone number to search existing customers.
+                No customers found matching &quot;{searchQuery}&quot;.
               </div>
             )}
           </div>

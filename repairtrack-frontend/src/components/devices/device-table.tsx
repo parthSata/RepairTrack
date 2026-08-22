@@ -13,6 +13,7 @@ import {
   Search,
   Smartphone,
   Tablet,
+  Trash2,
   User,
   X,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { DeviceForm } from './device-form'
+import { DeviceDeleteDialog } from './device-delete-dialog'
 
 export function DeviceTypeIcon({ type }: { type: DeviceType }) {
   switch (type) {
@@ -78,6 +80,7 @@ export function DeviceTable() {
 
   const [createOpen, setCreateOpen] = React.useState(false)
   const [editDevice, setEditDevice] = React.useState<Device | null>(null)
+  const [deleteDevice, setDeleteDevice] = React.useState<Device | null>(null)
 
   const { data, isLoading, isError, refetch } = useDevices(filters)
 
@@ -174,14 +177,35 @@ export function DeviceTable() {
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
+            <Button
+              variant="ghost"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+              onClick={() => setDeleteDevice(device)}
+              aria-label={`Delete ${device.brand} ${device.model}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )
       },
     },
   ]
 
+  const [searchTerm, setSearchTerm] = React.useState(filters.search ?? '')
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters((prev) => {
+        if (prev.search === searchTerm) return prev
+        return { ...prev, search: searchTerm, page: 1 }
+      })
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFilters((prev) => ({ ...prev, search: e.target.value, page: 1 }))
+    setSearchTerm(e.target.value)
   }
 
   const handlePageChange = (pageIndex: number) => {
@@ -209,14 +233,17 @@ export function DeviceTable() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search by brand, model, serial..."
-              value={filters.search ?? ''}
+              value={searchTerm}
               onChange={handleSearchChange}
               className="pl-9 pr-8 h-10 text-sm"
             />
-            {filters.search && (
+            {searchTerm && (
               <button
                 type="button"
-                onClick={() => setFilters((prev) => ({ ...prev, search: '', page: 1 }))}
+                onClick={() => {
+                  setSearchTerm('')
+                  setFilters((prev) => ({ ...prev, search: '', page: 1 }))
+                }}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
@@ -329,6 +356,14 @@ export function DeviceTable() {
           />
         )}
       </Dialog>
+
+      {/* Delete Device Dialog */}
+      <DeviceDeleteDialog
+        open={Boolean(deleteDevice)}
+        onOpenChange={(open) => !open && setDeleteDevice(null)}
+        device={deleteDevice}
+        onSuccess={() => setDeleteDevice(null)}
+      />
     </div>
   )
 }

@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import type { CustomerFilterInput } from './schemas'
 
@@ -59,6 +59,7 @@ export function useCustomers(filters: CustomerFilterInput) {
       return response.data
     },
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
