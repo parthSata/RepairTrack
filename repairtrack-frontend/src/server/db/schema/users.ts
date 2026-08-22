@@ -5,6 +5,11 @@ export const userRole = pgEnum('user_role', ['OWNER', 'STAFF', 'TECHNICIAN'])
 export const shops = pgTable('shops', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  address: text('address'),
+  businessInfo: text('business_info'),
+  logoKey: text('logo_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

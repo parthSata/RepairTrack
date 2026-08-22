@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-const emailSchema = z
+export const emailSchema = z
   .string({ error: 'Email is required' })
   .trim()
   .toLowerCase()
@@ -40,6 +40,8 @@ export const registerSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
 })
+
+export const emailCheckSchema = z.object({ email: emailSchema })
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
