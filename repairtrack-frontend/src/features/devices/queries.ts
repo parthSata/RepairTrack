@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import type { DeviceFilterInput, DeviceType, DeviceCondition } from './schemas'
 
@@ -62,6 +62,7 @@ export function useDevices(filters: DeviceFilterInput) {
       return response.data
     },
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -94,11 +95,12 @@ export function useCustomerSearch(query: string) {
     queryKey: ['customers', 'search', query],
     queryFn: async () => {
       const response = await apiClient.get<{ items: LinkedCustomer[] }>('/customers', {
-        params: { search: query, limit: 10 },
+        params: { search: query, limit: 5 },
       })
       return response.data
     },
-    enabled: query.trim().length >= 1,
+    enabled: query.trim().length >= 3,
     staleTime: 30 * 1000,
+    placeholderData: keepPreviousData,
   })
 }

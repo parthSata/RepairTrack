@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, or } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, or, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
@@ -77,13 +77,11 @@ export async function listDevices({
         phone: customers.phone,
         email: customers.email,
       },
-      totalRepairs: count(repairs.id),
+      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = ${devices.id})`,
     })
     .from(devices)
     .leftJoin(customers, eq(customers.id, devices.customerId))
-    .leftJoin(repairs, eq(repairs.deviceId, devices.id))
     .where(whereClause)
-    .groupBy(devices.id, customers.id)
     .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
     .limit(limit)
     .offset(offset)
@@ -117,13 +115,11 @@ export async function getDeviceById({ shopId, id }: { shopId: string; id: string
         phone: customers.phone,
         email: customers.email,
       },
-      totalRepairs: count(repairs.id),
+      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = ${devices.id})`,
     })
     .from(devices)
     .leftJoin(customers, eq(customers.id, devices.customerId))
-    .leftJoin(repairs, eq(repairs.deviceId, devices.id))
     .where(and(eq(devices.id, id), eq(devices.shopId, shopId)))
-    .groupBy(devices.id, customers.id)
 
   const device = result[0]
   if (!device) throw new HTTPException(404, { message: 'Device not found' })
