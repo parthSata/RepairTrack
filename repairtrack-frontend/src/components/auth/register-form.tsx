@@ -29,9 +29,16 @@ export function RegisterForm() {
       setFormError('This email address cannot receive email. Check the address and try again.')
       return
     }
-    const result = await authClient.signUp.email({ email: values.email, password: values.password, name: values.ownerName, callbackURL: '/onboarding' })
-    if (result.error) {
-      setFormError(result.error.message ?? 'Unable to create your account.')
+    try {
+      await apiClient.post('auth/sign-up/email', {
+        email: values.email,
+        password: values.password,
+        name: values.ownerName,
+        shopName: values.shopName,
+        callbackURL: '/dashboard',
+      })
+    } catch {
+      setFormError('Unable to create your account.')
       return
     }
     setVerificationEmail(values.email)
@@ -42,7 +49,7 @@ export function RegisterForm() {
     if (resendCount >= 2 || isResending) return
     setFormError(null)
     setIsResending(true)
-    const result = await authClient.sendVerificationEmail({ email: verificationEmail, callbackURL: '/onboarding' })
+    const result = await authClient.sendVerificationEmail({ email: verificationEmail, callbackURL: '/dashboard' })
     if (result.error) setFormError('We could not send the verification email. Please try again later.')
     else setResendCount((count) => count + 1)
     setIsResending(false)
@@ -50,7 +57,7 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {verificationSent && <div role="status" className="space-y-3 rounded-md border border-success/30 bg-success/5 p-4 text-sm text-foreground"><p className="font-medium">Check your email to continue.</p><p className="leading-5 text-muted-foreground">We sent a verification link to {verificationEmail}. Verify it, then return here to finish setting up your shop.</p>{resendCount < 2 ? <button type="button" className="font-medium text-foreground underline disabled:opacity-50" onClick={() => void resendVerification()} disabled={isResending}>{isResending ? 'Sending...' : `Resend verification email (${2 - resendCount} remaining)`}</button> : <p className="text-muted-foreground">Resend limit reached. Please use the latest email.</p>}<Link href="/login" className="block font-medium text-foreground underline">Go to sign in</Link></div>}
+      {verificationSent && <div role="status" className="space-y-3 rounded-md border border-success/30 bg-success/5 p-4 text-sm text-foreground"><p className="font-medium">Check your email to continue.</p><p className="leading-5 text-muted-foreground">We sent a verification link to {verificationEmail}. Verify it, then return here to open your workspace.</p>{resendCount < 2 ? <button type="button" className="font-medium text-foreground underline disabled:opacity-50" onClick={() => void resendVerification()} disabled={isResending}>{isResending ? 'Sending...' : `Resend verification email (${2 - resendCount} remaining)`}</button> : <p className="text-muted-foreground">Resend limit reached. Please use the latest email.</p>}<Link href="/login" className="block font-medium text-foreground underline">Go to sign in</Link></div>}
       {!verificationSent && <>
       {formError && <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{formError}</p>}
       <div className="space-y-2"><Label htmlFor="shopName">Shop name</Label><Input id="shopName" autoComplete="organization" {...register('shopName')} />{errors.shopName && <p className="text-sm text-destructive">{errors.shopName.message}</p>}</div>

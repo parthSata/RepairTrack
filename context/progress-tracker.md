@@ -8,7 +8,7 @@ Current Sprint: Sprint 1 — MVP
 
 Overall Progress: 15%
 
-Current Task: Shop Management / Shop Profile completed
+Current Task: Database Foundation user shop_id requirement fixed
 
 Next: Dashboard data API and repair workflow
 
@@ -50,11 +50,11 @@ Authentication
 
 ## 2. Database Foundation
 
-- [ ] Configure PostgreSQL
-- [ ] Configure Drizzle ORM
-- [ ] Configure migrations
-- [ ] Create users schema
-- [ ] Create shops schema
+- [x] Configure PostgreSQL
+- [x] Configure Drizzle ORM
+- [x] Configure migrations
+- [x] Create users schema
+- [x] Create shops schema
 - [ ] Create customers schema
 - [ ] Create devices schema
 - [ ] Create repairs schema
@@ -325,7 +325,7 @@ None currently.
 
 # Current Task
 
-Workshop Precision UI refresh for Login, Register, and Dashboard completed.
+Database Foundation user shop_id requirement fixed.
 
 ---
 
@@ -336,6 +336,12 @@ Implement the dashboard data API and repair workflow.
 ---
 
 # Change Log
+
+## Database Foundation Fix
+
+- Made `users.shop_id` required in the Drizzle schema and generated migration `0004_reflective_whizzer`.
+- Updated Better Auth user creation to create and attach a shop before every user row is inserted.
+- Updated email and Google auth redirects so new users go directly to the dashboard after shop creation.
 
 ## Initial Setup
 

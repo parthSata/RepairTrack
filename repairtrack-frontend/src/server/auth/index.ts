@@ -1,8 +1,21 @@
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { betterAuth } from 'better-auth'
 import { db } from '@/server/db'
-import { accounts, sessions, users, verifications } from '@/server/db/schema'
+import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
 import { sendEmail } from '@/server/services/gmail.service'
+
+function readShopName(body: unknown, userName: string) {
+  const fallbackName = `${userName}'s shop`
+  if (!body || typeof body !== 'object' || !('shopName' in body)) return fallbackName
+
+  const shopName = (body as Record<string, unknown>).shopName
+  if (typeof shopName !== 'string') return fallbackName
+
+  const trimmedShopName = shopName.trim()
+  if (trimmedShopName.length < 2 || trimmedShopName.length > 120) return fallbackName
+
+  return trimmedShopName
+}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -23,6 +36,29 @@ export const auth = betterAuth({
     additionalFields: {
       role: { type: 'string', required: false, defaultValue: 'OWNER' },
       shopId: { type: 'string', required: false },
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user, context) => {
+          if (typeof user.shopId === 'string' && user.shopId.trim().length > 0) return
+
+          const shopId = crypto.randomUUID()
+          await db.insert(shops).values({
+            id: shopId,
+            name: readShopName(context?.body, user.name),
+          })
+
+          return {
+            data: {
+              ...user,
+              role: 'OWNER',
+              shopId,
+            },
+          }
+        },
+      },
     },
   },
   emailAndPassword: { enabled: true, requireEmailVerification: true },

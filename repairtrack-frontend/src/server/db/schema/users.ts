@@ -21,7 +21,7 @@ export const users = pgTable('users', {
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
   role: userRole('role').default('OWNER').notNull(),
-  shopId: text('shop_id').references(() => shops.id),
+  shopId: text('shop_id').notNull().references(() => shops.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
