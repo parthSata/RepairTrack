@@ -43,6 +43,13 @@
       "when": 1787384159427,
       "tag": "0005_sour_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787396707910,
+      "tag": "0006_chemical_bucky",
+      "breakpoints": true
     }
   ]
 }

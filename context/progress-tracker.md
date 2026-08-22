@@ -122,10 +122,10 @@ Authentication
 
 ## 7. Device Management
 
-- [ ] Device registration
-- [ ] Device details
-- [ ] Customer-device relationship
-- [ ] Device repair history
+- [x] Device registration
+- [x] Device details
+- [x] Customer-device relationship
+- [x] Device repair history
 
 ---
 
@@ -323,14 +323,25 @@ None currently.
 
 ---
 
-# Current Task: Customer Management feature UI and backend implemented (Customer CRUD, search, TableCraft list, repair history, role protection)
+# Current Task: Device Management feature UI and backend implemented (Device CRUD, customer picker, TableCraft list, repair history, popup dialog modal, role protection)
 
-Next: Device management and Repair ticket creation workflow.
+Next: Repair ticket creation workflow and repair management.
 
 
 ---
 
 # Change Log
+
+## Device Management Feature
+
+- Added `device_type` and `device_condition` enums, `accessories` column to `devices` table with Drizzle migration `0006_chemical_bucky.sql`.
+- Built Zod schema `deviceSchema` and `deviceFilterSchema` in `src/features/devices/schemas.ts`.
+- Created TanStack Query hooks `useDevices`, `useDevice`, `useDeviceRepairHistory`, `useCustomerSearch`, and key factory `deviceKeys`.
+- Created mutations `useCreateDevice`, `useUpdateDevice`, `useDeleteDevice` with Query cache invalidation for device list, details, and linked customer.
+- Built Drizzle service `src/server/services/device.service.ts` with tenant scoping and customer ownership validation.
+- Created Hono router `src/server/hono/routes/devices.ts` with `OWNER` / `STAFF` permission enforcement (`TECHNICIAN` blocked with 403 Forbidden).
+- Implemented `CustomerPicker` combobox, `DeviceForm`, `DeviceTable` with TableCraft & centered Dialog popup modals with backdrop blur background, and `DeviceRepairHistory`.
+- Added App Router pages `/devices` and `/devices/[id]`.
 
 ## Database Foundation Fix
 
