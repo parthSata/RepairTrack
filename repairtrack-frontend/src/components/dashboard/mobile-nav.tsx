@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 export function MobileNav({ role }: { role: string }) {
   const [open, setOpen] = useState(false)
   const restricted = role === 'TECHNICIAN'
+  const owner = role === 'OWNER'
   const close = () => setOpen(false)
 
   const links = [
@@ -18,7 +19,7 @@ export function MobileNav({ role }: { role: string }) {
     ...(!restricted ? [
       { href: '/inventory', label: 'Inventory', icon: Boxes },
       { href: '/invoices', label: 'Invoices', icon: CircleDollarSign },
-      { href: '/settings', label: 'Settings', icon: Settings },
+      ...(owner ? [{ href: '/settings/shop', label: 'Settings', icon: Settings }] : []),
     ] : []),
   ]
 
