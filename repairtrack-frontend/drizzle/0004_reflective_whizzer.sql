@@ -1,0 +1,1 @@
+ALTER TABLE "users" ALTER COLUMN "shop_id" SET NOT NULL;

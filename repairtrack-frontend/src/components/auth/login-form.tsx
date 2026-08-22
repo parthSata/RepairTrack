@@ -34,7 +34,7 @@ export function LoginForm() {
   async function signInWithGoogle() {
     setFormError(null)
     setIsGooglePending(true)
-    const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/onboarding' })
+    const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
     if (result.error) {
       setFormError('Google sign-in is unavailable right now.')
       setIsGooglePending(false)
