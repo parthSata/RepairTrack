@@ -268,6 +268,13 @@ Users with appropriate permissions can:
 - Complete repairs
 - Mark repairs ready for pickup
 
+
+When a repair moves to `DIAGNOSING` and its linked device has an
+unverified model (see Device Management below), the technician should
+be prompted — non-blocking — to confirm the device's model as part of
+diagnosis, since this is the natural point where the device is
+physically opened/inspected.
+
 ---
 
 ## Customer Management
@@ -294,6 +301,21 @@ Users can:
 - View device repair history
 - View device condition
 - Store device photos where required
+
+### Unverified device model
+ 
+A device's `model` is not always knowable at intake — the device may be
+powered off, dead, or missing its IMEI/serial. To avoid blocking intake:
+ 
+- `model` is optional when a device is created. If left blank, the
+  device is marked **Unverified** and shown with a clear visual
+  indicator wherever it appears (Device List, Device Details, Repair
+  Details).
+- A device can be confirmed/updated at any time from Device Details, or
+  inline during repair diagnosis (see Repair Management above).
+- Unverified is a normal, expected state for a newly-received device —
+  it is not an error condition and must not block repair-ticket
+  creation or status progression.
 
 ---
 
@@ -352,8 +374,46 @@ Examples:
 - Low inventory
 - Customer approval required
 
-Do not introduce email infrastructure unless it is explicitly
-approved in a future requirement.
+Transactional email (repair status changes, invites) is sent through the
+owner's own connected Gmail account — see "Owner Email Connection"
+below. This is approved for Sprint 3. Do not add a separate
+transactional email provider (SendGrid, Resend, Postmark, etc.) or a
+shared RepairTrack-owned sender address — every shop sends from its own
+owner's Gmail.
+
+Bulk/marketing email and automated drip campaigns remain out of scope
+(see §9).
+
+---
+
+## Owner Email Connection
+
+The shop owner can connect their own Gmail account so repair
+notifications are sent from their real email address, not a shared
+RepairTrack address.
+
+- Settings → Email & Notifications → Connect Gmail
+- Google OAuth consent, scoped to sending mail only
+- This is a **separate OAuth grant from Google login** — connecting
+  Gmail does not require the owner to have logged in via Google, and
+  logging in via Google does not automatically grant send access
+- Owner sees connection status (Connected / Not Connected) and can
+  disconnect at any time
+- If disconnected, notification-triggered emails simply do not send
+  (no fallback shared sender)
+- Staff/Technicians never see or handle the owner's Gmail credentials —
+  they can trigger a send action, RepairTrack executes it through the
+  owner's stored authorization
+
+Events that trigger an email (once connected):
+
+- Repair approval required
+- Repair approved
+- Repair ready for pickup
+- Repair delayed (optional)
+- Staff/Technician invitation (see Staff Management)
+
+Do not add an email for every minor field change.
 
 ---
 
@@ -394,8 +454,32 @@ Settings may include:
 
 - User profile
 - Shop information
-- Staff management
+- Staff management (see "Staff Management" below)
 - Application preferences
+
+---
+
+## Staff Management
+
+The owner manages their team from Settings → Staff Management.
+
+Owner can:
+
+- View all staff/technicians in their shop
+- Invite a new Staff or Technician (name, email, role)
+- Generate a shareable invite link (Sprint 1) / send an invite email
+  once Gmail is connected (Sprint 3)
+- View invite status: Active, Invited (pending)
+- Change a staff member's role (Staff ↔ Technician)
+- Deactivate / reactivate a staff member
+- Remove a staff member
+
+Invited users accept via `/invite/[token]`, complete their account, and
+are added to the inviting owner's shop with the assigned role. They never
+self-register into an existing shop (see §7 Authentication above).
+
+Staff and Technicians cannot invite, remove, or change the role of
+anyone. Only OWNER can access this screen.
 
 ---
 
@@ -431,7 +515,9 @@ The following may be considered in future development:
 - Activity / Audit Logs
 - Advanced analytics
 - Advanced reporting
-- Automated customer communication
+- Automated customer communication (bulk/marketing sequences — distinct
+  from the individual transactional emails sent via Owner Email
+  Connection, which are in scope for Sprint 3)
 - Additional payment providers
 - Multi-location support
 - Advanced inventory forecasting
@@ -482,7 +568,9 @@ RepairTrack will be developed in four major sprints.
 
 ## Sprint 1 — MVP
 
-Focus on the minimum usable repair-management product.
+Focus on the minimum usable repair-management product, including
+authentication and Staff Management (owner can build their team before
+repair operations depend on technician assignment).
 
 ## Sprint 2 — Core Operations
 
@@ -490,8 +578,8 @@ Expand repair, customer, device, inventory, and billing workflows.
 
 ## Sprint 3 — Business Intelligence
 
-Add reports, notifications, improved operational workflows, and
-polishing.
+Add reports, notifications, the owner's Gmail-based email connection,
+and polishing.
 
 ## Sprint 4 — Advanced / Production Readiness
 

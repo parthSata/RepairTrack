@@ -162,6 +162,7 @@ Dashboard should provide:
 - Profile
 - Shop Settings
 - Staff Management
+- Email & Notifications (Gmail connection)
 
 ---
 
