@@ -82,6 +82,15 @@ Google OAuth should be available where appropriate.
 
 ---
 
+## Staff Invitation (Sprint 1)
+
+- Public "Accept Invitation" screen (`/invite/[token]`) — shows the
+  inviting shop's name, invited role, and a form to set a password or
+  continue with Google OAuth. Same visual language as Login/Register,
+  not a separate design system.
+
+---
+
 ## Dashboard
 
 - Dashboard
@@ -154,6 +163,7 @@ Dashboard should provide:
 ## Reports
 
 - Reports Dashboard
+- Technician Performance (Owner-only view)
 
 ---
 
@@ -161,8 +171,13 @@ Dashboard should provide:
 
 - Profile
 - Shop Settings
-- Staff Management
-- Email & Notifications (Gmail connection)
+- Staff Management — list (name, role, status: Active/Invited/Inactive),
+  Add Staff form (name, email, role picker), copyable invite link,
+  deactivate/reactivate, role change
+- Email & Notifications — Gmail connection status (Not Connected /
+  Connected as `owner@email.com`), Connect/Disconnect actions, email
+  template preview, "Send Test Email" (Sprint 3; OWNER-only screen —
+  do not show Connect/Disconnect to STAFF or TECHNICIAN)
 
 ---
 
@@ -194,6 +209,8 @@ Examples of screens that must NOT be invented:
 - HR
 - Payroll
 - Subscription Management
+- A granular per-checkbox permission editor for Owner use in Sprint 1
+  (that belongs to Sprint 4 — see `progress-tracker.md`)
 
 unless explicitly added to the product requirements.
 
@@ -215,7 +232,8 @@ Primary navigation should be focused on:
 - Reports
 
 Notifications and Settings can use appropriate secondary
-navigation or header controls.
+navigation or header controls. Staff Management and Email &
+Notifications live inside Settings, not as top-level nav items.
 
 Do not add navigation items for non-existent features.
 
@@ -232,7 +250,8 @@ The application must work across:
 
 Do not simply shrink the desktop UI.
 
-Important tables should have an appropriate mobile representation.
+Important tables should have an appropriate mobile representation
+(this includes the Staff Management list).
 
 Every screen must work down to 375px wide.
 
@@ -261,14 +280,17 @@ Examples:
 - Empty State
 
 Before creating a new component, check whether an existing component
-can be reused.
+can be reused. The Staff status indicator (Active/Invited/Inactive)
+and the Gmail connection status indicator should both reuse the
+existing Badge component — do not invent a second badge style for
+either.
 
 Primitives come from shadcn/ui in `src/components/ui`. Do not hand-write
 a Button, Input, Dialog, or Table — compose from the existing set and
 extend before forking.
 
-List views (repairs, customers, inventory, invoices) use TableCraft.
-Do not hand-roll pagination, sorting, or filtering.
+List views (repairs, customers, inventory, invoices, staff) use
+TableCraft. Do not hand-roll pagination, sorting, or filtering.
 
 Forms use react-hook-form with the feature's Zod schema via
 `zodResolver`, and show field-level errors.

@@ -34,3 +34,4 @@ coverage/
 # IDE — .vscode/settings.json is tracked on purpose (AI instruction settings)
 .idea/
 !.vscode/settings.json
+context/progress-tracker.md

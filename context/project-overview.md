@@ -61,6 +61,7 @@ Responsible for:
 - Managing inventory
 - Managing invoices
 - Viewing reports
+- Connecting the shop's own Gmail account for customer email sending
 
 ### Staff
 
@@ -112,7 +113,7 @@ RepairTrack consists of the following approved modules:
 8. Payment Management
 9. Notifications
 10. Reports
-11. Settings
+11. Settings (Shop Profile, Staff Management, Email & Notifications)
 12. Customer Repair Tracking
 
 ---
@@ -197,9 +198,20 @@ sign in; they use the public tracking page only.
 | Manage inventory | yes | yes | no |
 | View reports | yes | yes | no |
 | Manage staff, shop settings | yes | no | no |
+| Connect/disconnect shop Gmail | yes | no | no |
+| Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no 
 
 Every mutating endpoint must check this table server-side. If an
 action is not listed, ask before implementing a permission for it.
+
+This table (not the illustrative `permissionKey.action` list in any
+planning doc) is the single source of truth for authorization checks.
+The underlying implementation should express permissions as discrete
+keys (e.g. `customers.view`, `staff.create`, `settings.update`) mapped
+per role, rather than hard-coded `if (role === 'OWNER')` checks
+scattered through the codebase — this makes Sprint 4's move to
+granular, owner-configurable permissions an additive change rather
+than a rewrite.
 
 ---
 
@@ -221,7 +233,7 @@ Authentication is handled through Better Auth.
 - Public registration creates **a new shop**, and the registering user
   becomes its `OWNER`. This is the only way a shop comes into existence.
 - `STAFF` and `TECHNICIAN` accounts are **invited by the owner** from
-  Settings → Staff. They never self-register into an existing shop.
+  Settings → Staff Management. They never self-register into an existing shop.
 - A user belongs to exactly one shop. Multi-location and multi-shop
   membership are deferred (§9) — do not model a join table for them now.
 - Every signed-in user therefore always has exactly one `shop_id`,
@@ -229,6 +241,56 @@ Authentication is handled through Better Auth.
   every query by.
 
 ---
+
+### Google OAuth Login vs. Gmail Sending (important distinction)
+ 
+"Continue with Google" (Better Auth login) and the Owner's Gmail
+sending connection (§ Owner Gmail Connection, below) are two separate
+authorization grants, even when the same Google account is used for
+both:
+ 
+- **Google OAuth Login** = "use Google to sign in to RepairTrack."
+  Configured through Better Auth. Every role can use it.
+- **Gmail API OAuth** = "allow RepairTrack to send email through my
+  Gmail." A separate, narrower consent (`gmail.send` scope only),
+  requested only from Settings, only by the OWNER.
+Do not conflate the two flows or reuse one token for the other purpose.
+ 
+---
+
+## Staff Management (Sprint 1)
+ 
+The Owner manages the shop's internal team from Settings → Staff
+Management.
+ 
+- Owner invites a new team member by name, email, and role
+  (`STAFF` or `TECHNICIAN`).
+- **Sprint 1 invitation delivery:** RepairTrack has no way to send
+  email yet in Sprint 1 (Gmail connects in Sprint 3 — see below), so
+  invitations are delivered as a **copyable invite link** that the
+  Owner shares manually (e.g. WhatsApp, SMS, in person). The link
+  contains a single-use, expiring invitation token.
+- Once Sprint 3's Owner Gmail Connection is live, an invited-but-not-yet-
+  connected Owner still gets the link flow; a connected Owner instead
+  gets both the link and an automatic invitation email sent from their
+  own Gmail address. The link never stops working — the email is an
+  enhancement, not a replacement.
+- Accepting an invitation lets the invitee set a password (or use
+  Google OAuth) and creates their account with the invited role,
+  scoped to the inviting Owner's shop. Invited accounts cannot self-
+  select a role or shop.
+- The Owner can view all staff with their role and status
+  (`Active` / `Invited` / `Inactive`), deactivate or reactivate a
+  staff member, and change a `STAFF` ↔ `TECHNICIAN` role assignment.
+- Deactivated staff cannot sign in but their historical repair/invoice
+  records are preserved (never hard-delete a staff account with
+  existing repair history).
+- Fine-grained, owner-configurable permission toggles (beyond the
+  fixed role table in §6b) are explicitly out of scope for Sprint 1 —
+  see §9 and Sprint 4 in `progress-tracker.md`.
+
+---
+
 
 ## Dashboard
 
@@ -386,34 +448,36 @@ Bulk/marketing email and automated drip campaigns remain out of scope
 
 ---
 
-## Owner Email Connection
-
-The shop owner can connect their own Gmail account so repair
-notifications are sent from their real email address, not a shared
-RepairTrack address.
-
-- Settings → Email & Notifications → Connect Gmail
-- Google OAuth consent, scoped to sending mail only
-- This is a **separate OAuth grant from Google login** — connecting
-  Gmail does not require the owner to have logged in via Google, and
-  logging in via Google does not automatically grant send access
-- Owner sees connection status (Connected / Not Connected) and can
-  disconnect at any time
-- If disconnected, notification-triggered emails simply do not send
-  (no fallback shared sender)
-- Staff/Technicians never see or handle the owner's Gmail credentials —
-  they can trigger a send action, RepairTrack executes it through the
-  owner's stored authorization
-
-Events that trigger an email (once connected):
-
-- Repair approval required
-- Repair approved
-- Repair ready for pickup
-- Repair delayed (optional)
-- Staff/Technician invitation (see Staff Management)
-
-Do not add an email for every minor field change.
+## Owner Gmail Connection (Sprint 3)
+ 
+Each shop's Owner may connect their own Gmail account so that customer
+emails are sent from the shop's real identity, not a shared RepairTrack
+address.
+ 
+- Settings → Email & Notifications shows connection status
+  (`Not Connected` / `Connected: <email>`) with Connect/Disconnect
+  actions.
+- Connecting opens a Google OAuth consent screen scoped to
+  `gmail.send` only (see "Google OAuth Login vs. Gmail Sending" above).
+  RepairTrack never requests full mailbox read access.
+- Each shop's Gmail connection is independent — Shop A's owner
+  connects `ownerA@gmail.com`, Shop B's owner connects
+  `ownerB@gmail.com`. There is no shared/global sending account.
+- `STAFF` can trigger a send action (e.g. "Send Ready for Pickup
+  Email") but never sees or handles the Owner's Gmail credentials or
+  tokens — the request is proxied through RepairTrack's server using
+  the stored, encrypted OAuth token for that shop.
+- If a shop's Owner has not connected Gmail, customer-facing email
+  sending is simply unavailable for that shop; in-app notifications
+  and the Sprint 1 invite-link flow are unaffected.
+- Approved trigger events: repair needs approval, repair approved,
+  ready for pickup, repair delayed. Repair received is optional. Do
+  not add a new trigger event without approval — avoid emailing
+  customers on every minor field change.
+- Reusable, editable email templates: Repair Received, Repair Approval
+  Required, Repair Approved, Repair Delayed, Ready for Pickup, Payment
+  Receipt. The Owner can preview a template and send a test email to
+  themselves before it goes live.
 
 ---
 
@@ -455,6 +519,7 @@ Settings may include:
 - User profile
 - Shop information
 - Staff management (see "Staff Management" below)
+- Email & Notifications / Owner Gmail Connection (see above, Sprint 3)
 - Application preferences
 
 ---
@@ -502,6 +567,9 @@ The following are NOT part of the current product scope:
 - Customer community
 - Unrelated AI features
 - Unapproved integrations
+- A shared/global RepairTrack-operated Gmail sending account — see
+  "Owner Gmail Connection" above; every shop must use its own Owner's
+  connected Gmail
 
 Do not create UI, routes, APIs, database tables, or components for
 these features.
@@ -524,7 +592,10 @@ The following may be considered in future development:
 - Advanced role permissions
 - AI-assisted repair insights
 
-These are NOT MVP requirements.
+These are NOT MVP requirements. Note that the base Gmail sending
+capability itself is no longer "future" — it is approved and scheduled
+for Sprint 3 as described above; only *additional* automated
+communication beyond the fixed event list stays deferred.
 
 Do not implement them unless explicitly requested.
 
@@ -568,9 +639,10 @@ RepairTrack will be developed in four major sprints.
 
 ## Sprint 1 — MVP
 
-Focus on the minimum usable repair-management product, including
-authentication and Staff Management (owner can build their team before
-repair operations depend on technician assignment).
+Focus on the minimum usable repair-management product, **including**
+the Owner → Staff/Technician invitation and permission foundation
+(role-based, link-based invites) so that technician assignment and
+role checks exist from day one rather than being retrofitted later.
 
 ## Sprint 2 — Core Operations
 
@@ -578,13 +650,16 @@ Expand repair, customer, device, inventory, and billing workflows.
 
 ## Sprint 3 — Business Intelligence
 
-Add reports, notifications, the owner's Gmail-based email connection,
-and polishing.
+Add reports, in-app + email notifications (via each shop's own
+connected Gmail account), improved operational workflows, and
+polishing.
+ 
 
 ## Sprint 4 — Advanced / Production Readiness
 
-Improve security, performance, permissions, auditability,
-accessibility, testing, and commercial readiness.
+Improve security, performance, granular/advanced permissions,
+auditability (Activity/Audit Logs), accessibility, testing, and
+commercial readiness.
 
 The exact task status must always be tracked in:
 

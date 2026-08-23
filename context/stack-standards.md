@@ -36,7 +36,9 @@ This file does not repeat either; it only covers per-library idioms.
 - Fetch independent data in parallel with `Promise.all`. Sequential
   `await`s are the most common App Router performance mistake.
 - Mark server-only modules with the `server-only` package so an
-  accidental client import fails at build time, not at runtime.
+  accidental client import fails at build time, not at runtime. This
+  matters especially for `src/server/email/*` (Sprint 3) — a Gmail
+  OAuth client must never end up in a client bundle.
 - **Do not use Server Actions.** All mutations go through the Hono API
   (`architecture-context.md` §7) so there is one validated, role-checked
   entry point. A `features/<x>/actions.ts` file should not exist.
@@ -68,6 +70,11 @@ This file does not repeat either; it only covers per-library idioms.
   body; handlers just throw.
 - We call the API with Axios, so do **not** add the `hc` RPC client — one
   client, per `architecture-context.md` §1.
+- The Gmail OAuth callback route (`/api/settings/gmail/callback`,
+  §14 in `architecture-context.md`) is still a normal Hono handler:
+  validate the `state`/`code` query params with Zod, verify `state`
+  matches the session before exchanging the code, then hand off to
+  `gmail.service.ts`. Don't do the token exchange inline in the route.
 
 ---
 
@@ -84,14 +91,20 @@ This file does not repeat either; it only covers per-library idioms.
   ```
   Never loop a query inside `.map()`.
 - Select only the columns you need. Avoid `select()` with no argument on
-  wide tables or list endpoints.
+  wide tables or list endpoints — this matters in particular for
+  `gmail_connections`: never `select()` the whole row into a response;
+  explicitly omit `refresh_token` from anything returned to the client.
 - Wrap multi-write operations in `db.transaction()` — creating a repair
   plus its first status-history row is one transaction, not two writes.
+  Accepting a staff invitation (create user + mark invitation accepted)
+  is likewise one transaction.
 - Use `.returning()` instead of a follow-up `SELECT` after insert/update.
 - Migrations: `db:generate` then `db:migrate`. Never `push` outside a
   local throwaway database.
 - Row types come from `$inferSelect` / `$inferInsert`.
-- Name indexes explicitly (`repairs_shop_id_status_idx`).
+- Name indexes explicitly (`repairs_shop_id_status_idx`,
+  `staff_invitations_token_idx` (unique), `gmail_connections_shop_id_idx`
+  (unique)).
 
 ---
 
@@ -106,7 +119,10 @@ This file does not repeat either; it only covers per-library idioms.
   correct.
 - Query-string numbers and booleans need `z.coerce.number()` /
   `z.coerce.boolean()`.
-- Validate `process.env` once at startup into a typed config object.
+- Validate `process.env` once at startup into a typed config object —
+  this now includes the Gmail OAuth client id/secret/redirect URI
+  (Sprint 3), which must be distinct env vars from Better Auth's Google
+  OAuth client id/secret (see `architecture-context.md` §5 note).
 
 ---
 
@@ -120,6 +136,8 @@ This file does not repeat either; it only covers per-library idioms.
     detail: (id: string) => [...repairKeys.all, 'detail', id] as const,
   }
   ```
+  Apply the same pattern to `staffKeys` (Sprint 1) and a single
+  `gmailConnectionKey` (Sprint 3, no filters needed — one row per shop).
 - Share config with `queryOptions()` so a query can be reused and
   prefetched with the same types.
 - Set a deliberate `staleTime` (default 60s for lists). `staleTime`
@@ -147,7 +165,9 @@ This file does not repeat either; it only covers per-library idioms.
   output stays referentially stable.
 - Actions live in the store next to the state they change.
 - Split into slices only once a store genuinely outgrows one concern.
-- No server data in Zustand (`code-standards.md` §8).
+- No server data in Zustand (`code-standards.md` §8). This applies to
+  the Gmail connection status too — it's server state, fetch it with
+  TanStack Query, don't cache it in a store.
 
 ---
 
@@ -163,24 +183,10 @@ This file does not repeat either; it only covers per-library idioms.
 - Rate-limit the auth endpoints.
 - `role` and `shopId` come from the server session on every request, never
   from the request body.
-
----
-
-# 8b. Gmail API (Owner-connected send)
-
-- Use `googleapis` (or `google-auth-library` + a minimal raw call) —
-  do not add Nodemailer or React Email (still excluded,
-  `architecture-context.md` §2).
-- This is a second, separate OAuth client registration from Better
-  Auth's Google login client — different scopes
-  (`gmail.send`), different consent screen entry, do not reuse the
-  Better Auth Google credentials.
-- Store only the refresh token (encrypted) — never the access token
-  long-term; exchange for a fresh access token per send.
-- Build email bodies as plain template strings/functions in
-  `email.service.ts` — no templating library, no MJML, no React Email.
-- Every send call goes through `src/server/gmail/`, never called
-  directly from a route handler or component.
+- **Do not extend Better Auth's own Google OAuth config to request
+  `gmail.send`.** Login OAuth and Gmail-sending OAuth are separate
+  client registrations in Google Cloud Console and separate code paths
+  — see §14 (Gmail API) below and `architecture-context.md` §5.
 
 ---
 
@@ -264,6 +270,34 @@ Conventional commits, one logical change each:
 feat(repairs): add status filter to repair list
 fix(auth): reject session with missing shopId
 chore(db): add index on repairs.status
+feat(staff): add invitation accept flow
+feat(notifications): send ready-for-pickup email via owner gmail
 ```
 
 Do not commit commented-out code, debug logging, or `.env` files.
+
+---
+
+# 14. Gmail API (Owner Email Sending — Sprint 3)
+
+- Libraries: `googleapis` (the Gmail client) + `google-auth-library`
+  (`OAuth2Client` for the authorization-code exchange and refresh).
+  These are the only approved email-related packages — see the
+  exclusion list in `architecture-context.md` §2.
+- Request the narrowest scope: `https://www.googleapis.com/auth/gmail.send`
+  only. Never `gmail.modify` or `gmail.readonly`.
+- OAuth2Client setup uses its own client id/secret/redirect URI (env
+  vars distinct from Better Auth's), per §8 above.
+- Store only the refresh token (encrypted) in `gmail_connections`; mint
+  a short-lived access token per send via
+  `oauth2Client.refreshAccessToken()` rather than persisting access
+  tokens.
+- Compose the outgoing message as a raw base64url-encoded MIME message
+  and send with `gmail.users.messages.send({ userId: 'me', requestBody: { raw } })`.
+- If a send fails because the refresh token was revoked (Google returns
+  `invalid_grant`), mark that shop's `gmail_connections` row as
+  disconnected and surface "reconnect Gmail" in Settings — don't retry
+  silently in a loop.
+- Never log the refresh token, access token, or raw message body long-
+  term (`code-standards.md` §17 already forbids logging OAuth secrets;
+  this is the concrete case it applies to).
