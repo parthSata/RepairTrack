@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
-import { Bell, Boxes, CircleDollarSign, LayoutDashboard, Settings, Smartphone, Users, Wrench } from 'lucide-react'
+import { Bell, Boxes, CircleDollarSign, LayoutDashboard, Settings, Smartphone, UserPlus, Users, Wrench } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/server/auth'
@@ -28,7 +28,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <Link className={navClass} href="/repairs"><Wrench className="h-4 w-4" />Repairs</Link>
           <Link className={navClass} href="/customers"><Users className="h-4 w-4" />Customers</Link>
           <Link className={navClass} href="/devices"><Smartphone className="h-4 w-4" />Devices</Link>
-          {!restricted && <><Link className={navClass} href="/inventory"><Boxes className="h-4 w-4" />Inventory</Link><Link className={navClass} href="/invoices"><CircleDollarSign className="h-4 w-4" />Invoices</Link>{owner && <Link className={navClass} href="/settings/shop"><Settings className="h-4 w-4" />Settings</Link>}</>}
+          {!restricted && <><Link className={navClass} href="/inventory"><Boxes className="h-4 w-4" />Inventory</Link><Link className={navClass} href="/invoices"><CircleDollarSign className="h-4 w-4" />Invoices</Link>{owner && <><Link className={navClass} href="/settings/staff"><UserPlus className="h-4 w-4" />Staff</Link><Link className={navClass} href="/settings/shop"><Settings className="h-4 w-4" />Settings</Link></>}</>}
         </nav>
         <div className="mx-4 mt-4 rounded-lg border border-border bg-muted p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">Workspace</p>

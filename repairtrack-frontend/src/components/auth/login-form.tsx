@@ -24,7 +24,7 @@ export function LoginForm() {
     setFormError(null)
     const result = await authClient.signIn.email({ ...values, callbackURL: '/dashboard' })
     if (result.error) {
-      setFormError('Those credentials do not match an account.')
+      setFormError(result.error.message || 'Those credentials do not match an account.')
       return
     }
     router.push('/dashboard')
