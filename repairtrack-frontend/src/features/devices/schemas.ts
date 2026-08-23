@@ -19,8 +19,11 @@ export const deviceSchema = z.object({
   model: z
     .string()
     .trim()
-    .min(2, { message: 'Model name must be at least 2 characters' })
-    .max(100, { message: 'Model name cannot exceed 100 characters' }),
+    .max(100, { message: 'Model name cannot exceed 100 characters' })
+    .optional()
+    .nullable(),
+  markUnverified: z.boolean().optional(),
+  modelVerificationOverrideReason: z.string().trim().min(1, { message: 'Override reason is required' }).optional().nullable(),
   serialNumber: z
     .string()
     .trim()
