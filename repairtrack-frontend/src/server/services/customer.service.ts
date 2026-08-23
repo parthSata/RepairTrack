@@ -51,13 +51,11 @@ export async function listCustomers({
       notes: customers.notes,
       createdAt: customers.createdAt,
       updatedAt: customers.updatedAt,
-      totalRepairs: count(repairs.id),
-      lastVisit: sql<string | null>`max(${repairs.createdAt})`,
+      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = ${customers.id})`,
+      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = ${customers.id})`,
     })
     .from(customers)
-    .leftJoin(repairs, eq(repairs.customerId, customers.id))
     .where(whereClause)
-    .groupBy(customers.id)
     .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
     .limit(limit)
     .offset(offset)
@@ -83,13 +81,11 @@ export async function getCustomerById({ shopId, id }: { shopId: string; id: stri
       notes: customers.notes,
       createdAt: customers.createdAt,
       updatedAt: customers.updatedAt,
-      totalRepairs: count(repairs.id),
-      lastVisit: sql<string | null>`max(${repairs.createdAt})`,
+      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = ${customers.id})`,
+      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = ${customers.id})`,
     })
     .from(customers)
-    .leftJoin(repairs, eq(repairs.customerId, customers.id))
     .where(and(eq(customers.id, id), eq(customers.shopId, shopId)))
-    .groupBy(customers.id)
 
   const customer = result[0]
   if (!customer) throw new HTTPException(404, { message: 'Customer not found' })

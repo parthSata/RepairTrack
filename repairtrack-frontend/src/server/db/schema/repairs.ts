@@ -1,4 +1,4 @@
-import { index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 import { shops } from './users'
 import { customers } from './customers'
 
@@ -15,6 +15,20 @@ export const repairStatusEnum = pgEnum('repair_status', [
   'CANCELLED',
 ])
 
+export const deviceTypeEnum = pgEnum('device_type', [
+  'PHONE',
+  'LAPTOP',
+  'TABLET',
+  'DESKTOP',
+  'OTHER',
+])
+
+export const deviceConditionEnum = pgEnum('device_condition', [
+  'GOOD',
+  'FAIR',
+  'POOR',
+])
+
 export const devices = pgTable(
   'devices',
   {
@@ -26,8 +40,14 @@ export const devices = pgTable(
       .notNull()
       .references(() => customers.id, { onDelete: 'cascade' }),
     brand: text('brand').notNull(),
-    model: text('model').notNull(),
+    model: text('model'),
     serialNumber: text('serial_number'),
+    deviceType: deviceTypeEnum('device_type').default('PHONE').notNull(),
+    condition: deviceConditionEnum('condition').default('GOOD').notNull(),
+    accessories: text('accessories'),
+    modelVerified: boolean('model_verified').default(true).notNull(),
+    modelVerificationOverridden: boolean('model_verification_overridden').default(false).notNull(),
+    modelVerificationNote: text('model_verification_note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

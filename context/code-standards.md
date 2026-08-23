@@ -228,7 +228,10 @@ Reusable business operations belong in the appropriate service module.
 
 Authentication must use Better Auth.
 
-Google OAuth is the approved social authentication provider.
+Google OAuth is the approved social authentication provider for login.
+Gmail-send authorization (Owner Email Connection) is a distinct OAuth
+grant with its own scopes — see `architecture-context.md` §15. Do not
+treat a login session as authorization to send email, and vice versa.
 
 Do not implement a second authentication system.
 
