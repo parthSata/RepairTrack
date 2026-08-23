@@ -117,17 +117,32 @@ export function DeviceForm({
         {/* Model */}
         <div className="space-y-1">
           <label htmlFor="model" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Model <span className="text-destructive">*</span>
+            Model <span className="text-xs font-normal text-muted-foreground">(Optional at intake)</span>
           </label>
           <Input
             id="model"
-            placeholder="e.g. iPhone 14 Pro, XPS 15"
+            placeholder="e.g. iPhone 14 Pro, XPS 15 (leave empty if unconfirmed)"
             {...register('model')}
             disabled={isPending}
           />
           {errors.model && (
             <p className="text-xs font-medium text-destructive">{errors.model.message}</p>
           )}
+
+          {watch('model')?.trim() ? (
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="markUnverified"
+                {...register('markUnverified')}
+                disabled={isPending}
+                className="h-3.5 w-3.5 rounded border-input bg-background text-accent focus:ring-accent"
+              />
+              <label htmlFor="markUnverified" className="text-xs text-muted-foreground cursor-pointer select-none">
+                Low confidence — mark as unverified
+              </label>
+            </div>
+          ) : null}
         </div>
       </div>
 

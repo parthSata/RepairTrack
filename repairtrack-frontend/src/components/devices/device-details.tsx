@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { ConditionBadge, DeviceTypeIcon } from './device-table'
+import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from './device-table'
 import { DeviceForm } from './device-form'
 import { DeviceRepairHistory } from './device-repair-history'
 
@@ -74,15 +74,24 @@ export function DeviceDetails({ id }: DeviceDetailsProps) {
               <DeviceTypeIcon type={device.deviceType} />
             </div>
             <div className="space-y-1">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-foreground">
-                  {device.brand} {device.model}
+                  {device.brand} {device.model || <span className="text-muted-foreground italic font-normal text-lg">Unconfirmed</span>}
                 </h1>
+                <ModelVerificationBadge
+                  modelVerified={device.modelVerified}
+                  modelVerificationOverridden={device.modelVerificationOverridden}
+                />
                 <ConditionBadge condition={device.condition} />
               </div>
               <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
                 {device.deviceType}
               </p>
+              {device.modelVerificationOverridden && device.modelVerificationNote && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md mt-1">
+                  <strong>Override Note:</strong> {device.modelVerificationNote}
+                </p>
+              )}
             </div>
           </div>
         </div>

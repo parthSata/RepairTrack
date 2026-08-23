@@ -14,11 +14,14 @@ export interface Device {
   shopId: string
   customerId: string
   brand: string
-  model: string
+  model: string | null
   serialNumber: string | null
   deviceType: DeviceType
   condition: DeviceCondition
   accessories: string | null
+  modelVerified: boolean
+  modelVerificationOverridden: boolean
+  modelVerificationNote: string | null
   createdAt: string
   updatedAt: string
   customer?: LinkedCustomer

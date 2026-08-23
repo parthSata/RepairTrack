@@ -69,6 +69,9 @@ export async function listDevices({
       deviceType: devices.deviceType,
       condition: devices.condition,
       accessories: devices.accessories,
+      modelVerified: devices.modelVerified,
+      modelVerificationOverridden: devices.modelVerificationOverridden,
+      modelVerificationNote: devices.modelVerificationNote,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,
       customer: {
@@ -107,6 +110,9 @@ export async function getDeviceById({ shopId, id }: { shopId: string; id: string
       deviceType: devices.deviceType,
       condition: devices.condition,
       accessories: devices.accessories,
+      modelVerified: devices.modelVerified,
+      modelVerificationOverridden: devices.modelVerificationOverridden,
+      modelVerificationNote: devices.modelVerificationNote,
       createdAt: devices.createdAt,
       updatedAt: devices.updatedAt,
       customer: {
@@ -146,6 +152,11 @@ export async function createDevice({
     })
   }
 
+  const modelVal = data.model?.trim() || null
+  const isModelProvided = Boolean(modelVal)
+  const markUnverified = Boolean(data.markUnverified)
+  const modelVerified = isModelProvided && !markUnverified
+
   const id = crypto.randomUUID()
   const [created] = await db
     .insert(devices)
@@ -154,11 +165,14 @@ export async function createDevice({
       shopId,
       customerId: data.customerId,
       brand: data.brand,
-      model: data.model,
+      model: modelVal,
       serialNumber: data.serialNumber ?? null,
       deviceType: data.deviceType,
       condition: data.condition,
       accessories: data.accessories ?? null,
+      modelVerified,
+      modelVerificationOverridden: false,
+      modelVerificationNote: null,
     })
     .returning()
 
@@ -196,16 +210,38 @@ export async function updateDevice({
     })
   }
 
+  const isOverride = Boolean(data.modelVerificationOverrideReason)
+  const modelVal = data.model !== undefined ? (data.model?.trim() || null) : existing.model
+
+  let modelVerified = existing.modelVerified
+  let modelVerificationOverridden = existing.modelVerificationOverridden
+  let modelVerificationNote = existing.modelVerificationNote
+
+  if (isOverride) {
+    modelVerified = true
+    modelVerificationOverridden = true
+    modelVerificationNote = data.modelVerificationOverrideReason!.trim()
+  } else {
+    const isModelProvided = Boolean(modelVal)
+    const markUnverified = Boolean(data.markUnverified)
+    modelVerified = isModelProvided && !markUnverified
+    modelVerificationOverridden = false
+    modelVerificationNote = null
+  }
+
   const [updated] = await db
     .update(devices)
     .set({
       customerId: data.customerId,
       brand: data.brand,
-      model: data.model,
+      model: modelVal,
       serialNumber: data.serialNumber ?? null,
       deviceType: data.deviceType,
       condition: data.condition,
       accessories: data.accessories ?? null,
+      modelVerified,
+      modelVerificationOverridden,
+      modelVerificationNote,
       updatedAt: new Date(),
     })
     .where(and(eq(devices.id, id), eq(devices.shopId, shopId)))
