@@ -166,6 +166,24 @@ This file does not repeat either; it only covers per-library idioms.
 
 ---
 
+# 8b. Gmail API (Owner-connected send)
+
+- Use `googleapis` (or `google-auth-library` + a minimal raw call) —
+  do not add Nodemailer or React Email (still excluded,
+  `architecture-context.md` §2).
+- This is a second, separate OAuth client registration from Better
+  Auth's Google login client — different scopes
+  (`gmail.send`), different consent screen entry, do not reuse the
+  Better Auth Google credentials.
+- Store only the refresh token (encrypted) — never the access token
+  long-term; exchange for a fresh access token per send.
+- Build email bodies as plain template strings/functions in
+  `email.service.ts` — no templating library, no MJML, no React Email.
+- Every send call goes through `src/server/gmail/`, never called
+  directly from a route handler or component.
+
+---
+
 # 9. Tailwind & shadcn/ui
 
 - Merge classes with a `cn()` helper (`clsx` + `tailwind-merge`) so

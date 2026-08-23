@@ -96,6 +96,11 @@ Better Auth manages authentication and sessions.
 
 Do not introduce another authentication framework.
 
+Google OAuth here is for **login only** (Better Auth). Sending email
+through a connected Gmail account is a **separate OAuth grant** with
+different scopes — see §15 below. Do not conflate the two; do not reuse
+the login OAuth token for sending mail.
+
 ---
 
 ## Data Fetching
@@ -186,7 +191,6 @@ Do NOT introduce:
 - Prisma
 - Nodemailer
 - React Email
-- Gmail API
 - Firebase Authentication
 - Firebase Storage
 - tRPC
@@ -196,6 +200,9 @@ Do NOT introduce:
 
 Introducing a new framework, ORM, state library, or any new
 dependency requires asking first.
+
+(Gmail API is no longer on this list — it is now an approved, scoped
+integration for owner-authorized transactional sending. See §15.)
 
 ---
 
@@ -242,9 +249,13 @@ src/api/routes/     Hono route handlers (thin: validate → service → return)
 src/api/middleware/ auth, error handler
 src/server/db/      Drizzle schema + migrations (the only place Drizzle/SQL is written)
 src/server/services/ business logic (the only place that talks to the db)
+src/server/services/email.service.ts   builds + triggers transactional emails
+src/server/gmail/   Gmail OAuth client + send wrapper (the only place that calls the Gmail API)
 src/server/auth/    Better Auth config
 src/server/storage/ R2 client
 src/features/<x>/   schemas.ts (Zod), queries.ts, mutations.ts, types.ts
+src/features/staff/        schemas.ts, queries.ts, mutations.ts — invites
+src/features/settings/email/  schemas.ts, queries.ts, mutations.ts — Gmail connect/disconnect
 src/components/ui/  shadcn primitives — do not hand-write a Button/Input/Dialog
 src/components/<x>/ feature components
 src/stores/         Zustand — UI state only
@@ -289,6 +300,20 @@ Protect route groups in middleware **and** re-check the role in the API
 handler. Both layers.
 
 Do not hand-roll JWTs. Do not store sessions in localStorage.
+
+Staff/Technician invites are a separate mechanism from Better Auth
+self-registration:
+
+Owner creates invite (email, role) → invitation row created with a
+crypto-secure token + expiry → invite link shared (Sprint 1: manual
+copy; Sprint 3: also emailed via Owner Email Connection) → invitee opens
+`/invite/[token]` → completes account creation → user row created with
+`shop_id` = inviting owner's shop, `role` = the invited role → invitation
+marked accepted.
+
+An invitation token is single-use and expires (e.g. 7 days). Do not
+reuse Better Auth's registration flow for this — it must not be able to
+create a new shop.
 
 ---
 
@@ -354,6 +379,9 @@ Core entities may include:
 
 - users
 - shops
+- staff_invitations   (token, email, role, shop_id, status, expires_at)
+- shop_email_connections   (shop_id, connected_email, encrypted refresh
+  token, scopes, connected_at)
 - customers
 - devices
 - repairs
@@ -371,6 +399,10 @@ Conventions:
 - Enums (repair status, payment status, role) as pg enums, matching the
   status list in `project-overview.md` exactly.
 - Money stored as `integer` paise — never float. Format only in the UI.
+
+`shop_email_connections.refresh_token` is stored encrypted at rest
+(app-level encryption, not plaintext), never returned in any API
+response, and never logged (see `code-standards.md` §17).
 
 **Multi-tenant boundary:** every query made on behalf of a signed-in
 user is scoped to that user's `shop_id`.
@@ -515,3 +547,37 @@ Before introducing a major architectural change:
 3. Check existing implementation.
 4. Determine whether the change is actually required.
 5. Ask for approval if it affects the core architecture.
+
+---
+
+# 15. Owner Email / Gmail Integration Architecture
+
+Each shop's owner connects their own Gmail account. There is no shared
+RepairTrack-owned sender account.
+
+```text
+Owner (per shop)
+  ↓
+Google OAuth (send-mail scope, separate grant from login)
+  ↓
+Refresh token stored encrypted, keyed to shop_id
+  ↓
+Repair event (status change, invite, etc.)
+  ↓
+email.service.ts builds the message
+  ↓
+src/server/gmail/ sends via Gmail API using that shop's stored token
+  ↓
+Email delivered from the owner's real address
+```
+
+Rules:
+
+- One Gmail connection per shop, tied to `shop_id` — never global.
+- If a shop has no connection, sends for that shop are simply skipped
+  (log it, don't fail the triggering action).
+- Token refresh failures should surface to the owner in Settings
+  ("Reconnect Gmail") rather than fail silently forever.
+- Do not build a queue/worker for this (see `code-standards.md` §25) —
+  send inline from the service call; a slow/failed send should not block
+  the underlying repair-status update.

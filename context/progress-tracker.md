@@ -2,17 +2,11 @@
 
 # Project Status
 
-Status: IN PROGRESS
+Status: NOT STARTED
 
 Current Sprint: Sprint 1 — MVP
 
-Overall Progress: 15%
-
-Current Task: Shop Profile performance optimization completed (Server-side prefetching, React Query hydration, optimistic updates)
-
-Next: Dashboard data API and repair workflow
-
-Gmail API email service configured with OAuth2 refresh-token support.
+Overall Progress: 0%
 
 ---
 
@@ -25,6 +19,7 @@ Build the minimum usable RepairTrack product.
 The MVP should demonstrate the core repair-shop workflow:
 
 Authentication
+→ Staff/Technician Invite
 → Customer
 → Device
 → Repair Ticket
@@ -50,11 +45,11 @@ Authentication
 
 ## 2. Database Foundation
 
-- [x] Configure PostgreSQL
-- [x] Configure Drizzle ORM
-- [x] Configure migrations
-- [x] Create users schema
-- [x] Create shops schema
+- [ ] Configure PostgreSQL
+- [ ] Configure Drizzle ORM
+- [ ] Configure migrations
+- [ ] Create users schema
+- [ ] Create shops schema
 - [ ] Create customers schema
 - [ ] Create devices schema
 - [ ] Create repairs schema
@@ -63,38 +58,40 @@ Authentication
 
 ## 3. Authentication
 
-- [x] Configure Better Auth
-- [x] Configure Google OAuth
-- [x] Create login screen
-- [x] Create registration flow (creates shop + OWNER)
-- [x] Create protected routes
-- [x] Create logout
-- [x] Verify session handling
+- [ ] Configure Better Auth
+- [ ] Configure Google OAuth
+- [ ] Create login screen
+- [ ] Create registration flow (creates shop + OWNER)
+- [ ] Create protected routes
+- [ ] Create logout
+- [ ] Verify session handling
+
+---
+
+## 3b. Staff Management
+
+- [ ] Create staff_invitations schema
+- [ ] Staff Management screen (list staff/technicians, status)
+- [ ] Add Staff / Add Technician form (name, email, role)
+- [ ] Generate invite token + shareable link
+- [ ] Invite acceptance flow (/invite/[token])
+- [ ] Change staff role (Staff ↔ Technician)
+- [ ] Deactivate / reactivate staff
+- [ ] Remove staff
+- [ ] Shop isolation verified (invited user always joins inviter's shop_id)
 
 ---
 
 ## 4. Application Layout
 
-- [x] Create dashboard layout
-- [x] Create sidebar
-- [x] Create header
-- [x] Create responsive navigation
-- [x] Create page container
-- [x] Create loading states
+- [ ] Create dashboard layout
+- [ ] Create sidebar
+- [ ] Create header
+- [ ] Create responsive navigation
+- [ ] Create page container
+- [ ] Create loading states
 - [ ] Create error states
 - [ ] Create empty states
-
----
-
-## 4b. Shop Management
-
-- [x] Create shop profile
-- [x] Shop name
-- [x] Phone
-- [x] Email
-- [x] Address
-- [x] Logo upload and replacement
-- [x] Business information
 
 ---
 
@@ -112,20 +109,23 @@ Authentication
 
 ## 6. Customer Management
 
-- [x] Customer list
-- [x] Customer search
-- [x] Create customer
-- [x] Customer details
-- [x] Customer repair history
+- [ ] Customer list
+- [ ] Customer search
+- [ ] Create customer
+- [ ] Customer details
+- [ ] Customer repair history
 
 ---
 
 ## 7. Device Management
 
-- [x] Device registration
-- [x] Device details
-- [x] Customer-device relationship
-- [x] Device repair history
+- [ ] Device registration
+- [ ] Device details
+- [ ] Customer-device relationship
+- [ ] Device repair history
+- [ ] Device list grouped by customer (collapsible rows)
+- [ ] Support Unverified model state (model optional at intake, badge
+      shown on Device List/Details)
 
 ---
 
@@ -142,6 +142,8 @@ Authentication
 - [ ] Add diagnosis
 - [ ] Add repair notes
 - [ ] Repair status timeline
+- [ ] Prompt to confirm device model when entering DIAGNOSING (if
+      Unverified) — non-blocking, inline on repair details
 
 ---
 
@@ -158,17 +160,17 @@ Authentication
 
 ## 10. MVP UI / UX
 
-- [x] Apply design system
-- [x] Responsive desktop UI
-- [x] Responsive tablet UI
-- [x] Responsive mobile UI
+- [ ] Apply design system
+- [ ] Responsive desktop UI
+- [ ] Responsive tablet UI
+- [ ] Responsive mobile UI
 - [ ] Loading states
 - [ ] Empty states
 - [ ] Error states
-- [x] Form validation states
+- [ ] Form validation states
 - [ ] Repair status animations
 - [ ] Micro-interactions
-- [x] Reduced-motion support
+- [ ] Reduced-motion support
 
 ---
 
@@ -177,14 +179,15 @@ Authentication
 Sprint 1 is complete when a shop user can:
 
 1. Sign in
-2. Access the dashboard
-3. Create a customer
-4. Register a device
-5. Create a repair ticket
-6. Update repair status
-7. View repair details
-8. View customer repair history
-9. Provide a customer-facing tracking experience
+2. Invite a Staff/Technician and have them accept and log in
+3. Access the dashboard
+4. Create a customer
+5. Register a device
+6. Create a repair ticket
+7. Update repair status
+8. View repair details
+9. View customer repair history
+10. Provide a customer-facing tracking experience
 
 The MVP should be usable from start to finish without requiring
 future sprint functionality.
@@ -240,6 +243,20 @@ Status: NOT STARTED
 - [ ] Ready-for-pickup notification
 - [ ] Pending approval notification
 - [ ] Low-stock notification
+
+## Owner Email Connection
+
+- [ ] Gmail OAuth client setup (send scope, separate from login client)
+- [ ] shop_email_connections schema (encrypted refresh token)
+- [ ] Connect Gmail UI (Settings → Email & Notifications)
+- [ ] Disconnect Gmail UI
+- [ ] email.service.ts — event-triggered send logic
+- [ ] Email templates: Repair Received, Approval Required, Approved,
+      Delayed, Ready for Pickup, Staff Invitation
+- [ ] Send Test Email action
+- [ ] Reconnect-on-failure UI state
+- [ ] Staff invitation flow upgraded to also send real email (Sprint 1
+      link-only fallback stays as backup if disconnected)
 
 ## Reports
 
@@ -306,7 +323,7 @@ explicit approval.
 The following are intentionally deferred:
 
 - Warranty management
-- Email sending infrastructure
+- Bulk/marketing email automation
 - Activity / Audit Logs
 - Advanced analytics
 - Multi-location support
@@ -323,31 +340,19 @@ None currently.
 
 ---
 
-# Current Task: Device Management feature UI and backend implemented (Device CRUD, customer picker, TableCraft list, repair history, popup dialog modal, role protection)
+# Current Task
 
-Next: Repair ticket creation workflow and repair management.
+No task currently assigned.
 
+---
+
+# Next Recommended Task
+
+Initialize the project foundation.
 
 ---
 
 # Change Log
-
-## Device Management Feature
-
-- Added `device_type` and `device_condition` enums, `accessories` column to `devices` table with Drizzle migration `0006_chemical_bucky.sql`.
-- Built Zod schema `deviceSchema` and `deviceFilterSchema` in `src/features/devices/schemas.ts`.
-- Created TanStack Query hooks `useDevices`, `useDevice`, `useDeviceRepairHistory`, `useCustomerSearch`, and key factory `deviceKeys`.
-- Created mutations `useCreateDevice`, `useUpdateDevice`, `useDeleteDevice` with Query cache invalidation for device list, details, and linked customer.
-- Built Drizzle service `src/server/services/device.service.ts` with tenant scoping and customer ownership validation.
-- Created Hono router `src/server/hono/routes/devices.ts` with `OWNER` / `STAFF` permission enforcement (`TECHNICIAN` blocked with 403 Forbidden).
-- Implemented `CustomerPicker` combobox, `DeviceForm`, `DeviceTable` with TableCraft & centered Dialog popup modals with backdrop blur background, and `DeviceRepairHistory`.
-- Added App Router pages `/devices` and `/devices/[id]`.
-
-## Database Foundation Fix
-
-- Made `users.shop_id` required in the Drizzle schema and generated migration `0004_reflective_whizzer`.
-- Updated Better Auth user creation to create and attach a shop before every user row is inserted.
-- Updated email and Google auth redirects so new users go directly to the dashboard after shop creation.
 
 ## Initial Setup
 
@@ -372,3 +377,25 @@ Next: Repair ticket creation workflow and repair management.
 - Removed Gmail API
 - Removed Warranty Management
 - Deferred Activity / Audit Logs to advanced phase
+
+## Sprint Plan Revision — Staff Management & Owner Gmail
+
+- Moved Staff Management from an unscheduled Settings item into Sprint 1
+  as a first-class feature (invitations, roles, shop isolation)
+- Reinstated Gmail API for Sprint 3 — **scoped to owner-authorized
+  transactional sending only**, one connection per shop, no shared
+  sender account. This reverses the earlier "Removed Gmail API" note.
+- Nodemailer and React Email remain excluded — Gmail API used directly
+  with plain-string email bodies.
+- Sprint 1 invitations use a shareable link only until Gmail is
+  connected in Sprint 3, at which point real invite emails activate too.
+
+## Device Model Verification
+ 
+- Added "Unverified" model state to Device Management: model is optional
+  at intake, flagged with a badge until confirmed
+- Added non-blocking model-confirmation prompt to the DIAGNOSING repair
+  status, since that's the natural point where a device gets physically
+  opened/inspected
+- Added Device List grouped-by-customer presentation (collapsible rows)
+  as a task item
