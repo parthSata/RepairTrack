@@ -116,12 +116,20 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
     sendVerificationEmail: async ({ user, url }) => {
-      const result = await sendEmail({
-        to: user.email,
-        subject: 'Verify your RepairTrack email',
-        html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
-      })
-      if (!result.sent) throw new Error('Gmail email service is not configured')
+      if (user.emailVerified) {
+        return
+      }
+
+      try {
+        const result = await sendEmail({
+          to: user.email,
+          subject: 'Verify your RepairTrack email',
+          html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
+        })
+        if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
+      } catch (err) {
+        console.warn('Failed to send verification email:', err)
+      }
     },
   },
   socialProviders: {

@@ -6,7 +6,7 @@ export const emailSchema = z
   .toLowerCase()
   .email('Enter a valid email address')
 
-const passwordSchema = z
+export const passwordSchema = z
   .string({ error: 'Password is required' })
   .min(8, 'Password must be at least 8 characters')
   .max(72, 'Password must be 72 characters or fewer')
@@ -27,7 +27,7 @@ const nameSchema = (label: string) =>
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: passwordSchema,
+  password: z.string({ error: 'Password is required' }).min(1, 'Password is required'),
 })
 
 export const registerSchema = z.object({

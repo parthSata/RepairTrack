@@ -15,6 +15,7 @@ import { loginSchema, type LoginInput } from '@/features/auth/schemas'
 export function LoginForm() {
   const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
   const [isGooglePending, setIsGooglePending] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -22,9 +23,14 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginInput) {
     setFormError(null)
+    setUnverifiedEmail(null)
     const result = await authClient.signIn.email({ ...values, callbackURL: '/dashboard' })
     if (result.error) {
-      setFormError('Those credentials do not match an account.')
+      const msg = result.error.message || 'Those credentials do not match an account.'
+      setFormError(msg)
+      if (msg.toLowerCase().includes('verify') || msg.toLowerCase().includes('email')) {
+        setUnverifiedEmail(values.email)
+      }
       return
     }
     router.push('/dashboard')
@@ -33,7 +39,7 @@ export function LoginForm() {
 
   async function signInWithGoogle() {
     setFormError(null)
-    setIsGooglePending(true)
+    setUnverifiedEmail(null)
     const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
     if (result.error) {
       setFormError('Google sign-in is unavailable right now.')
@@ -43,7 +49,18 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {formError && <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{formError}</p>}
+      {formError && (
+        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive space-y-1">
+          <p>{formError}</p>
+          {unverifiedEmail && (
+            <p className="text-xs">
+              <a href={`/verify-email?email=${encodeURIComponent(unverifiedEmail)}`} className="font-semibold underline">
+                Click here to verify your email address
+              </a>
+            </p>
+          )}
+        </div>
+      )}
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" autoComplete="email" {...register('email')} />
