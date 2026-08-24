@@ -27,3 +27,32 @@ export function useAcceptInvitation(token: string) {
     },
   })
 }
+
+export function useSetStaffStatus() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: 'ACTIVE' | 'INACTIVE' }) => {
+      const response = await apiClient.patch<{ success: boolean; userId: string; status: string }>(`staff/${id}/status`, { status })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all })
+    },
+  })
+}
+
+export function useChangeStaffRole() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: 'STAFF' | 'TECHNICIAN' }) => {
+      const response = await apiClient.patch<{ success: boolean; id: string; role: string; isInvitation: boolean }>(`staff/${id}/role`, { role })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: staffKeys.all })
+    },
+  })
+}
+

@@ -7,6 +7,17 @@ export async function middleware(request: NextRequest) {
   if (!session) return NextResponse.redirect(new URL('/login', request.url))
 
   const path = request.nextUrl.pathname
+
+  if (session.user?.status === 'INACTIVE') {
+    return NextResponse.redirect(new URL('/login?error=account_deactivated', request.url))
+  }
+
+  if (!session.user?.emailVerified && !path.startsWith('/verify-email')) {
+    const verifyUrl = new URL('/verify-email', request.url)
+    verifyUrl.searchParams.set('email', session.user.email)
+    return NextResponse.redirect(verifyUrl)
+  }
+
   const role = session.user?.role ?? 'OWNER'
 
   // STAFF role: allowed on all operational pages except shop & staff settings
@@ -24,12 +35,19 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/dashboard',
     '/dashboard/:path*',
+    '/repairs',
     '/repairs/:path*',
+    '/customers',
     '/customers/:path*',
+    '/devices',
     '/devices/:path*',
+    '/inventory',
     '/inventory/:path*',
+    '/invoices',
     '/invoices/:path*',
+    '/settings',
     '/settings/:path*',
   ],
 }
