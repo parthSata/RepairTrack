@@ -88,11 +88,6 @@ export async function acceptInvitation(token: string, input: AcceptInvitationInp
       if (!createdUser) {
         throw new HTTPException(400, { message: 'Failed to create staff account' })
       }
-
-      await tx
-        .update(users)
-        .set({ emailVerified: true })
-        .where(eq(users.email, invitation.email.toLowerCase()))
     } catch (err: unknown) {
       if (err instanceof HTTPException) throw err
       const errorMessage = err instanceof Error ? err.message : 'Unable to create user account'

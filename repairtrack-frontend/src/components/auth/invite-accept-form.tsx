@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
 import { useAcceptInvitation } from '@/features/staff/mutations'
 import { acceptInvitationSchema, type AcceptInvitationInput, type InvitationDetails } from '@/features/staff/schemas'
+import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 
 export function InviteAcceptForm({
   token,
@@ -44,21 +45,7 @@ export function InviteAcceptForm({
     setFormError(null)
     try {
       await acceptMutation.mutateAsync(values)
-
-      // Sign in automatically with created credentials
-      const signInResult = await authClient.signIn.email({
-        email: details.email,
-        password: values.password,
-        callbackURL: '/dashboard',
-      })
-
-      if (signInResult.error) {
-        setSuccess(true)
-        return
-      }
-
-      router.push('/dashboard')
-      router.refresh()
+      setSuccess(true)
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'response' in err
@@ -79,20 +66,7 @@ export function InviteAcceptForm({
   }
 
   if (success) {
-    return (
-      <div className="space-y-4 text-center py-4">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-          <CheckCircle className="h-6 w-6" />
-        </div>
-        <h2 className="text-xl font-semibold">Account Created!</h2>
-        <p className="text-sm text-muted-foreground">
-          Your account has been set up successfully for {details.shopName}.
-        </p>
-        <Button onClick={() => router.push('/login')} className="w-full mt-2">
-          Proceed to Sign In
-        </Button>
-      </div>
-    )
+    return <VerifyEmailCard initialEmail={details.email} />
   }
 
   return (
