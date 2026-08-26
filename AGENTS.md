@@ -1,7 +1,7 @@
 # AGENTS.md — RepairTrack
 
 Repair-shop ticketing SaaS built with Next.js, TypeScript, Bun, Hono, PostgreSQL/Drizzle,
-Better Auth, TanStack Query, Zustand, Tailwind/shadcn and Cloudflare R2.
+Better Auth, TanStack Query, Zustand, Tailwind/shadcn and Cloudinary.
 
 This file owns **how to work**. It does not restate the rules — each topic has exactly one
 owner below. Change a rule in its owning file, never here.
@@ -14,7 +14,7 @@ owner below. Change a rule in its owning file, never here.
 | [context/architecture-context.md](context/architecture-context.md) | Stack, folder layout, API/DB/auth/upload architecture, layer boundaries | Touching the API, database, auth or storage |
 | [context/ui-context.md](context/ui-context.md) | Design language, approved screens, components, animation, states | Touching any screen or component |
 | [context/code-standards.md](context/code-standards.md) | Naming, TypeScript, state, validation, security, verification, simplicity limits | Writing any code |
-| [context/stack-standards.md](context/stack-standards.md) | Per-library conventions: Next.js, Hono, Drizzle, Zod, TanStack Query, Zustand, Better Auth, Tailwind/shadcn, R2, Bun, Prettier/ESLint | Using any of those libraries |
+| [context/stack-standards.md](context/stack-standards.md) | Per-library conventions: Next.js, Hono, Drizzle, Zod, TanStack Query, Zustand, Better Auth, Tailwind/shadcn, Cloudinary, Bun, Prettier/ESLint | Using any of those libraries |
 | [context/progress-tracker.md](context/progress-tracker.md) | What is done, current task, what's next | Starting and finishing a task |
 
 @context/project-overview.md

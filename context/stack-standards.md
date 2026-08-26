@@ -206,17 +206,14 @@ This file does not repeat either; it only covers per-library idioms.
 
 ---
 
-# 10. Cloudflare R2
+# 10. Cloudinary
 
-- Use the S3-compatible client (`@aws-sdk/client-s3` +
-  `@aws-sdk/s3-request-presigner`).
-- Object keys are structured and tenant-scoped:
-  `shops/{shopId}/repairs/{repairId}/{uuid}.{ext}`.
-- Presign uploads and downloads; the bucket stays private. Presigned URLs
-  get a short expiry (15 minutes).
-- Validate content-type and size server-side *before* signing
-  (`architecture-context.md` §10).
-- Delete the object when its database row is deleted.
+- Use the official `cloudinary` v2 Node.js SDK (`src/server/storage/cloudinary.ts`).
+- Require environment variables: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_PRESET_KEY`.
+- Store images under structured folder paths (e.g. `RepairTrack/shops/{shopId}/logo/{uuid}`).
+- Server generates signed upload request data (`createLogoUploadData`) including signature, timestamp, and preset key for client uploads.
+- Maximum file size limit: 5MB (`MAX_UPLOAD_SIZE`).
+- Delete remote resource (`deleteObject` via `cloudinary.uploader.destroy`) when associated database records/logos are updated or deleted.
 
 ---
 

@@ -299,7 +299,7 @@ Do not log:
 - Session IDs
 - OAuth secrets
 - API keys
-- R2 credentials
+- Cloudinary credentials / API secrets
 - Sensitive customer information
 
 ---
