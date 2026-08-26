@@ -1,6 +1,9 @@
 import { resolveMx } from 'node:dns/promises'
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
+import { eq } from 'drizzle-orm'
+import { db } from '@/server/db'
+import { users } from '@/server/db/schema'
 import { emailCheckSchema } from '@/features/auth/schemas'
 
 const emailCheckRouter = new Hono()
@@ -10,20 +13,27 @@ emailCheckRouter.post('/', zValidator('json', emailCheckSchema, (result, context
 }), async (context) => {
   const { email } = context.req.valid('json')
   const domain = email.split('@')[1]
-  if (!domain) return context.json({ valid: false }, 422)
+  if (!domain) return context.json({ valid: false, exists: false }, 422)
   if (['example.com', 'example.net', 'example.org', 'invalid'].includes(domain)) {
-    return context.json({ valid: false }, 422)
+    return context.json({ valid: false, exists: false }, 422)
   }
 
   try {
     const records = await resolveMx(domain)
     const hasWorkingMailServer = records.some((record) => record.exchange !== '.')
-    if (!hasWorkingMailServer) return context.json({ valid: false }, 422)
+    if (!hasWorkingMailServer) return context.json({ valid: false, exists: false }, 422)
   } catch {
-    return context.json({ valid: false }, 422)
+    return context.json({ valid: false, exists: false }, 422)
   }
 
-  return context.json({ valid: true })
+  const existingUser = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email.toLowerCase()))
+    .limit(1)
+
+  const exists = existingUser.length > 0
+  return context.json({ valid: true, exists })
 })
 
 export { emailCheckRouter }

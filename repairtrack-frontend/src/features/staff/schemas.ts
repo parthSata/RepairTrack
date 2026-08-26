@@ -35,3 +35,27 @@ export interface InviteStaffResponse {
   inviteLink: string
   expiresAt: string
 }
+
+export const setStaffStatusSchema = z.object({
+  status: z.enum(['ACTIVE', 'INACTIVE']),
+})
+
+export type SetStaffStatusInput = z.infer<typeof setStaffStatusSchema>
+
+export const changeStaffRoleSchema = z.object({
+  role: z.enum(['STAFF', 'TECHNICIAN']),
+})
+
+export type ChangeStaffRoleInput = z.infer<typeof changeStaffRoleSchema>
+
+export interface UnifiedStaffMember {
+  id: string
+  name: string
+  email: string
+  role: 'STAFF' | 'TECHNICIAN'
+  status: 'ACTIVE' | 'INACTIVE' | 'INVITED'
+  isInvitation: boolean
+  token?: string
+  expiresAt?: string
+  createdAt: string
+}

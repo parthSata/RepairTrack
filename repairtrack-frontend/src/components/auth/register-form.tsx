@@ -1,11 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowRight, LoaderCircle } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'react-toastify'
 import { apiClient } from '@/lib/api-client'
+import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +16,7 @@ import { registerSchema, type RegisterInput } from '@/features/auth/schemas'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 
 export function RegisterForm() {
+  const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
   const [verificationSent, setVerificationSent] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
@@ -25,25 +29,62 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterInput) {
     setFormError(null)
+    
+    let isAlreadyRegistered = false
     try {
-      const response = await apiClient.post<{ valid: boolean }>('email-check', { email: values.email })
+      const response = await apiClient.post<{ valid: boolean; exists?: boolean }>('email-check', { email: values.email })
       if (!response.data.valid) throw new Error('Email domain is not valid')
+      if (response.data.exists) {
+        isAlreadyRegistered = true
+      }
     } catch {
       setFormError('This email address cannot receive email. Check the address and try again.')
       return
     }
-    try {
-      await apiClient.post('auth/sign-up/email', {
+
+    if (isAlreadyRegistered) {
+      const signInResult = await authClient.signIn.email({
         email: values.email,
         password: values.password,
-        name: values.ownerName,
-        shopName: values.shopName,
         callbackURL: '/dashboard',
       })
-    } catch {
-      setFormError('Unable to create your account.')
-      return
+
+      if (!signInResult.error) {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      } else {
+        toast.info('User already exist')
+        router.push('/login')
+        return
+      }
     }
+
+    const signUpResult = await authClient.signUp.email({
+      email: values.email,
+      password: values.password,
+      name: values.ownerName,
+      callbackURL: '/dashboard',
+    })
+
+    if (signUpResult.error) {
+      const signInResult = await authClient.signIn.email({
+        email: values.email,
+        password: values.password,
+        callbackURL: '/dashboard',
+      })
+
+      if (!signInResult.error) {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      } else {
+        toast.info('User already exist')
+        router.push('/login')
+        return
+      }
+    }
+
     setVerificationEmail(values.email)
     setVerificationSent(true)
   }

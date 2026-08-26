@@ -1,9 +1,11 @@
 import { eq } from 'drizzle-orm'
-import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
+import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { db } from '@/server/db'
 import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
 import { sendEmail } from '@/server/services/gmail.service'
+import { buildVerificationEmailHtml } from '@/server/services/email-templates'
 
 function readShopName(body: unknown, userName: string) {
   const fallbackName = `${userName}'s shop`
@@ -25,10 +27,21 @@ export const auth = betterAuth({
   }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL,
+  account: {
+    storeStateStrategy: 'cookie',
+  },
   trustedOrigins: [
     process.env.NEXT_PUBLIC_APP_URL,
     process.env.BETTER_AUTH_URL,
+    'http://localhost:3000',
+    'http://192.168.1.8:3000',
   ].filter((origin): origin is string => Boolean(origin)),
+  advanced: {
+    defaultCookieAttributes: {
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    },
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
@@ -36,6 +49,7 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: { type: 'string', required: false, defaultValue: 'OWNER' },
+      status: { type: 'string', required: false, defaultValue: 'ACTIVE' },
       shopId: { type: 'string', required: false },
     },
   },
@@ -43,19 +57,22 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user, context) => {
-          if (typeof user.shopId === 'string' && user.shopId.trim().length > 0) return
+          const hasShopId = typeof user.shopId === 'string' && user.shopId.trim().length > 0
+          const shopId = hasShopId ? (user.shopId as string) : crypto.randomUUID()
 
-          const shopId = crypto.randomUUID()
-          await db.insert(shops).values({
-            id: shopId,
-            name: readShopName(context?.body, user.name),
-          })
+          if (!hasShopId) {
+            await db.insert(shops).values({
+              id: shopId,
+              name: readShopName(context?.body, user.name),
+            })
+          }
 
           return {
             data: {
               ...user,
-              role: 'OWNER',
+              role: user.role ?? 'OWNER',
               shopId,
+              emailVerified: false,
             },
           }
         },
@@ -86,6 +103,15 @@ export const auth = betterAuth({
       create: {
         before: async (session) => {
           if (session.userId) {
+            const dbUser = await db.query.users.findFirst({
+              where: eq(users.id, session.userId),
+            })
+            if (dbUser?.status === 'INACTIVE') {
+              throw new APIError('FORBIDDEN', {
+                message: 'Your account has been deactivated. Contact the owner for activation.',
+              })
+            }
+
             const userAccounts = await db
               .select()
               .from(accounts)
@@ -121,10 +147,11 @@ export const auth = betterAuth({
       }
 
       try {
+        const html = buildVerificationEmailHtml({ name: user.name, url })
         const result = await sendEmail({
           to: user.email,
           subject: 'Verify your RepairTrack email',
-          html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
+          html,
         })
         if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
       } catch (err) {
