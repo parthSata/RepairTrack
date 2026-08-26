@@ -125,6 +125,32 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
     setIsResending(false)
   }
 
+  useEffect(() => {
+    if (status !== 'success') return
+    const timer = setTimeout(() => {
+      router.push('/dashboard')
+      router.refresh()
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [status, router])
+
+  useEffect(() => {
+    if (status !== 'idle') return
+
+    const interval = setInterval(async () => {
+      try {
+        const session = await authClient.getSession()
+        if (session.data?.user?.emailVerified) {
+          setStatus('success')
+        }
+      } catch {
+        // Silent poll check
+      }
+    }, 2500)
+
+    return () => clearInterval(interval)
+  }, [status])
+
   if (status === 'verifying') {
     return (
       <div className="space-y-4 text-center py-6">
@@ -147,10 +173,13 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         </div>
         <h2 className="text-xl font-semibold">Email Verified!</h2>
         <p className="text-sm text-muted-foreground">
-          Your email address has been successfully verified. You can now access your shop workspace.
+          Your email address has been verified. Redirecting to your dashboard...
         </p>
-        <Button onClick={() => router.push('/dashboard')} className="w-full mt-2">
-          Continue to Dashboard
+        <div className="flex justify-center pt-2">
+          <LoaderCircle className="h-5 w-5 animate-spin text-accent" />
+        </div>
+        <Button onClick={() => router.push('/dashboard')} variant="outline" className="w-full mt-2">
+          Click here if not redirected automatically
         </Button>
       </div>
     )

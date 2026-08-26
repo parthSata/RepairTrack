@@ -1,6 +1,7 @@
 import { boolean, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
 
 export const userRole = pgEnum('user_role', ['OWNER', 'STAFF', 'TECHNICIAN'])
+export const userStatusEnum = pgEnum('user_status', ['ACTIVE', 'INACTIVE'])
 
 export const shops = pgTable('shops', {
   id: text('id').primaryKey(),
@@ -21,6 +22,7 @@ export const users = pgTable('users', {
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
   role: userRole('role').default('OWNER').notNull(),
+  status: userStatusEnum('status').default('ACTIVE').notNull(),
   shopId: text('shop_id').notNull().references(() => shops.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

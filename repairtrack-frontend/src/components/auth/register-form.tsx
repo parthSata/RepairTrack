@@ -1,11 +1,14 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowRight, LoaderCircle } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'react-toastify'
 import { apiClient } from '@/lib/api-client'
+import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +16,7 @@ import { registerSchema, type RegisterInput } from '@/features/auth/schemas'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 
 export function RegisterForm() {
+  const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
   const [verificationSent, setVerificationSent] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
@@ -25,65 +29,60 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterInput) {
     setFormError(null)
-
-    // 1. Email domain validity check
+    
+    let isAlreadyRegistered = false
     try {
-      const response = await apiClient.post<{ valid: boolean }>('email-check', { email: values.email })
-      if (!response.data.valid) {
-        throw new Error('Email domain is not valid')
+      const response = await apiClient.post<{ valid: boolean; exists?: boolean }>('email-check', { email: values.email })
+      if (!response.data.valid) throw new Error('Email domain is not valid')
+      if (response.data.exists) {
+        isAlreadyRegistered = true
       }
     } catch {
       setFormError('This email address cannot receive email. Check the address and try again.')
       return
     }
 
-    // 2. Pre-check if user already exists
-    try {
-      const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)
-      if (checkRes.ok) {
-        const userStatus = (await checkRes.json()) as { exists: boolean; emailVerified: boolean }
-        if (userStatus.exists) {
-          if (userStatus.emailVerified) {
-            setFormError('This email address is already registered. Please sign in.')
-            return
-          } else {
-            setVerificationEmail(values.email)
-            setVerificationSent(true)
-            return
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    // 3. Perform Sign-Up
-    try {
-      await apiClient.post('auth/sign-up/email', {
+    if (isAlreadyRegistered) {
+      const signInResult = await authClient.signIn.email({
         email: values.email,
         password: values.password,
-        name: values.ownerName,
-        shopName: values.shopName,
         callbackURL: '/dashboard',
       })
-    } catch {
-      // Fallback user status check after failure
-      try {
-        const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)
-        if (checkRes.ok) {
-          const userStatus = (await checkRes.json()) as { exists: boolean; emailVerified: boolean }
-          if (userStatus.exists && !userStatus.emailVerified) {
-            setVerificationEmail(values.email)
-            setVerificationSent(true)
-            return
-          }
-        }
-      } catch {
-        // ignore
-      }
 
-      setFormError('Unable to create your account or email is already registered.')
-      return
+      if (!signInResult.error) {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      } else {
+        toast.info('User already exist')
+        router.push('/login')
+        return
+      }
+    }
+
+    const signUpResult = await authClient.signUp.email({
+      email: values.email,
+      password: values.password,
+      name: values.ownerName,
+      callbackURL: '/dashboard',
+    })
+
+    if (signUpResult.error) {
+      const signInResult = await authClient.signIn.email({
+        email: values.email,
+        password: values.password,
+        callbackURL: '/dashboard',
+      })
+
+      if (!signInResult.error) {
+        router.push('/dashboard')
+        router.refresh()
+        return
+      } else {
+        toast.info('User already exist')
+        router.push('/login')
+        return
+      }
     }
 
     setVerificationEmail(values.email)
