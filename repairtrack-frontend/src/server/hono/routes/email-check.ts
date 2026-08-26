@@ -1,7 +1,7 @@
 import { resolveMx } from 'node:dns/promises'
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { eq } from 'drizzle-orm'
+import { eq, ilike } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { users } from '@/server/db/schema'
 import { emailCheckSchema } from '@/features/auth/schemas'
