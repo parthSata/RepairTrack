@@ -2,8 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
-import { ArrowRight, CheckCircle, LoaderCircle, ShieldCheck } from 'lucide-react'
+import { ArrowRight, LoaderCircle, ShieldCheck } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -21,7 +20,6 @@ export function InviteAcceptForm({
   token: string
   details: InvitationDetails
 }) {
-  const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
   const [isGooglePending, setIsGooglePending] = useState(false)
   const [success, setSuccess] = useState(false)

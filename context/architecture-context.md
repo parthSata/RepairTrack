@@ -132,13 +132,13 @@ ad-hoc axios instances or mix in bare `fetch` for API calls.
 
 ## File Storage
 
-- Cloudflare R2
+- Cloudinary
 
-Use Cloudflare R2 for appropriate uploaded files such as:
+Use Cloudinary for appropriate uploaded files such as:
 
 - Device images
 - Repair images
-- Shop assets
+- Shop assets (logos)
 
 Do not store large user-uploaded files directly in PostgreSQL.
 
@@ -247,9 +247,9 @@ For file uploads:
 ```text
 User
   ↓
-Next.js / API
+Next.js / API (Generates Signed Upload Data)
   ↓
-Cloudflare R2
+Cloudinary
 ```
 
 For customer email sending (Sprint 3):
@@ -273,20 +273,18 @@ Customer's inbox
 # 4. Folder Layout
 
 ```text
-src/app/            Next.js routes/pages (Server Components by default)
-src/app/api/[[...route]]/route.ts   the single Hono mount point
-src/api/routes/     Hono route handlers (thin: validate → service → return)
-src/api/middleware/ auth, error handler
-src/server/db/      Drizzle schema + migrations (the only place Drizzle/SQL is written)
-src/server/services/ business logic (the only place that talks to the db)
-src/server/auth/    Better Auth config
-src/server/storage/ R2 client
-src/server/email/   Gmail OAuth client, email templates, send service (Sprint 3)
-src/features/<x>/   schemas.ts (Zod), queries.ts, mutations.ts, types.ts
-src/components/ui/  shadcn primitives — do not hand-write a Button/Input/Dialog
-src/components/<x>/ feature components
-src/stores/         Zustand — UI state only
-src/lib/            api-client.ts, utils, constants
+src/app/                    Next.js routes/pages ((auth), (dashboard), (public))
+src/app/api/[[...route]]/   Hono mount point (route.ts exporting handle(app))
+src/server/hono/            Hono app (app.ts), routes/, and middlewares/
+src/server/db/              Drizzle schema + migrations (the only place Drizzle/SQL is written)
+src/server/services/        Business logic services (the only place that talks to the db)
+src/server/auth/            Better Auth server config (auth.ts)
+src/server/storage/         Cloudinary client & signed upload helpers (cloudinary.ts)
+src/server/email/           Gmail OAuth client, email templates, send service (Sprint 3)
+src/features/<x>/           Feature queries.ts, mutations.ts, schemas.ts, types.ts, components/
+src/components/ui/          shadcn primitives — do not hand-write a Button/Input/Dialog
+src/components/             Global / shared layout components
+src/lib/                    api-client.ts, auth-client.ts, utils.ts
 ```
 
 Do not create a folder until a real requirement needs it.
@@ -479,29 +477,24 @@ never import `db`. Route handlers never query the database directly.
 
 # 10. File Upload Architecture
 
-Uploaded repair/device images should follow:
+Uploaded repair/device images and shop logos should follow:
 
 ```text
 Client
   ↓
-Presigned URL from server
+Signed upload parameters / signature from server
   ↓
-Cloudflare R2
+Cloudinary
   ↓
-Stored object key
+Stored public ID / image URL
   ↓
 PostgreSQL
 ```
 
-The server issues a presigned URL and the client PUTs directly to R2.
-Validate content-type (`image/jpeg|png|webp`) and max size (5MB)
-server-side before signing.
+The server configures Cloudinary SDK parameters/signatures (`src/server/storage/cloudinary.ts`) and the client uploads to Cloudinary.
+Validate image content-type (`image/jpeg|png|webp`) and max size (5MB) server-side before signature generation.
 
-Store the object key in Postgres, never a public URL. Serve reads
-through presigned GETs.
-
-Database records should store references/metadata rather than large
-binary files.
+Store the Cloudinary public ID or URL in Postgres, never large binary files. Serve images directly via Cloudinary CDN URLs.
 
 ---
 

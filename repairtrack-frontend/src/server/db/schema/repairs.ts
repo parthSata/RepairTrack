@@ -1,5 +1,6 @@
 import { boolean, index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
-import { shops } from './users'
+import { relations } from 'drizzle-orm'
+import { shops, users } from './users'
 import { customers } from './customers'
 
 export const repairStatusEnum = pgEnum('repair_status', [
@@ -13,6 +14,13 @@ export const repairStatusEnum = pgEnum('repair_status', [
   'READY_FOR_PICKUP',
   'COMPLETED',
   'CANCELLED',
+])
+
+export const repairPriorityEnum = pgEnum('repair_priority', [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'URGENT',
 ])
 
 export const deviceTypeEnum = pgEnum('device_type', [
@@ -72,15 +80,59 @@ export const repairs = pgTable(
       .references(() => devices.id, { onDelete: 'restrict' }),
     ticketNumber: text('ticket_number').notNull().unique(),
     status: repairStatusEnum('status').default('RECEIVED').notNull(),
+    problemDescription: text('problem_description'),
     issueDescription: text('issue_description'),
+    initialCondition: text('initial_condition'),
     estimatedCost: integer('estimated_cost'),
     finalCost: integer('final_cost'),
+    priority: repairPriorityEnum('priority').default('MEDIUM').notNull(),
+    expectedCompletionDate: timestamp('expected_completion_date', { withTimezone: true }),
+    assignedTechnicianId: text('assigned_technician_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('repairs_shop_id_idx').on(table.shopId),
     index('repairs_customer_id_idx').on(table.customerId),
+    index('repairs_device_id_idx').on(table.deviceId),
     index('repairs_status_idx').on(table.status),
+    index('repairs_assigned_technician_id_idx').on(table.assignedTechnicianId),
   ],
 )
+
+export const repairNotes = pgTable(
+  'repair_notes',
+  {
+    id: text('id').primaryKey(),
+    repairId: text('repair_id')
+      .notNull()
+      .references(() => repairs.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    note: text('note').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('repair_notes_repair_id_idx').on(table.repairId)],
+)
+
+export const repairsRelations = relations(repairs, ({ one, many }) => ({
+  shop: one(shops, { fields: [repairs.shopId], references: [shops.id] }),
+  customer: one(customers, { fields: [repairs.customerId], references: [customers.id] }),
+  device: one(devices, { fields: [repairs.deviceId], references: [devices.id] }),
+  assignedTechnician: one(users, {
+    fields: [repairs.assignedTechnicianId],
+    references: [users.id],
+  }),
+  creator: one(users, { fields: [repairs.createdBy], references: [users.id] }),
+  notes: many(repairNotes),
+}))
+
+export const repairNotesRelations = relations(repairNotes, ({ one }) => ({
+  repair: one(repairs, { fields: [repairNotes.repairId], references: [repairs.id] }),
+  author: one(users, { fields: [repairNotes.authorId], references: [users.id] }),
+}))
+

@@ -7,6 +7,21 @@ import type { AcceptInvitationInput, InviteStaffInput, UnifiedStaffMember } from
 import { sendEmail } from '@/server/services/gmail.service'
 import { buildStaffInvitationEmailHtml } from '@/server/services/email-templates'
 
+export async function getTechnicians(shopId: string) {
+  const techs = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+    })
+    .from(users)
+    .where(and(eq(users.shopId, shopId), eq(users.role, 'TECHNICIAN')))
+
+  return techs
+}
+
+
 export async function inviteStaff(shopId: string, invitedBy: string, input: InviteStaffInput) {
   const targetEmail = input.email.trim().toLowerCase()
 

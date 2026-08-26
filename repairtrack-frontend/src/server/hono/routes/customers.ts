@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception'
 import { customerFilterSchema, customerSchema } from '@/features/customers/schemas'
 import { auth } from '@/server/auth'
 import {
+  checkCustomerEmail,
   createCustomer,
   deleteCustomer,
   getCustomerById,
@@ -40,6 +41,14 @@ customersRouter.get(
     return c.json(result)
   },
 )
+
+customersRouter.get('/check-email', async (c) => {
+  const { shopId } = await requireCustomerAccess(c.req.raw)
+  const email = c.req.query('email') || ''
+  const excludeId = c.req.query('excludeId') || undefined
+  const result = await checkCustomerEmail({ shopId, email, excludeCustomerId: excludeId })
+  return c.json(result)
+})
 
 customersRouter.post(
   '/',

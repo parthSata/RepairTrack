@@ -21,7 +21,13 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   )
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [verificationEmail] = useState(emailParam)
-  const [resendCount, setResendCount] = useState(0)
+  const [resendCount, setResendCount] = useState(() => {
+    if (typeof window === 'undefined' || !emailParam) return 0
+    const storedCount = localStorage.getItem(`resend_count_${emailParam}`)
+    const storedExpiry = localStorage.getItem(`resend_cooldown_${emailParam}`)
+    if (storedExpiry && Date.now() < parseInt(storedExpiry, 10)) return 2
+    return storedCount ? parseInt(storedCount, 10) : 0
+  })
   const [isResending, setIsResending] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null)
 
@@ -54,9 +60,10 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
 
   useEffect(() => {
     if (!verificationEmail) return
-    const storageKey = `resend_cooldown_${verificationEmail}`
-    const storedExpiry = localStorage.getItem(storageKey)
+    const cooldownKey = `resend_cooldown_${verificationEmail}`
+    const countKey = `resend_count_${verificationEmail}`
 
+    const storedExpiry = localStorage.getItem(cooldownKey)
     if (storedExpiry) {
       const expiryTime = parseInt(storedExpiry, 10)
       if (Date.now() < expiryTime) {
@@ -65,13 +72,15 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         const interval = setInterval(() => {
           if (!updateCooldownText(expiryTime)) {
             clearInterval(interval)
-            localStorage.removeItem(storageKey)
+            localStorage.removeItem(cooldownKey)
+            localStorage.removeItem(countKey)
           }
-        }, 30000)
+        }, 10000)
 
         return () => clearInterval(interval)
       } else {
-        localStorage.removeItem(storageKey)
+        localStorage.removeItem(cooldownKey)
+        localStorage.removeItem(countKey)
       }
     }
   }, [verificationEmail])
@@ -90,7 +99,9 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   }
 
   async function resendVerification() {
-    if (!verificationEmail || resendCount >= 2 || isResending || cooldownRemaining) return
+    if (!verificationEmail || resendCount >= 2 || isResending || cooldownRemaining) {
+      return
+    }
     setErrorMsg(null)
     setIsResending(true)
 
@@ -103,6 +114,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
     } else {
       const nextCount = resendCount + 1
       setResendCount(nextCount)
+      localStorage.setItem(`resend_count_${verificationEmail}`, nextCount.toString())
 
       if (nextCount >= 2) {
         const expiryTime = Date.now() + TWO_HOURS_MS

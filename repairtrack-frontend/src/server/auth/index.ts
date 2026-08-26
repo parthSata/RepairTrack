@@ -7,8 +7,9 @@ import { accounts, sessions, shops, users, verifications } from '@/server/db/sch
 import { sendEmail } from '@/server/services/gmail.service'
 import { buildVerificationEmailHtml } from '@/server/services/email-templates'
 
-function readShopName(body: unknown, userName: string) {
-  const fallbackName = `${userName}'s shop`
+function readShopName(body: unknown, userName?: string): string {
+  const nameStr = userName || 'Owner'
+  const fallbackName = `${nameStr}'s shop`
   if (!body || typeof body !== 'object' || !('shopName' in body)) return fallbackName
 
   const shopName = (body as Record<string, unknown>).shopName
@@ -74,6 +75,22 @@ export const auth = betterAuth({
               shopId,
               emailVerified: false,
             },
+          }
+        },
+        after: async (user) => {
+          if (!user.emailVerified) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+            const url = `${appUrl}/verify-email?email=${encodeURIComponent(user.email)}`
+            try {
+              const result = await sendEmail({
+                to: user.email,
+                subject: 'Verify your RepairTrack email',
+                html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
+              })
+              if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
+            } catch (err) {
+              console.warn('Failed to send verification email for user:', err)
+            }
           }
         },
       },
@@ -168,3 +185,4 @@ export const auth = betterAuth({
     },
   },
 })
+

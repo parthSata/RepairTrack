@@ -19,6 +19,7 @@ interface Repair {
   shopId: string
   ticketNumber: string
   status: string
+  assignedTechnicianId?: string | null
   issueDescription: string | null
   estimatedCost: number | null
   finalCost: number | null
@@ -89,7 +90,9 @@ export function RepairDetails({ id }: { id: string }) {
   }
 
   const showModelConfirmationCard =
-    repair.status === 'DIAGNOSING' && repair.device.modelVerified === false
+    repair.status === 'DIAGNOSING' &&
+    repair.device.modelVerified === false &&
+    Boolean(repair.assignedTechnicianId)
 
   return (
     <div className="space-y-6">
