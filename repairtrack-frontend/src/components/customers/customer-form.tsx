@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Mail, MapPin, Phone, User, FileText, AlertCircle } from 'lucide-react'
 import { customerSchema, type CustomerFormInput } from '@/features/customers/schemas'
 import { useCreateCustomer, useUpdateCustomer } from '@/features/customers/mutations'
+import type { Customer } from '@/features/customers/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +17,7 @@ interface CustomerFormProps {
   mode: 'create' | 'edit'
   customerId?: string
   initialData?: Partial<CustomerFormInput>
-  onSuccess: () => void
+  onSuccess: (customer?: Customer) => void
   onCancel?: () => void
 }
 
@@ -32,14 +33,19 @@ export function CustomerForm({
 
   const isPending = createMutation.isPending || updateMutation.isPending
 
+  const [emailWarning, setEmailWarning] = React.useState<string | null>(null)
+
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
+    setError,
     formState: { errors },
   } = useForm<CustomerFormInput>({
     resolver: zodResolver(customerSchema),
-    mode: 'onTouched',
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       name: initialData?.name ?? '',
       phone: initialData?.phone ?? '',
@@ -49,22 +55,64 @@ export function CustomerForm({
     },
   })
 
+  const watchedEmail = watch('email')
+
+  // Real-time email check effect
+  React.useEffect(() => {
+    if (!watchedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(watchedEmail)) {
+      setEmailWarning(null)
+      return
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const queryParams = new URLSearchParams({ email: watchedEmail })
+        if (mode === 'edit' && customerId) {
+          queryParams.append('excludeId', customerId)
+        }
+        const res = await fetch(`/api/customers/check-email?${queryParams.toString()}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.validDomain === false && data.reason) {
+            setEmailWarning(`Error: ${data.reason}`)
+          } else if (data.exists && data.customer) {
+            setEmailWarning(`Warning: Customer "${data.customer.name}" already uses this email.`)
+          } else {
+            setEmailWarning(null)
+          }
+        }
+      } catch {
+        // ignore fetch error
+      }
+    }, 400)
+
+    return () => clearTimeout(timer)
+  }, [watchedEmail, mode, customerId])
+
   const onSubmit = async (values: CustomerFormInput) => {
     try {
+      let savedCustomer: Customer | undefined
       if (mode === 'create') {
-        await createMutation.mutateAsync(values)
+        savedCustomer = await createMutation.mutateAsync(values)
         toast.success('Customer created successfully')
       } else {
         if (!customerId) return
-        await updateMutation.mutateAsync({ id: customerId, data: values })
+        savedCustomer = await updateMutation.mutateAsync({ id: customerId, data: values })
         toast.success('Customer updated successfully')
       }
-      onSuccess()
+      onSuccess(savedCustomer)
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err && (err as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data?.error?.message
+      const errResponseMsg =
+        err && typeof err === 'object' && 'response' in err
           ? (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error?.message
-          : (err as Error).message || 'An error occurred while saving the customer'
+          : undefined
+      const message = errResponseMsg || (err instanceof Error ? err.message : '') || 'An error occurred while saving the customer'
+
+      if (message.toLowerCase().includes('email')) {
+        setError('email', { type: 'manual', message })
+      } else if (message.toLowerCase().includes('phone')) {
+        setError('phone', { type: 'manual', message })
+      }
 
       toast.error(message, {
         duration: 5000,
@@ -81,7 +129,6 @@ export function CustomerForm({
             <User className="h-4 w-4 text-muted-foreground" />
             Full Name <span className="text-destructive font-bold">*</span>
           </Label>
-          <span className="text-[11px] font-medium text-destructive">Required</span>
         </div>
         <Input
           id="name"
@@ -105,7 +152,6 @@ export function CustomerForm({
             <Phone className="h-4 w-4 text-muted-foreground" />
             Phone Number <span className="text-destructive font-bold">*</span>
           </Label>
-          <span className="text-[11px] font-medium text-destructive">Required (Digits Only)</span>
         </div>
         <Input
           id="phone"
@@ -134,14 +180,13 @@ export function CustomerForm({
         )}
       </div>
 
-      {/* Email Address (Optional) */}
+      {/* Email Address (Required) */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label htmlFor="email" className="flex items-center gap-2 text-sm font-medium">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            Email Address
+            Email Address <span className="text-destructive font-bold">*</span>
           </Label>
-          <span className="text-[11px] text-muted-foreground">Optional</span>
         </div>
         <Input
           id="email"
@@ -151,12 +196,17 @@ export function CustomerForm({
           className={errors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
           {...register('email')}
         />
-        {errors.email && (
+        {errors.email ? (
           <p className="text-xs text-destructive flex items-center gap-1 font-medium mt-1">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {errors.email.message}
           </p>
-        )}
+        ) : emailWarning ? (
+          <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium mt-1">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            {emailWarning}
+          </p>
+        ) : null}
       </div>
 
       {/* Street Address (Optional) */}

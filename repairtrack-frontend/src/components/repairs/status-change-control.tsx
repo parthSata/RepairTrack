@@ -1,10 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { AlertCircle, ChevronDown } from 'lucide-react'
+import { AlertCircle, ChevronDown, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/sonner'
 import { apiClient } from '@/lib/api-client'
+import { authClient } from '@/lib/auth-client'
 
 const STATUS_LABELS: Record<string, string> = {
   RECEIVED: 'Received',
@@ -45,9 +46,22 @@ export function StatusChangeControl({
   modelVerified,
   onStatusUpdated,
 }: StatusChangeControlProps) {
+  const { data: session } = authClient.useSession()
+  const userRole = (session?.user as { role?: string } | undefined)?.role ?? 'OWNER'
+  const isTechnician = userRole === 'TECHNICIAN'
+
   const [selectedStatus, setSelectedStatus] = React.useState(currentStatus)
   const [isUpdating, setIsUpdating] = React.useState(false)
   const [validationError, setValidationError] = React.useState<string | null>(null)
+
+  if (!isTechnician) {
+    return (
+      <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
+        <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span>Status updates are reserved for Technicians.</span>
+      </div>
+    )
+  }
 
   const isTransitionBlocked =
     currentStatus === 'DIAGNOSING' &&

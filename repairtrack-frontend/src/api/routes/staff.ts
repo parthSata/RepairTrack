@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { inviteStaffSchema } from '@/features/staff/schemas'
 import { auth } from '@/server/auth'
-import { inviteStaff } from '@/server/services/staff.service'
+import { getTechnicians, inviteStaff } from '@/server/services/staff.service'
 
 const staffRouter = new Hono()
 
@@ -15,6 +15,23 @@ async function ownerSession(request: Request) {
   }
   return { session, shopId: session.user.shopId, userId: session.user.id }
 }
+
+async function requireStaffAccess(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
+  const role = session.user.role ?? 'OWNER'
+  const shopId = session.user.shopId
+  if (!['OWNER', 'STAFF'].includes(role) || !shopId) {
+    throw new HTTPException(403, { message: 'Not authorized' })
+  }
+  return { session, shopId }
+}
+
+staffRouter.get('/technicians', async (c) => {
+  const { shopId } = await requireStaffAccess(c.req.raw)
+  const technicians = await getTechnicians(shopId)
+  return c.json(technicians)
+})
 
 staffRouter.post(
   '/invite',
@@ -32,3 +49,4 @@ staffRouter.post(
 )
 
 export { staffRouter }
+

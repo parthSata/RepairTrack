@@ -66,7 +66,7 @@ export function RegisterForm() {
         shopName: values.shopName,
         callbackURL: '/dashboard',
       })
-    } catch (err: unknown) {
+    } catch {
       // Fallback user status check after failure
       try {
         const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)

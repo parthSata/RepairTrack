@@ -1,9 +1,24 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { auth } from '@/server/auth'
 import { db } from '@/server/db'
 import { staffInvitations, users } from '@/server/db/schema'
 import type { AcceptInvitationInput, InviteStaffInput } from '@/features/staff/schemas'
+
+export async function getTechnicians(shopId: string) {
+  const techs = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+    })
+    .from(users)
+    .where(and(eq(users.shopId, shopId), eq(users.role, 'TECHNICIAN')))
+
+  return techs
+}
+
 
 export async function inviteStaff(shopId: string, invitedBy: string, input: InviteStaffInput) {
   const token = crypto.randomUUID()

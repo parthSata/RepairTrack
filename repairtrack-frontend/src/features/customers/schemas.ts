@@ -19,11 +19,9 @@ export const customerSchema = z.object({
   email: z
     .string()
     .trim()
-    .optional()
-    .nullable()
-    .refine((val) => !val || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), {
-      message: 'Please enter a valid email address (e.g. name@example.com)',
-    }),
+    .min(1, { message: 'Email address is required' })
+    .email({ message: 'Please enter a valid email address (e.g. name@example.com)' })
+    .toLowerCase(),
   address: z
     .string()
     .trim()

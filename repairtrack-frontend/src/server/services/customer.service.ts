@@ -4,6 +4,7 @@ import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairs } from '@/server/db/schema/repairs'
 import type { CustomerFilterInput, CustomerFormInput } from '@/features/customers/schemas'
+import { verifyEmailDomain } from '@/server/utils/email-domain-validator'
 
 export async function listCustomers({
   shopId,
@@ -16,7 +17,11 @@ export async function listCustomers({
   const offset = (page - 1) * limit
 
   const searchCondition = search
-    ? or(ilike(customers.name, `%${search}%`), ilike(customers.phone, `%${search}%`))
+    ? or(
+        ilike(customers.name, `%${search}%`),
+        ilike(customers.phone, `%${search}%`),
+        ilike(customers.email, `%${search}%`),
+      )
     : undefined
 
   const whereClause = searchCondition
@@ -51,8 +56,8 @@ export async function listCustomers({
       notes: customers.notes,
       createdAt: customers.createdAt,
       updatedAt: customers.updatedAt,
-      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = ${customers.id})`,
-      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = ${customers.id})`,
+      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = customers.id), 0)`,
+      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = customers.id)`,
     })
     .from(customers)
     .where(whereClause)
@@ -81,8 +86,8 @@ export async function getCustomerById({ shopId, id }: { shopId: string; id: stri
       notes: customers.notes,
       createdAt: customers.createdAt,
       updatedAt: customers.updatedAt,
-      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = ${customers.id})`,
-      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = ${customers.id})`,
+      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = customers.id), 0)`,
+      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = customers.id)`,
     })
     .from(customers)
     .where(and(eq(customers.id, id), eq(customers.shopId, shopId)))
@@ -91,6 +96,56 @@ export async function getCustomerById({ shopId, id }: { shopId: string; id: stri
   if (!customer) throw new HTTPException(404, { message: 'Customer not found' })
 
   return customer
+}
+
+export async function checkCustomerEmail({
+  shopId,
+  email,
+  excludeCustomerId,
+}: {
+  shopId: string
+  email: string
+  excludeCustomerId?: string
+}) {
+  if (!email || email.trim() === '') {
+    return { exists: false, validDomain: true, customer: null, reason: null }
+  }
+
+  const domainCheck = await verifyEmailDomain(email)
+  if (!domainCheck.valid) {
+    return {
+      exists: false,
+      validDomain: false,
+      customer: null,
+      reason: domainCheck.reason ?? 'Invalid or non-existent email domain.',
+    }
+  }
+
+  const conditions = [eq(customers.shopId, shopId), ilike(customers.email, email.trim())]
+  if (excludeCustomerId) {
+    conditions.push(sql`${customers.id} != ${excludeCustomerId}`)
+  }
+
+  const [existing] = await db
+    .select({
+      id: customers.id,
+      name: customers.name,
+      phone: customers.phone,
+      email: customers.email,
+    })
+    .from(customers)
+    .where(and(...conditions))
+
+  if (existing) {
+    return {
+      exists: true,
+      validDomain: true,
+      customer: existing,
+      reason: `Customer "${existing.name}" already uses this email.`,
+    }
+  }
+
+  return { exists: false, validDomain: true, customer: null, reason: null }
 }
 
 export async function createCustomer({
@@ -107,6 +162,26 @@ export async function createCustomer({
 
   if (existingPhone.length > 0) {
     throw new HTTPException(400, { message: 'A customer with this phone number already exists in your shop' })
+  }
+
+  if (data.email && data.email.trim() !== '') {
+    const domainCheck = await verifyEmailDomain(data.email)
+    if (!domainCheck.valid) {
+      throw new HTTPException(400, {
+        message: domainCheck.reason || `Email address "${data.email}" does not exist or cannot receive mail.`,
+      })
+    }
+
+    const existingEmail = await db
+      .select({ id: customers.id, name: customers.name })
+      .from(customers)
+      .where(and(eq(customers.shopId, shopId), ilike(customers.email, data.email.trim())))
+
+    if (existingEmail.length > 0) {
+      throw new HTTPException(400, {
+        message: `A customer (${existingEmail[0].name}) with email "${data.email}" already exists in your shop`,
+      })
+    }
   }
 
   const id = crypto.randomUUID()
@@ -152,6 +227,32 @@ export async function updateCustomer({
 
     if (existingPhone.length > 0) {
       throw new HTTPException(400, { message: 'A customer with this phone number already exists in your shop' })
+    }
+  }
+
+  if (data.email && data.email.trim() !== '' && data.email.toLowerCase() !== (existing.email ?? '').toLowerCase()) {
+    const domainCheck = await verifyEmailDomain(data.email)
+    if (!domainCheck.valid) {
+      throw new HTTPException(400, {
+        message: domainCheck.reason || `Email address "${data.email}" does not exist or cannot receive mail.`,
+      })
+    }
+
+    const existingEmail = await db
+      .select({ id: customers.id, name: customers.name })
+      .from(customers)
+      .where(
+        and(
+          eq(customers.shopId, shopId),
+          ilike(customers.email, data.email.trim()),
+          sql`${customers.id} != ${id}`,
+        ),
+      )
+
+    if (existingEmail.length > 0) {
+      throw new HTTPException(400, {
+        message: `A customer (${existingEmail[0].name}) with email "${data.email}" already exists in your shop`,
+      })
     }
   }
 

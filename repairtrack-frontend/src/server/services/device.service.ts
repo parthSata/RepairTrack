@@ -80,7 +80,7 @@ export async function listDevices({
         phone: customers.phone,
         email: customers.email,
       },
-      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = ${devices.id})`,
+      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = devices.id), 0)`,
     })
     .from(devices)
     .leftJoin(customers, eq(customers.id, devices.customerId))
@@ -121,7 +121,7 @@ export async function getDeviceById({ shopId, id }: { shopId: string; id: string
         phone: customers.phone,
         email: customers.email,
       },
-      totalRepairs: sql<number>`(SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = ${devices.id})`,
+      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = devices.id), 0)`,
     })
     .from(devices)
     .leftJoin(customers, eq(customers.id, devices.customerId))
@@ -153,9 +153,7 @@ export async function createDevice({
   }
 
   const modelVal = data.model?.trim() || null
-  const isModelProvided = Boolean(modelVal)
-  const markUnverified = Boolean(data.markUnverified)
-  const modelVerified = isModelProvided && !markUnverified
+  const modelVerified = true
 
   const id = crypto.randomUUID()
   const [created] = await db
