@@ -24,15 +24,33 @@ export function LoginForm() {
   async function onSubmit(values: LoginInput) {
     setFormError(null)
     setUnverifiedEmail(null)
+
     const result = await authClient.signIn.email({ ...values, callbackURL: '/dashboard' })
     if (result.error) {
-      const msg = result.error.message || 'Those credentials do not match an account.'
-      setFormError(msg)
-      if (msg.toLowerCase().includes('verify') || msg.toLowerCase().includes('email')) {
-        setUnverifiedEmail(values.email)
+      try {
+        const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)
+        if (checkRes.ok) {
+          const userStatus = (await checkRes.json()) as { exists: boolean; emailVerified: boolean }
+          if (!userStatus.exists) {
+            setFormError('User account does not exist. Please check your email or sign up.')
+            setUnverifiedEmail(null)
+            return
+          }
+          if (userStatus.exists && !userStatus.emailVerified) {
+            setFormError('Your email address is not verified. Please verify your email before signing in.')
+            setUnverifiedEmail(values.email)
+            return
+          }
+        }
+      } catch {
+        // Fallback if status check fails
       }
+
+      setFormError('Invalid email or password.')
+      setUnverifiedEmail(null)
       return
     }
+
     router.push('/dashboard')
     router.refresh()
   }
@@ -40,6 +58,8 @@ export function LoginForm() {
   async function signInWithGoogle() {
     setFormError(null)
     setUnverifiedEmail(null)
+    setIsGooglePending(true)
+
     const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
     if (result.error) {
       setFormError('Google sign-in is unavailable right now.')

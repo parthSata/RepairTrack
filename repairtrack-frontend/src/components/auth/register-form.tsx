@@ -25,13 +25,39 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterInput) {
     setFormError(null)
+
+    // 1. Email domain validity check
     try {
       const response = await apiClient.post<{ valid: boolean }>('email-check', { email: values.email })
-      if (!response.data.valid) throw new Error('Email domain is not valid')
+      if (!response.data.valid) {
+        throw new Error('Email domain is not valid')
+      }
     } catch {
       setFormError('This email address cannot receive email. Check the address and try again.')
       return
     }
+
+    // 2. Pre-check if user already exists
+    try {
+      const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)
+      if (checkRes.ok) {
+        const userStatus = (await checkRes.json()) as { exists: boolean; emailVerified: boolean }
+        if (userStatus.exists) {
+          if (userStatus.emailVerified) {
+            setFormError('This email address is already registered. Please sign in.')
+            return
+          } else {
+            setVerificationEmail(values.email)
+            setVerificationSent(true)
+            return
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Perform Sign-Up
     try {
       await apiClient.post('auth/sign-up/email', {
         email: values.email,
@@ -40,10 +66,26 @@ export function RegisterForm() {
         shopName: values.shopName,
         callbackURL: '/dashboard',
       })
-    } catch {
-      setFormError('Unable to create your account.')
+    } catch (err: unknown) {
+      // Fallback user status check after failure
+      try {
+        const checkRes = await fetch(`/api/email-check/user-status?email=${encodeURIComponent(values.email)}`)
+        if (checkRes.ok) {
+          const userStatus = (await checkRes.json()) as { exists: boolean; emailVerified: boolean }
+          if (userStatus.exists && !userStatus.emailVerified) {
+            setVerificationEmail(values.email)
+            setVerificationSent(true)
+            return
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      setFormError('Unable to create your account or email is already registered.')
       return
     }
+
     setVerificationEmail(values.email)
     setVerificationSent(true)
   }

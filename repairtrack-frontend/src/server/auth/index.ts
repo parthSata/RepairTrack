@@ -5,8 +5,9 @@ import { db } from '@/server/db'
 import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
 import { sendEmail } from '@/server/services/gmail.service'
 
-function readShopName(body: unknown, userName: string) {
-  const fallbackName = `${userName}'s shop`
+function readShopName(body: unknown, userName?: string): string {
+  const nameStr = userName || 'Owner'
+  const fallbackName = `${nameStr}'s shop`
   if (!body || typeof body !== 'object' || !('shopName' in body)) return fallbackName
 
   const shopName = (body as Record<string, unknown>).shopName
@@ -43,20 +44,51 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user, context) => {
-          if (typeof user.shopId === 'string' && user.shopId.trim().length > 0) return
+          // Prevent duplicate account registration on the same email address across any auth method
+          const [existing] = await db
+            .select({ id: users.id, email: users.email, emailVerified: users.emailVerified })
+            .from(users)
+            .where(eq(users.email, user.email.trim()))
 
-          const shopId = crypto.randomUUID()
-          await db.insert(shops).values({
-            id: shopId,
-            name: readShopName(context?.body, user.name),
-          })
+          if (existing) {
+            throw new Error('An account with this email address already exists. Please sign in instead.')
+          }
+
+          const userShopId = (user as { shopId?: string }).shopId
+          const isShopExisting = typeof userShopId === 'string' && userShopId.trim().length > 0
+          const shopId = isShopExisting ? userShopId : crypto.randomUUID()
+
+          if (!isShopExisting) {
+            const shopName = readShopName(context?.body, user.name)
+            await db.insert(shops).values({
+              id: shopId,
+              name: shopName,
+            })
+          }
 
           return {
             data: {
               ...user,
-              role: 'OWNER',
+              role: (user as { role?: string }).role ?? 'OWNER',
               shopId,
+              emailVerified: Boolean(user.emailVerified),
             },
+          }
+        },
+        after: async (user) => {
+          if (!user.emailVerified) {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+            const url = `${appUrl}/verify-email?email=${encodeURIComponent(user.email)}`
+            try {
+              const result = await sendEmail({
+                to: user.email,
+                subject: 'Verify your RepairTrack email',
+                html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
+              })
+              if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
+            } catch (err) {
+              console.warn('Failed to send verification email for user:', err)
+            }
           }
         },
       },
@@ -141,3 +173,4 @@ export const auth = betterAuth({
     },
   },
 })
+

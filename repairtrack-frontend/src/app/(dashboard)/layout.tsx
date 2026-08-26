@@ -11,6 +11,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
 
+  if (!session.user.emailVerified) {
+    redirect(`/verify-email?email=${encodeURIComponent(session.user.email)}`)
+  }
+
   const role = session.user.role ?? 'OWNER'
   const restricted = role === 'TECHNICIAN'
   const owner = role === 'OWNER'

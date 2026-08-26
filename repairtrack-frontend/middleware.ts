@@ -3,10 +3,19 @@ import type { NextRequest } from 'next/server'
 import { auth } from '@/server/auth'
 
 export async function middleware(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session) return NextResponse.redirect(new URL('/login', request.url))
-
   const path = request.nextUrl.pathname
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  const userEmail = session.user?.email ?? ''
+  const isEmailVerified = Boolean(session.user?.emailVerified)
+
+  if (!isEmailVerified) {
+    return NextResponse.redirect(new URL(`/verify-email?email=${encodeURIComponent(userEmail)}`, request.url))
+  }
+
   const role = session.user?.role ?? 'OWNER'
 
   // STAFF role: allowed on all operational pages except shop & staff settings
