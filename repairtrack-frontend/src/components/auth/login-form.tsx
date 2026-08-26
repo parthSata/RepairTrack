@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import { LoaderCircle, LogIn, ShieldAlert } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -16,22 +16,18 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const errorParam = searchParams.get('error')
+  const isDeactivatedParam = errorParam === 'account_deactivated'
 
   const [formError, setFormError] = useState<string | null>(null)
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null)
   const [isInactiveUser, setIsInactiveUser] = useState(false)
   const [isGooglePending, setIsGooglePending] = useState(false)
 
+  const showInactiveUser = isDeactivatedParam || isInactiveUser
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   })
-
-  useEffect(() => {
-    if (errorParam === 'account_deactivated') {
-      setIsInactiveUser(true)
-      setFormError('Your account has been deactivated. Contact your shop owner for activation.')
-    }
-  }, [errorParam])
 
   async function onSubmit(values: LoginInput) {
     setFormError(null)
@@ -49,7 +45,6 @@ export function LoginForm() {
       }
       return
     }
-
     router.push('/dashboard')
     router.refresh()
   }
@@ -70,7 +65,7 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-      {isInactiveUser ? (
+      {showInactiveUser ? (
         <div role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-800 dark:text-amber-300 space-y-2">
           <div className="flex items-center gap-2 font-semibold text-sm">
             <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
