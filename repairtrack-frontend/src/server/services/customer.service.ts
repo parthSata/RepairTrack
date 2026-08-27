@@ -28,14 +28,6 @@ export async function listCustomers({
     ? and(eq(customers.shopId, shopId), searchCondition)
     : eq(customers.shopId, shopId)
 
-  const countResult = await db
-    .select({ total: count() })
-    .from(customers)
-    .where(whereClause)
-
-  const total = countResult[0]?.total ?? 0
-  const totalPages = Math.ceil(total / limit) || 1
-
   const sortColumn =
     sortBy === 'name'
       ? customers.name
@@ -45,25 +37,35 @@ export async function listCustomers({
       ? customers.updatedAt
       : customers.createdAt
 
-  const items = await db
-    .select({
-      id: customers.id,
-      shopId: customers.shopId,
-      name: customers.name,
-      phone: customers.phone,
-      email: customers.email,
-      address: customers.address,
-      notes: customers.notes,
-      createdAt: customers.createdAt,
-      updatedAt: customers.updatedAt,
-      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = customers.id), 0)`,
-      lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = customers.id)`,
-    })
-    .from(customers)
-    .where(whereClause)
-    .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
-    .limit(limit)
-    .offset(offset)
+  const [countResult, items] = await Promise.all([
+    db
+      .select({ total: count() })
+      .from(customers)
+      .where(whereClause),
+
+    db
+      .select({
+        id: customers.id,
+        shopId: customers.shopId,
+        name: customers.name,
+        phone: customers.phone,
+        email: customers.email,
+        address: customers.address,
+        notes: customers.notes,
+        createdAt: customers.createdAt,
+        updatedAt: customers.updatedAt,
+        totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.customer_id = customers.id), 0)`,
+        lastVisit: sql<string | null>`(SELECT max(created_at) FROM repairs WHERE repairs.customer_id = customers.id)`,
+      })
+      .from(customers)
+      .where(whereClause)
+      .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
+      .limit(limit)
+      .offset(offset),
+  ])
+
+  const total = countResult[0]?.total ?? 0
+  const totalPages = Math.ceil(total / limit) || 1
 
   return {
     items,

@@ -40,15 +40,6 @@ export async function listDevices({
 
   const whereClause = and(...conditions)
 
-  const countResult = await db
-    .select({ total: count() })
-    .from(devices)
-    .leftJoin(customers, eq(customers.id, devices.customerId))
-    .where(whereClause)
-
-  const total = countResult[0]?.total ?? 0
-  const totalPages = Math.ceil(total / limit) || 1
-
   const sortColumn =
     sortBy === 'brand'
       ? devices.brand
@@ -58,36 +49,47 @@ export async function listDevices({
       ? devices.updatedAt
       : devices.createdAt
 
-  const items = await db
-    .select({
-      id: devices.id,
-      shopId: devices.shopId,
-      customerId: devices.customerId,
-      brand: devices.brand,
-      model: devices.model,
-      serialNumber: devices.serialNumber,
-      deviceType: devices.deviceType,
-      condition: devices.condition,
-      accessories: devices.accessories,
-      modelVerified: devices.modelVerified,
-      modelVerificationOverridden: devices.modelVerificationOverridden,
-      modelVerificationNote: devices.modelVerificationNote,
-      createdAt: devices.createdAt,
-      updatedAt: devices.updatedAt,
-      customer: {
-        id: customers.id,
-        name: customers.name,
-        phone: customers.phone,
-        email: customers.email,
-      },
-      totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = devices.id), 0)`,
-    })
-    .from(devices)
-    .leftJoin(customers, eq(customers.id, devices.customerId))
-    .where(whereClause)
-    .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
-    .limit(limit)
-    .offset(offset)
+  const [countResult, items] = await Promise.all([
+    db
+      .select({ total: count() })
+      .from(devices)
+      .leftJoin(customers, eq(customers.id, devices.customerId))
+      .where(whereClause),
+
+    db
+      .select({
+        id: devices.id,
+        shopId: devices.shopId,
+        customerId: devices.customerId,
+        brand: devices.brand,
+        model: devices.model,
+        serialNumber: devices.serialNumber,
+        deviceType: devices.deviceType,
+        condition: devices.condition,
+        accessories: devices.accessories,
+        modelVerified: devices.modelVerified,
+        modelVerificationOverridden: devices.modelVerificationOverridden,
+        modelVerificationNote: devices.modelVerificationNote,
+        createdAt: devices.createdAt,
+        updatedAt: devices.updatedAt,
+        customer: {
+          id: customers.id,
+          name: customers.name,
+          phone: customers.phone,
+          email: customers.email,
+        },
+        totalRepairs: sql<number>`COALESCE((SELECT COUNT(*)::int FROM repairs WHERE repairs.device_id = devices.id), 0)`,
+      })
+      .from(devices)
+      .leftJoin(customers, eq(customers.id, devices.customerId))
+      .where(whereClause)
+      .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
+      .limit(limit)
+      .offset(offset),
+  ])
+
+  const total = countResult[0]?.total ?? 0
+  const totalPages = Math.ceil(total / limit) || 1
 
   return {
     items,

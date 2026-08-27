@@ -71,6 +71,13 @@
       "when": 1787557532381,
       "tag": "0009_flat_frank_castle",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787759366592,
+      "tag": "0010_dark_liz_osborn",
+      "breakpoints": true
     }
   ]
 }

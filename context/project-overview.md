@@ -192,14 +192,18 @@ sign in; they use the public tracking page only.
 | Create/edit customers, devices | yes | yes | no |
 | Create repair ticket | yes | yes | no |
 | Assign technician | yes | yes | no |
-| Update repair status, diagnosis, notes | yes | yes | assigned repairs only |
+| Update repair status | NO* | yes | assigned repairs only |
+| Edit diagnosis, add repair notes | yes | yes | assigned repairs only |
+| Reopen COMPLETED/CANCELLED ticket | yes | no | no |
 | Record parts used | yes | yes | assigned repairs only |
 | Create/edit invoices, record payments | yes | yes | no |
 | Manage inventory | yes | yes | no |
 | View reports | yes | yes | no |
 | Manage staff, shop settings | yes | no | no |
 | Connect/disconnect shop Gmail | yes | no | no |
-| Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no 
+| Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no |
+
+* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER retains the single administrative override exception to reopen COMPLETED or CANCELLED tickets.
 
 Every mutating endpoint must check this table server-side. If an
 action is not listed, ask before implementing a permission for it.
