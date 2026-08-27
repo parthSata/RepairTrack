@@ -1,10 +1,22 @@
-import postgres from 'postgres';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import * as schema from './schema';
+import postgres from 'postgres'
+import { drizzle } from 'drizzle-orm/postgres-js'
+import * as schema from './schema'
 
-const connection = postgres(process.env.DATABASE_URL!, {
-  prepare: false,
-});
+const globalForDb = globalThis as unknown as {
+  conn: postgres.Sql | undefined
+}
 
-export const db = drizzle(connection, { schema });
+const connection =
+  globalForDb.conn ??
+  postgres(process.env.DATABASE_URL!, {
+    prepare: false,
+    max: 10,
+    idle_timeout: 30,
+    connect_timeout: 10,
+  })
 
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb.conn = connection
+}
+
+export const db = drizzle(connection, { schema })

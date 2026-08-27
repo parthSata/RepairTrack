@@ -128,27 +128,6 @@ export const auth = betterAuth({
                 message: 'Your account has been deactivated. Contact the owner for activation.',
               })
             }
-
-            const userAccounts = await db
-              .select()
-              .from(accounts)
-              .where(eq(accounts.userId, session.userId))
-
-            for (const account of userAccounts) {
-              if (!account.accessToken || !account.refreshToken) {
-                const now = new Date()
-                await db
-                  .update(accounts)
-                  .set({
-                    accessToken: account.accessToken ?? crypto.randomUUID(),
-                    refreshToken: account.refreshToken ?? crypto.randomUUID(),
-                    accessTokenExpiresAt: account.accessTokenExpiresAt ?? new Date(now.getTime() + 24 * 60 * 60 * 1000),
-                    refreshTokenExpiresAt: account.refreshTokenExpiresAt ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
-                    updatedAt: now,
-                  })
-                  .where(eq(accounts.id, account.id))
-              }
-            }
           }
         },
       },

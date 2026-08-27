@@ -345,63 +345,58 @@ export async function getRepairById({
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
-  // Fetch creator info
-  let creator = null
-  if (repair.createdBy) {
-    const [c] = await db
-      .select({ id: users.id, name: users.name, email: users.email, role: users.role })
-      .from(users)
-      .where(eq(users.id, repair.createdBy))
-    creator = c || null
-  }
+  // Fetch creator info, assigned technician, notes, and status history concurrently in parallel
+  const [creatorResult, techResult, notes, statusHistory] = await Promise.all([
+    repair.createdBy
+      ? db
+          .select({ id: users.id, name: users.name, email: users.email, role: users.role })
+          .from(users)
+          .where(eq(users.id, repair.createdBy))
+      : Promise.resolve([]),
+    repair.assignedTechnicianId
+      ? db
+          .select({ id: users.id, name: users.name, email: users.email })
+          .from(users)
+          .where(eq(users.id, repair.assignedTechnicianId))
+      : Promise.resolve([]),
+    db
+      .select({
+        id: repairNotes.id,
+        note: repairNotes.note,
+        createdAt: repairNotes.createdAt,
+        author: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+        },
+      })
+      .from(repairNotes)
+      .leftJoin(users, eq(users.id, repairNotes.authorId))
+      .where(eq(repairNotes.repairId, id))
+      .orderBy(asc(repairNotes.createdAt)),
+    db
+      .select({
+        id: repairStatusHistory.id,
+        fromStatus: repairStatusHistory.fromStatus,
+        toStatus: repairStatusHistory.toStatus,
+        note: repairStatusHistory.note,
+        createdAt: repairStatusHistory.createdAt,
+        changedBy: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+        },
+      })
+      .from(repairStatusHistory)
+      .leftJoin(users, eq(users.id, repairStatusHistory.changedBy))
+      .where(eq(repairStatusHistory.repairId, id))
+      .orderBy(asc(repairStatusHistory.createdAt)),
+  ])
 
-  // Fetch assigned technician info
-  let assignedTechnician = null
-  if (repair.assignedTechnicianId) {
-    const [t] = await db
-      .select({ id: users.id, name: users.name, email: users.email })
-      .from(users)
-      .where(eq(users.id, repair.assignedTechnicianId))
-    assignedTechnician = t || null
-  }
-
-  // Fetch repair notes
-  const notes = await db
-    .select({
-      id: repairNotes.id,
-      note: repairNotes.note,
-      createdAt: repairNotes.createdAt,
-      author: {
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        role: users.role,
-      },
-    })
-    .from(repairNotes)
-    .leftJoin(users, eq(users.id, repairNotes.authorId))
-    .where(eq(repairNotes.repairId, id))
-    .orderBy(asc(repairNotes.createdAt))
-
-  // Fetch status history
-  const statusHistory = await db
-    .select({
-      id: repairStatusHistory.id,
-      fromStatus: repairStatusHistory.fromStatus,
-      toStatus: repairStatusHistory.toStatus,
-      note: repairStatusHistory.note,
-      createdAt: repairStatusHistory.createdAt,
-      changedBy: {
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        role: users.role,
-      },
-    })
-    .from(repairStatusHistory)
-    .leftJoin(users, eq(users.id, repairStatusHistory.changedBy))
-    .where(eq(repairStatusHistory.repairId, id))
-    .orderBy(asc(repairStatusHistory.createdAt))
+  const creator = creatorResult[0] || null
+  const assignedTechnician = techResult[0] || null
 
   return {
     ...repair,
