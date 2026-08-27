@@ -57,21 +57,30 @@ export function NewRepairWorkflow() {
   const [deviceDialogOpen, setDeviceDialogOpen] = React.useState(false)
 
   const [customerSearch, setCustomerSearch] = React.useState('')
+  const [debouncedCustomerSearch, setDebouncedCustomerSearch] = React.useState('')
   const [createdRepair, setCreatedRepair] = React.useState<Repair | null>(null)
+
+  // Debounce customer search input by 300ms to eliminate instant DB queries on every keystroke
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCustomerSearch(customerSearch)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [customerSearch])
 
   // 1. Fetch Customers
   const { data: customersData, isLoading: isLoadingCustomers } = useCustomers({
     page: 1,
-    limit: 100,
+    limit: 20,
     sortBy: 'createdAt',
     sortOrder: 'desc',
-    search: customerSearch.trim() || undefined,
+    search: debouncedCustomerSearch.trim() || undefined,
   })
 
   // 2. Fetch Devices for Selected Customer
   const { data: devicesData, isLoading: isLoadingDevices } = useDevices({
     page: 1,
-    limit: 100,
+    limit: 50,
     sortBy: 'createdAt',
     sortOrder: 'desc',
     customerId: selectedCustomer?.id || 'none',
