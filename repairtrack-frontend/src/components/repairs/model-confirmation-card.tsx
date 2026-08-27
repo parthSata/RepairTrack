@@ -3,14 +3,25 @@
 import * as React from 'react'
 import { AlertTriangle, Check, ShieldAlert } from 'lucide-react'
 import { useUpdateDevice } from '@/features/devices/mutations'
-import type { Device } from '@/features/devices/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/components/ui/sonner'
 
 interface ModelConfirmationCardProps {
-  device: Device
+  device: {
+    id: string
+    customerId?: string
+    brand: string
+    model: string | null
+    deviceType: 'PHONE' | 'LAPTOP' | 'TABLET' | 'DESKTOP' | 'OTHER'
+    condition: 'GOOD' | 'FAIR' | 'POOR'
+    modelVerified: boolean
+    modelVerificationOverridden?: boolean
+    modelVerificationNote?: string | null
+    serialNumber?: string | null
+    accessories?: string | null
+  }
   onConfirmed?: () => void
 }
 
@@ -39,7 +50,7 @@ export function ModelConfirmationCard({ device, onConfirmed }: ModelConfirmation
       await updateMutation.mutateAsync({
         id: device.id,
         data: {
-          customerId: device.customerId,
+          customerId: device.customerId || '',
           brand: brand.trim(),
           model: model.trim(),
           deviceType: device.deviceType,
@@ -71,7 +82,7 @@ export function ModelConfirmationCard({ device, onConfirmed }: ModelConfirmation
       await updateMutation.mutateAsync({
         id: device.id,
         data: {
-          customerId: device.customerId,
+          customerId: device.customerId || '',
           brand: device.brand,
           model: device.model,
           deviceType: device.deviceType,

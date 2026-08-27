@@ -16,7 +16,13 @@ export async function getTechnicians(shopId: string) {
       role: users.role,
     })
     .from(users)
-    .where(and(eq(users.shopId, shopId), eq(users.role, 'TECHNICIAN')))
+    .where(
+      and(
+        eq(users.shopId, shopId),
+        inArray(users.role, ['TECHNICIAN', 'STAFF']),
+        eq(users.status, 'ACTIVE'),
+      ),
+    )
 
   return techs
 }

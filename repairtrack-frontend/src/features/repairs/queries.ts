@@ -8,7 +8,14 @@ export interface TechnicianUser {
   id: string
   name: string
   email: string
-  role: 'TECHNICIAN'
+  role: 'TECHNICIAN' | 'STAFF'
+}
+
+export interface RepairCreator {
+  id: string
+  name: string
+  email: string
+  role: 'OWNER' | 'STAFF'
 }
 
 export interface RepairCustomer {
@@ -20,6 +27,7 @@ export interface RepairCustomer {
 
 export interface RepairDevice {
   id: string
+  customerId?: string
   brand: string
   model: string | null
   serialNumber: string | null
@@ -37,6 +45,22 @@ export interface RepairNote {
   author: {
     id: string
     name: string
+    email?: string
+    role?: string
+  }
+}
+
+export interface RepairStatusHistoryItem {
+  id: string
+  fromStatus: string | null
+  toStatus: string
+  note: string | null
+  createdAt: string
+  changedBy: {
+    id: string
+    name: string
+    email?: string
+    role?: string
   }
 }
 
@@ -50,6 +74,7 @@ export interface Repair {
   problemDescription: string | null
   issueDescription: string | null
   initialCondition: string | null
+  diagnosis: string | null
   estimatedCost: number | null
   finalCost: number | null
   priority: RepairPriority
@@ -61,15 +86,19 @@ export interface Repair {
   customer: RepairCustomer
   device: RepairDevice
   assignedTechnician?: TechnicianUser | null
+  creator?: RepairCreator | null
   notes?: RepairNote[]
+  statusHistory?: RepairStatusHistoryItem[]
 }
 
 export interface RepairListResponse {
   items: Repair[]
-  total: number
-  page: number
-  limit: number
-  totalPages: number
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    totalPages: number
+  }
 }
 
 export const repairKeys = {
@@ -90,7 +119,7 @@ export function useRepairs(filters: RepairFilterInput) {
       })
       return response.data
     },
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
     placeholderData: keepPreviousData,
   })
 }
@@ -103,7 +132,7 @@ export function useRepair(id: string) {
       return response.data
     },
     enabled: Boolean(id),
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
   })
 }
 
@@ -111,9 +140,14 @@ export function useTechnicians() {
   return useQuery<TechnicianUser[]>({
     queryKey: repairKeys.technicians(),
     queryFn: async () => {
-      const response = await apiClient.get<TechnicianUser[]>('/staff/technicians')
-      return response.data
+      try {
+        const response = await apiClient.get<TechnicianUser[]>('/staff/technicians')
+        return response.data
+      } catch {
+        const response = await apiClient.get<TechnicianUser[]>('/repairs/technicians')
+        return response.data
+      }
     },
-    staleTime: 60 * 1000,
+    staleTime: 10 * 1000,
   })
 }

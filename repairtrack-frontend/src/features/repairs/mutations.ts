@@ -21,8 +21,155 @@ export function useCreateRepair() {
     onError: (error: unknown) => {
       let message = 'Failed to create repair ticket'
       if (error && typeof error === 'object' && 'response' in error) {
-        const resData = (error as { response?: { data?: { error?: { message?: string } } } }).response?.data
-        if (resData?.error?.message) {
+        const resData = (error as { response?: { data?: { error?: { message?: string } | string; message?: string } } }).response?.data
+        if (typeof resData?.error === 'object' && resData.error?.message) {
+          message = resData.error.message
+        } else if (resData?.message) {
+          message = resData.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useUpdateRepairStatus(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { status: string; note?: string }>({
+    mutationFn: async ({ status, note }) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/status`, { status, note })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Repair status updated successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to update repair status'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useReopenRepair(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { note?: string }>({
+    mutationFn: async ({ note }) => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, { note })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Repair ticket reopened successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to reopen ticket'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useReassignTechnician(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { technicianId: string | null }>({
+    mutationFn: async ({ technicianId }) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/technician`, { technicianId })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Technician assignment updated!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to reassign technician'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useUpdateDiagnosis(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { diagnosis: string }>({
+    mutationFn: async ({ diagnosis }) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/diagnosis`, { diagnosis })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Diagnosis updated successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to update diagnosis'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useAddRepairNote(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ id: string; note: string }, Error, { note: string }>({
+    mutationFn: async ({ note }) => {
+      const response = await apiClient.post<{ id: string; note: string }>(`/repairs/${repairId}/notes`, { note })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      toast.success('Repair note added successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to add repair note'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
           message = resData.error.message
         }
       } else if (error instanceof Error) {

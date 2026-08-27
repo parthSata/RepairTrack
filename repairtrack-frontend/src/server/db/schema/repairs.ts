@@ -83,6 +83,7 @@ export const repairs = pgTable(
     problemDescription: text('problem_description'),
     issueDescription: text('issue_description'),
     initialCondition: text('initial_condition'),
+    diagnosis: text('diagnosis'),
     estimatedCost: integer('estimated_cost'),
     finalCost: integer('final_cost'),
     priority: repairPriorityEnum('priority').default('MEDIUM').notNull(),
@@ -119,6 +120,24 @@ export const repairNotes = pgTable(
   (table) => [index('repair_notes_repair_id_idx').on(table.repairId)],
 )
 
+export const repairStatusHistory = pgTable(
+  'repair_status_history',
+  {
+    id: text('id').primaryKey(),
+    repairId: text('repair_id')
+      .notNull()
+      .references(() => repairs.id, { onDelete: 'cascade' }),
+    fromStatus: repairStatusEnum('from_status'),
+    toStatus: repairStatusEnum('to_status').notNull(),
+    changedBy: text('changed_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('repair_status_history_repair_id_idx').on(table.repairId)],
+)
+
 export const repairsRelations = relations(repairs, ({ one, many }) => ({
   shop: one(shops, { fields: [repairs.shopId], references: [shops.id] }),
   customer: one(customers, { fields: [repairs.customerId], references: [customers.id] }),
@@ -129,10 +148,17 @@ export const repairsRelations = relations(repairs, ({ one, many }) => ({
   }),
   creator: one(users, { fields: [repairs.createdBy], references: [users.id] }),
   notes: many(repairNotes),
+  statusHistory: many(repairStatusHistory),
 }))
 
 export const repairNotesRelations = relations(repairNotes, ({ one }) => ({
   repair: one(repairs, { fields: [repairNotes.repairId], references: [repairs.id] }),
   author: one(users, { fields: [repairNotes.authorId], references: [users.id] }),
 }))
+
+export const repairStatusHistoryRelations = relations(repairStatusHistory, ({ one }) => ({
+  repair: one(repairs, { fields: [repairStatusHistory.repairId], references: [repairs.id] }),
+  changedByUser: one(users, { fields: [repairStatusHistory.changedBy], references: [users.id] }),
+}))
+
 

@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { changeStaffRoleSchema, inviteStaffSchema, setStaffStatusSchema } from '@/features/staff/schemas'
 import { auth } from '@/server/auth'
-import { changeStaffRole, inviteStaff, listStaff, setStaffStatus } from '@/server/services/staff.service'
+import { changeStaffRole, getTechnicians, inviteStaff, listStaff, setStaffStatus } from '@/server/services/staff.service'
 
 const staffRouter = new Hono()
 
@@ -16,10 +16,25 @@ async function ownerSession(request: Request) {
   return { session, shopId: session.user.shopId, userId: session.user.id }
 }
 
+async function shopUserSession(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers })
+  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
+  if (!session.user.shopId) {
+    throw new HTTPException(403, { message: 'Shop context missing' })
+  }
+  return { session, shopId: session.user.shopId, userId: session.user.id }
+}
+
 staffRouter.get('/', async (c) => {
   const { shopId } = await ownerSession(c.req.raw)
   const staffList = await listStaff(shopId)
   return c.json(staffList)
+})
+
+staffRouter.get('/technicians', async (c) => {
+  const { shopId } = await shopUserSession(c.req.raw)
+  const techs = await getTechnicians(shopId)
+  return c.json(techs)
 })
 
 staffRouter.post(
@@ -70,4 +85,3 @@ staffRouter.patch(
 )
 
 export { staffRouter }
-
