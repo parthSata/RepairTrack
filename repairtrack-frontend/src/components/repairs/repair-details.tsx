@@ -13,6 +13,7 @@ import {
   Wrench,
   UserCheck,
   AlertCircle,
+  AlertTriangle,
   Plus,
   Calendar,
   Pencil,
@@ -61,7 +62,9 @@ import {
   useUpdateDiagnosis,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
+import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
+import { toast } from 'sonner'
 
 export function RepairDetails({ id }: { id: string }) {
   const { data: session } = useSession()
@@ -141,7 +144,8 @@ export function RepairDetails({ id }: { id: string }) {
   const isAssignedTechnician = repair.assignedTechnicianId === userId
   const canEditDiagnosisAndNotes = ['OWNER', 'STAFF'].includes(userRole) || isAssignedTechnician
   const canReassignTechnician = ['OWNER', 'STAFF'].includes(userRole)
-  const canEditExpectedDate = ['OWNER', 'STAFF'].includes(userRole)
+  const canEditExpectedDate = canEditDiagnosisAndNotes
+  const todayDateMin = formatDateInputValue()
 
   const showModelConfirmationCard =
     repair.status === 'DIAGNOSING' &&
@@ -161,6 +165,11 @@ export function RepairDetails({ id }: { id: string }) {
   }
 
   const handleSaveExpectedDate = async () => {
+    if (expectedDateValue && isExpectedCompletionDateInPast(expectedDateValue)) {
+      toast.error('Expected completion date must not be in the past')
+      return
+    }
+
     await updateExpectedDateMutation.mutateAsync({
       expectedCompletionDate: expectedDateValue ? new Date(expectedDateValue).toISOString() : null,
     })
@@ -235,7 +244,7 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Status Control Box */}
-            <div className="w-full lg:w-auto lg:min-w-[280px]">
+            <div className="w-full lg:w-auto lg:min-w-70">
               <StatusChangeControl
                 repairId={repair.id}
                 currentStatus={repair.status}
@@ -351,7 +360,7 @@ export function RepairDetails({ id }: { id: string }) {
               )}
             </div>
 
-            {/* Expected Completion Date (Editable by Owner & Staff) */}
+            {/* Expected Completion Date */}
             <div className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                 <Calendar className="h-3.5 w-3.5" />
@@ -364,6 +373,7 @@ export function RepairDetails({ id }: { id: string }) {
                     <Input
                       type="date"
                       value={expectedDateValue}
+                      min={todayDateMin}
                       onChange={(e) => setExpectedDateValue(e.target.value)}
                       className="h-8 text-xs flex-1 px-2"
                     />
@@ -387,10 +397,18 @@ export function RepairDetails({ id }: { id: string }) {
                     </Button>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 h-8">
-                    <span className="text-sm font-semibold text-foreground">
-                      {formatDate(repair.expectedCompletionDate)}
-                    </span>
+                  <div className="flex items-center justify-between gap-2 min-h-8">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold text-foreground">
+                        {formatDate(repair.expectedCompletionDate)}
+                      </span>
+                      {repair.isOverdue ? (
+                        <Badge variant="warning" className="gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Overdue
+                        </Badge>
+                      ) : null}
+                    </div>
                     <Button
                       type="button"
                       variant="outline"
@@ -404,8 +422,14 @@ export function RepairDetails({ id }: { id: string }) {
                   </div>
                 )
               ) : (
-                <div className="text-sm font-semibold text-foreground h-8 flex items-center">
-                  {formatDate(repair.expectedCompletionDate)}
+                <div className="text-sm font-semibold text-foreground min-h-8 flex items-center gap-2 flex-wrap">
+                  <span>{formatDate(repair.expectedCompletionDate)}</span>
+                  {repair.isOverdue ? (
+                    <Badge variant="warning" className="gap-1">
+                      <AlertTriangle className="h-3 w-3" />
+                      Overdue
+                    </Badge>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -579,7 +603,7 @@ export function RepairDetails({ id }: { id: string }) {
               repair.statusHistory.map((item) => (
                 <div key={item.id} className="relative group">
                   {/* Timeline point icon */}
-                  <div className="absolute -left-[31px] top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background border-2 border-primary text-primary">
+                  <div className="absolute -left-7.75 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background border-2 border-primary text-primary">
                     <CheckCircle2 className="h-3 w-3" />
                   </div>
 

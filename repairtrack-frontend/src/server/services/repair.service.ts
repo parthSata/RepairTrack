@@ -5,6 +5,11 @@ import { customers } from '@/server/db/schema/customers'
 import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
+import {
+  computeIsRepairOverdue,
+  isExpectedCompletionDateInPast,
+  overdueRepairCondition,
+} from '@/features/repairs/overdue'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -162,6 +167,7 @@ export async function listRepairs({
   userId,
   status,
   priority,
+  overdue,
   technicianId,
   startDate,
   endDate,
@@ -174,6 +180,7 @@ export async function listRepairs({
   userId: string
   status?: string
   priority?: string
+  overdue?: boolean
   technicianId?: string
   startDate?: string
   endDate?: string
@@ -199,6 +206,10 @@ export async function listRepairs({
 
   if (priority) {
     conditions.push(eq(repairs.priority, priority as typeof repairs.$inferSelect.priority))
+  }
+
+  if (overdue) {
+    conditions.push(overdueRepairCondition())
   }
 
   if (startDate) {
@@ -279,7 +290,10 @@ export async function listRepairs({
   const total = Number(countResult[0]?.count ?? 0)
 
   return {
-    items,
+    items: items.map((item) => ({
+      ...item,
+      isOverdue: computeIsRepairOverdue(item.expectedCompletionDate, item.status),
+    })),
     pagination: {
       page,
       limit,
@@ -405,6 +419,7 @@ export async function getRepairById({
 
   return {
     ...repair,
+    isOverdue: computeIsRepairOverdue(repair.expectedCompletionDate, repair.status),
     creator,
     assignedTechnician,
     notes,
@@ -712,28 +727,40 @@ export async function addRepairNote({
 export async function updateExpectedCompletionDate({
   shopId,
   userRole,
+  userId,
   id,
   expectedCompletionDate,
 }: {
   shopId: string
   userRole: string
+  userId: string
   id: string
   expectedCompletionDate?: string | null
 }) {
-  // Permission check: OWNER and STAFF only
-  if (['OWNER', 'STAFF'].includes(userRole) === false) {
-    throw new HTTPException(403, {
-      message: 'Forbidden: Only Owner and Staff can update the expected completion date.',
-    })
-  }
-
   const [existing] = await db
-    .select({ id: repairs.id })
+    .select({ id: repairs.id, assignedTechnicianId: repairs.assignedTechnicianId })
     .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
 
   if (!existing) {
     throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message:
+        'Forbidden: Technicians can only update the expected completion date on repairs assigned to them.',
+    })
+  }
+
+  if (
+    expectedCompletionDate &&
+    expectedCompletionDate.trim().length > 0 &&
+    isExpectedCompletionDateInPast(expectedCompletionDate)
+  ) {
+    throw new HTTPException(400, {
+      message: 'Expected completion date must not be in the past',
+    })
   }
 
   const completionDateObj = expectedCompletionDate && expectedCompletionDate.trim().length > 0

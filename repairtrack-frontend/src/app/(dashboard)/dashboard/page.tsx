@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ArrowUpRight, ClipboardList } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { DashboardStatCards } from '@/features/dashboard/components/dashboard-stat-cards'
+import { DashboardOverdueRepairs } from '@/features/dashboard/components/dashboard-overdue-repairs'
 
 export default function DashboardPage() {
   return (
@@ -25,6 +26,8 @@ export default function DashboardPage() {
       </section>
 
       <DashboardStatCards />
+
+      <DashboardOverdueRepairs />
 
       <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <Card className="border-border shadow-none">

@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   Wrench,
   Plus,
   Search,
   User,
   AlertCircle,
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -18,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 import { useRepairs, useTechnicians } from '@/features/repairs/queries'
 import { useSession } from '@/lib/auth-client'
 
@@ -154,11 +157,15 @@ function getPriorityBadgeClass(priority: string): string {
 export function RepairList() {
   const { data: session } = useSession()
   const userRole = (session?.user as { role?: string } | undefined)?.role ?? 'OWNER'
+  const searchParams = useSearchParams()
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState<string>('')
   const [priority, setPriority] = useState<string>('')
+  const [overdue, setOverdue] = useState<string>(() =>
+    searchParams.get('overdue') === 'true' ? 'true' : '',
+  )
   const [technicianId, setTechnicianId] = useState<string>('')
   const [page, setPage] = useState(1)
 
@@ -176,6 +183,7 @@ export function RepairList() {
     search: debouncedSearch || undefined,
     status: status || undefined,
     priority: priority || undefined,
+    overdue: overdue === 'true' ? true : undefined,
     technicianId: technicianId || undefined,
     page,
     limit: 10,
@@ -281,6 +289,19 @@ export function RepairList() {
             <option value="URGENT">Urgent</option>
           </select>
 
+          {/* Overdue Filter */}
+          <select
+            value={overdue}
+            onChange={(e) => {
+              setOverdue(e.target.value)
+              setPage(1)
+            }}
+            className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
+          >
+            <option value="">All Deadlines</option>
+            <option value="true">Overdue Only</option>
+          </select>
+
           {/* Technician Filter (Visible to Owner & Staff) */}
           {userRole !== 'TECHNICIAN' && (
             <select
@@ -301,7 +322,7 @@ export function RepairList() {
           )}
 
           {/* Reset Filters */}
-          {(search || status || priority || technicianId) && (
+          {(search || status || priority || overdue || technicianId) && (
             <Button
               variant="outline"
               size="sm"
@@ -309,6 +330,7 @@ export function RepairList() {
                 setSearch('')
                 setStatus('')
                 setPriority('')
+                setOverdue('')
                 setTechnicianId('')
                 setPage(1)
               }}
@@ -372,7 +394,7 @@ export function RepairList() {
           </div>
           <h3 className="text-lg font-bold text-foreground">No Repair Tickets Found</h3>
           <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
-            {search || status || priority || technicianId
+            {search || status || priority || overdue || technicianId
               ? 'No tickets matched your filter criteria. Try resetting your search filters.'
               : userRole === 'TECHNICIAN'
               ? 'You currently have no assigned repair tickets.'
@@ -481,7 +503,15 @@ export function RepairList() {
 
                       {/* Expected Completion */}
                       <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                        {formatDate(repair.expectedCompletionDate)}
+                        <div className="flex items-center gap-2">
+                          <span>{formatDate(repair.expectedCompletionDate)}</span>
+                          {repair.isOverdue ? (
+                            <Badge variant="warning" className="gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              Overdue
+                            </Badge>
+                          ) : null}
+                        </div>
                       </td>
 
                       {/* Created Date */}
