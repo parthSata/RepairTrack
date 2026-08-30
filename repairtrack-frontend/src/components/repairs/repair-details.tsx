@@ -14,8 +14,11 @@ import {
   UserCheck,
   AlertCircle,
   Plus,
+  Calendar,
+  Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 function formatDateTime(dateStr?: string | null): string {
   if (!dateStr) return '-'
@@ -31,6 +34,19 @@ function formatDateTime(dateStr?: string | null): string {
     return '-'
   }
 }
+
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return 'Not set'
+  try {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  } catch {
+    return 'Not set'
+  }
+}
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +59,7 @@ import {
   useAddRepairNote,
   useReassignTechnician,
   useUpdateDiagnosis,
+  useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
 import { useSession } from '@/lib/auth-client'
 
@@ -57,17 +74,33 @@ export function RepairDetails({ id }: { id: string }) {
   const reassignMutation = useReassignTechnician(id)
   const diagnosisMutation = useUpdateDiagnosis(id)
   const addNoteMutation = useAddRepairNote(id)
+  const updateExpectedDateMutation = useUpdateExpectedCompletionDate(id)
 
   const [selectedTechId, setSelectedTechId] = React.useState<string>('')
   const [diagnosisText, setDiagnosisText] = React.useState<string>('')
   const [prevRepairId, setPrevRepairId] = React.useState<string | null>(null)
   const [isDiagnosisEditing, setIsDiagnosisEditing] = React.useState<boolean>(false)
   const [newNoteText, setNewNoteText] = React.useState<string>('')
+  const [isEditingExpectedDate, setIsEditingExpectedDate] = React.useState<boolean>(false)
+  const [expectedDateValue, setExpectedDateValue] = React.useState<string>('')
 
   if (repair && prevRepairId !== repair.id) {
     setPrevRepairId(repair.id)
     setSelectedTechId(repair.assignedTechnicianId ?? '')
     setDiagnosisText(repair.diagnosis ?? '')
+    if (repair.expectedCompletionDate) {
+      const dateObj = new Date(repair.expectedCompletionDate)
+      if (!isNaN(dateObj.getTime())) {
+        const yyyy = dateObj.getFullYear()
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0')
+        const dd = String(dateObj.getDate()).padStart(2, '0')
+        setExpectedDateValue(`${yyyy}-${mm}-${dd}`)
+      } else {
+        setExpectedDateValue('')
+      }
+    } else {
+      setExpectedDateValue('')
+    }
   }
 
   if (isLoading) {
@@ -108,6 +141,7 @@ export function RepairDetails({ id }: { id: string }) {
   const isAssignedTechnician = repair.assignedTechnicianId === userId
   const canEditDiagnosisAndNotes = ['OWNER', 'STAFF'].includes(userRole) || isAssignedTechnician
   const canReassignTechnician = ['OWNER', 'STAFF'].includes(userRole)
+  const canEditExpectedDate = ['OWNER', 'STAFF'].includes(userRole)
 
   const showModelConfirmationCard =
     repair.status === 'DIAGNOSING' &&
@@ -123,6 +157,14 @@ export function RepairDetails({ id }: { id: string }) {
   const handleSaveDiagnosis = async () => {
     await diagnosisMutation.mutateAsync({ diagnosis: diagnosisText })
     setIsDiagnosisEditing(false)
+    refetch()
+  }
+
+  const handleSaveExpectedDate = async () => {
+    await updateExpectedDateMutation.mutateAsync({
+      expectedCompletionDate: expectedDateValue ? new Date(expectedDateValue).toISOString() : null,
+    })
+    setIsEditingExpectedDate(false)
     refetch()
   }
 
@@ -204,8 +246,8 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* Grid: Customer, Device, Technician Assignment */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t border-border">
+          {/* Grid: Customer, Device, Technician Assignment, Expected Completion */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-border">
             {/* Linked Device */}
             <div className="space-y-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
@@ -305,6 +347,65 @@ export function RepairDetails({ id }: { id: string }) {
                   ) : (
                     <span className="text-xs italic text-muted-foreground">Unassigned</span>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* Expected Completion Date (Editable by Owner & Staff) */}
+            <div className="space-y-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                Expected Completion
+              </span>
+
+              {canEditExpectedDate ? (
+                isEditingExpectedDate ? (
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      type="date"
+                      value={expectedDateValue}
+                      onChange={(e) => setExpectedDateValue(e.target.value)}
+                      className="h-8 text-xs flex-1 px-2"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsEditingExpectedDate(false)}
+                      className="h-8 text-xs px-2"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleSaveExpectedDate}
+                      disabled={updateExpectedDateMutation.isPending}
+                      className="h-8 text-xs px-2.5"
+                    >
+                      {updateExpectedDateMutation.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 h-8">
+                    <span className="text-sm font-semibold text-foreground">
+                      {formatDate(repair.expectedCompletionDate)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditingExpectedDate(true)}
+                      className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </Button>
+                  </div>
+                )
+              ) : (
+                <div className="text-sm font-semibold text-foreground h-8 flex items-center">
+                  {formatDate(repair.expectedCompletionDate)}
                 </div>
               )}
             </div>

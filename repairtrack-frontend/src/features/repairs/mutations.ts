@@ -179,3 +179,33 @@ export function useAddRepairNote(repairId: string) {
     },
   })
 }
+
+export function useUpdateExpectedCompletionDate(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { expectedCompletionDate: string | null }>({
+    mutationFn: async ({ expectedCompletionDate }) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/expected-completion-date`, { expectedCompletionDate })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Expected completion date updated successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to update expected completion date'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+

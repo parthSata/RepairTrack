@@ -64,3 +64,9 @@ export const repairFilterSchema = z.object({
 })
 
 export type RepairFilterInput = z.infer<typeof repairFilterSchema>
+
+export const updateExpectedCompletionDateSchema = z.object({
+  expectedCompletionDate: z.string().nullable().optional(),
+})
+
+export type UpdateExpectedCompletionDateInput = z.infer<typeof updateExpectedCompletionDateSchema>

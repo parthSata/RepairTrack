@@ -708,3 +708,47 @@ export async function addRepairNote({
 
   return createdNote
 }
+
+export async function updateExpectedCompletionDate({
+  shopId,
+  userRole,
+  id,
+  expectedCompletionDate,
+}: {
+  shopId: string
+  userRole: string
+  id: string
+  expectedCompletionDate?: string | null
+}) {
+  // Permission check: OWNER and STAFF only
+  if (['OWNER', 'STAFF'].includes(userRole) === false) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Only Owner and Staff can update the expected completion date.',
+    })
+  }
+
+  const [existing] = await db
+    .select({ id: repairs.id })
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  const completionDateObj = expectedCompletionDate && expectedCompletionDate.trim().length > 0
+    ? new Date(expectedCompletionDate)
+    : null
+
+  const [updated] = await db
+    .update(repairs)
+    .set({
+      expectedCompletionDate: completionDateObj,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+    .returning()
+
+  return updated
+}
+

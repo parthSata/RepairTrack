@@ -12,11 +12,12 @@ import {
   reassignTechnician,
   reopenRepairTicket,
   updateDiagnosis,
+  updateExpectedCompletionDate,
   updateRepairStatus,
 } from '@/server/services/repair.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
-import { createRepairSchema } from '@/features/repairs/schemas'
+import { createRepairSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -211,3 +212,21 @@ export const repairsRouter = new Hono()
       return c.json(createdNote, 201)
     },
   )
+  .patch(
+    '/:id/expected-completion-date',
+    zValidator('json', updateExpectedCompletionDateSchema),
+    async (c) => {
+      const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { expectedCompletionDate } = c.req.valid('json')
+
+      const updated = await updateExpectedCompletionDate({
+        shopId,
+        userRole,
+        id,
+        expectedCompletionDate,
+      })
+      return c.json(updated)
+    },
+  )
+
