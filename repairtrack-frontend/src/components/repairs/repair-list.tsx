@@ -176,7 +176,7 @@ export function RepairList() {
     search: debouncedSearch || undefined,
     status: status || undefined,
     priority: priority || undefined,
-    assignedTechnicianId: technicianId || undefined,
+    technicianId: technicianId || undefined,
     page,
     limit: 10,
     sortBy: 'createdAt',

@@ -6,6 +6,15 @@ import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 
+export function applyTechnicianRepairScope(
+  conditions: SQL[],
+  { userRole, userId }: { userRole: string; userId: string },
+) {
+  if (userRole === 'TECHNICIAN') {
+    conditions.push(eq(repairs.assignedTechnicianId, userId))
+  }
+}
+
 function generateTicketNumber(): string {
   const array = new Uint32Array(1)
   crypto.getRandomValues(array)
@@ -174,10 +183,9 @@ export async function listRepairs({
 }) {
   const conditions: SQL[] = [eq(repairs.shopId, shopId)]
 
-  // Strict Technician Scoping: TECHNICIAN only ever sees repairs assigned to them
-  if (userRole === 'TECHNICIAN') {
-    conditions.push(eq(repairs.assignedTechnicianId, userId))
-  } else if (technicianId) {
+  applyTechnicianRepairScope(conditions, { userRole, userId })
+
+  if (userRole !== 'TECHNICIAN' && technicianId) {
     if (technicianId === 'unassigned') {
       conditions.push(eq(repairs.assignedTechnicianId, '')) // handled via null check below or empty
     } else {
@@ -294,10 +302,7 @@ export async function getRepairById({
 }) {
   const conditions: SQL[] = [eq(repairs.id, id), eq(repairs.shopId, shopId)]
 
-  // Strict Technician Scoping
-  if (userRole === 'TECHNICIAN') {
-    conditions.push(eq(repairs.assignedTechnicianId, userId))
-  }
+  applyTechnicianRepairScope(conditions, { userRole, userId })
 
   const result = await db
     .select({

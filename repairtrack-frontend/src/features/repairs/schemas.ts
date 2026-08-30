@@ -56,6 +56,7 @@ export const repairFilterSchema = z.object({
   customerId: z.string().optional(),
   deviceId: z.string().optional(),
   assignedTechnicianId: z.string().optional(),
+  technicianId: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(10),
   sortBy: z.enum(['createdAt', 'updatedAt', 'priority', 'status']).default('createdAt'),

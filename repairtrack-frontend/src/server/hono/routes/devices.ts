@@ -86,9 +86,14 @@ devicesRouter.delete('/:id', async (c) => {
 })
 
 devicesRouter.get('/:id/repairs', async (c) => {
-  const { shopId } = await requireDeviceAccess(c.req.raw)
+  const { shopId, session } = await requireDeviceAccess(c.req.raw)
   const id = c.req.param('id')
-  const history = await getDeviceRepairHistory({ shopId, deviceId: id })
+  const history = await getDeviceRepairHistory({
+    shopId,
+    deviceId: id,
+    userRole: session.user.role ?? 'OWNER',
+    userId: session.user.id,
+  })
   return c.json(history)
 })
 

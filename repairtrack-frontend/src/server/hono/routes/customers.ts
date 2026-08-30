@@ -96,9 +96,14 @@ customersRouter.delete('/:id', async (c) => {
 })
 
 customersRouter.get('/:id/repairs', async (c) => {
-  const { shopId } = await requireCustomerAccess(c.req.raw)
+  const { shopId, session } = await requireCustomerAccess(c.req.raw)
   const id = c.req.param('id')
-  const history = await getCustomerRepairHistory({ shopId, customerId: id })
+  const history = await getCustomerRepairHistory({
+    shopId,
+    customerId: id,
+    userRole: session.user.role ?? 'OWNER',
+    userId: session.user.id,
+  })
   return c.json(history)
 })
 

@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairs } from '@/server/db/schema/repairs'
+import { applyTechnicianRepairScope } from '@/server/services/repair.service'
 import type { CustomerFilterInput, CustomerFormInput } from '@/features/customers/schemas'
 import { verifyEmailDomain } from '@/server/utils/email-domain-validator'
 
@@ -305,10 +306,17 @@ export async function deleteCustomer({ shopId, id }: { shopId: string; id: strin
 export async function getCustomerRepairHistory({
   shopId,
   customerId,
+  userRole,
+  userId,
 }: {
   shopId: string
   customerId: string
+  userRole: string
+  userId: string
 }) {
+  const conditions = [eq(repairs.customerId, customerId), eq(repairs.shopId, shopId)]
+  applyTechnicianRepairScope(conditions, { userRole, userId })
+
   const history = await db
     .select({
       id: repairs.id,
@@ -327,7 +335,7 @@ export async function getCustomerRepairHistory({
     })
     .from(repairs)
     .leftJoin(devices, eq(devices.id, repairs.deviceId))
-    .where(and(eq(repairs.customerId, customerId), eq(repairs.shopId, shopId)))
+    .where(and(...conditions))
     .orderBy(desc(repairs.createdAt))
 
   return history
