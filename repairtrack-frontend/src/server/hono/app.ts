@@ -5,6 +5,7 @@ import { emailCheckRouter } from '@/server/hono/routes/email-check'
 import { customersRouter } from '@/server/hono/routes/customers'
 import { devicesRouter } from '@/server/hono/routes/devices'
 import { repairsRouter } from '@/server/hono/routes/repairs'
+import { dashboardRouter } from '@/server/hono/routes/dashboard'
 import { staffRouter } from '@/api/routes/staff'
 import { invitationsRouter } from '@/api/routes/invitations'
 
@@ -15,6 +16,7 @@ export const app = new Hono()
 	.route('/api/shops', shopsRouter)
 	.route('/api/customers', customersRouter)
 	.route('/api/devices', devicesRouter)
+	.route('/api/dashboard', dashboardRouter)
 	.route('/api/repairs', repairsRouter)
 	.route('/api/staff', staffRouter)
 	.route('/api/invitations', invitationsRouter)

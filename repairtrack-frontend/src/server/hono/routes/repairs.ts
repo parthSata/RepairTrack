@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { HTTPException } from 'hono/http-exception'
 import { auth } from '@/server/auth'
+import { resolveUserRole } from '@/server/lib/session-role'
 import {
   addRepairNote,
   createRepairTicket,
@@ -22,11 +23,12 @@ async function requireRepairUserSession(request: Request) {
   if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
   const shopId = session.user.shopId
   if (!shopId) throw new HTTPException(403, { message: 'Shop context missing' })
+  const userRole = await resolveUserRole(session.user.id, session.user.role)
   return {
     session,
     shopId,
     userId: session.user.id,
-    userRole: session.user.role ?? 'OWNER',
+    userRole,
   }
 }
 
@@ -66,6 +68,7 @@ export const repairsRouter = new Hono()
         status: z.string().optional(),
         priority: z.string().optional(),
         technicianId: z.string().optional(),
+        assignedTechnicianId: z.string().optional(),
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         search: z.string().optional(),
@@ -81,6 +84,7 @@ export const repairsRouter = new Hono()
         userRole,
         userId,
         ...query,
+        technicianId: query.technicianId ?? query.assignedTechnicianId,
       })
       return c.json(result)
     },

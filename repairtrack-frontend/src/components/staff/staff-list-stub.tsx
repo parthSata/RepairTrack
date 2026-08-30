@@ -129,6 +129,9 @@ export function StaffListStub() {
           if (status === 'INVITED') {
             return <Badge variant="warning">Invited</Badge>
           }
+          if (status === 'EXPIRED') {
+            return <Badge variant="secondary">Expired</Badge>
+          }
           return <Badge variant="secondary">Inactive</Badge>
         },
       },

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useInviteStaff } from '@/features/staff/mutations'
 import { inviteStaffSchema, type InviteStaffInput } from '@/features/staff/schemas'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { cn } from '@/lib/utils'
 
 export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
@@ -61,11 +62,7 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
       const fullUrl = `${window.location.origin}${result.inviteLink}`
       setGeneratedLink(fullUrl)
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : null
-      setErrorMsg(message || 'Failed to generate staff invitation link. Please try again.')
+      setErrorMsg(getApiErrorMessage(err, 'Failed to generate staff invitation link. Please try again.'))
     }
   }
 

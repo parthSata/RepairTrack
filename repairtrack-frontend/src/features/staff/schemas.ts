@@ -22,7 +22,10 @@ export const acceptInvitationSchema = z
 
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>
 
+export type InvitationState = 'pending' | 'expired' | 'accepted'
+
 export interface InvitationDetails {
+  state: InvitationState
   name: string
   email: string
   role: 'STAFF' | 'TECHNICIAN'
@@ -53,7 +56,7 @@ export interface UnifiedStaffMember {
   name: string
   email: string
   role: 'STAFF' | 'TECHNICIAN'
-  status: 'ACTIVE' | 'INACTIVE' | 'INVITED'
+  status: 'ACTIVE' | 'INACTIVE' | 'INVITED' | 'EXPIRED'
   isInvitation: boolean
   token?: string
   expiresAt?: string

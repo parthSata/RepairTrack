@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairs } from '@/server/db/schema/repairs'
+import { applyTechnicianRepairScope } from '@/server/services/repair.service'
 import type { DeviceFilterInput, DeviceFormInput, DeviceType } from '@/features/devices/schemas'
 
 export async function listDevices({
@@ -281,11 +282,14 @@ export async function deleteDevice({ shopId, id }: { shopId: string; id: string 
 export async function getDeviceRepairHistory({
   shopId,
   deviceId,
+  userRole,
+  userId,
 }: {
   shopId: string
   deviceId: string
+  userRole: string
+  userId: string
 }) {
-  // Check device exists
   const [existing] = await db
     .select({ id: devices.id })
     .from(devices)
@@ -294,6 +298,9 @@ export async function getDeviceRepairHistory({
   if (!existing) {
     throw new HTTPException(404, { message: 'Device not found' })
   }
+
+  const conditions = [eq(repairs.deviceId, deviceId), eq(repairs.shopId, shopId)]
+  applyTechnicianRepairScope(conditions, { userRole, userId })
 
   const history = await db
     .select({
@@ -306,7 +313,7 @@ export async function getDeviceRepairHistory({
       createdAt: repairs.createdAt,
     })
     .from(repairs)
-    .where(and(eq(repairs.deviceId, deviceId), eq(repairs.shopId, shopId)))
+    .where(and(...conditions))
     .orderBy(desc(repairs.createdAt))
 
   return history

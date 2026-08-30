@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { authClient } from '@/lib/auth-client'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { useAcceptInvitation } from '@/features/staff/mutations'
 import { acceptInvitationSchema, type AcceptInvitationInput, type InvitationDetails } from '@/features/staff/schemas'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
@@ -45,11 +46,7 @@ export function InviteAcceptForm({
       await acceptMutation.mutateAsync(values)
       setSuccess(true)
     } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : null
-      setFormError(message || 'Unable to accept invitation. Please try again.')
+      setFormError(getApiErrorMessage(err, 'Unable to accept invitation. Please try again.'))
     }
   }
 
