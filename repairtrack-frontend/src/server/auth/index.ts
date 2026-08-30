@@ -77,22 +77,6 @@ export const auth = betterAuth({
             },
           }
         },
-        after: async (user) => {
-          if (!user.emailVerified) {
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
-            const url = `${appUrl}/verify-email?email=${encodeURIComponent(user.email)}`
-            try {
-              const result = await sendEmail({
-                to: user.email,
-                subject: 'Verify your RepairTrack email',
-                html: `<p>Hi ${user.name},</p><p>Verify your email address to finish creating your RepairTrack shop.</p><p><a href="${url}">Verify email address</a></p><p>This link will expire soon.</p>`,
-              })
-              if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
-            } catch (err) {
-              console.warn('Failed to send verification email for user:', err)
-            }
-          }
-        },
       },
     },
     account: {
