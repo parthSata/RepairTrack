@@ -53,6 +53,7 @@ export const repairFilterSchema = z.object({
   search: z.string().optional(),
   status: z.string().optional(),
   priority: z.string().optional(),
+  overdue: z.coerce.boolean().optional(),
   customerId: z.string().optional(),
   deviceId: z.string().optional(),
   assignedTechnicianId: z.string().optional(),
@@ -66,7 +67,21 @@ export const repairFilterSchema = z.object({
 export type RepairFilterInput = z.infer<typeof repairFilterSchema>
 
 export const updateExpectedCompletionDateSchema = z.object({
-  expectedCompletionDate: z.string().nullable().optional(),
+  expectedCompletionDate: z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (val) => {
+        if (!val || val.trim() === '') return true
+        const selected = new Date(val)
+        if (isNaN(selected.getTime())) return false
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        return selected >= today
+      },
+      { message: 'Expected completion date must not be in the past' },
+    ),
 })
 
 export type UpdateExpectedCompletionDateInput = z.infer<typeof updateExpectedCompletionDateSchema>

@@ -73,6 +73,7 @@ export const repairsRouter = new Hono()
         startDate: z.string().optional(),
         endDate: z.string().optional(),
         search: z.string().optional(),
+        overdue: z.coerce.boolean().optional(),
         page: z.coerce.number().min(1).default(1),
         limit: z.coerce.number().min(1).max(100).default(10),
       }),
@@ -216,13 +217,14 @@ export const repairsRouter = new Hono()
     '/:id/expected-completion-date',
     zValidator('json', updateExpectedCompletionDateSchema),
     async (c) => {
-      const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
       const { expectedCompletionDate } = c.req.valid('json')
 
       const updated = await updateExpectedCompletionDate({
         shopId,
         userRole,
+        userId,
         id,
         expectedCompletionDate,
       })

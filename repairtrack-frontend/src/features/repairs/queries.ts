@@ -79,6 +79,7 @@ export interface Repair {
   finalCost: number | null
   priority: RepairPriority
   expectedCompletionDate: string | null
+  isOverdue?: boolean
   assignedTechnicianId: string | null
   createdBy: string | null
   createdAt: string
