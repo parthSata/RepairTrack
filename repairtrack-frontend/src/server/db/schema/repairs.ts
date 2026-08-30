@@ -135,7 +135,10 @@ export const repairStatusHistory = pgTable(
     note: text('note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('repair_status_history_repair_id_idx').on(table.repairId)],
+  (table) => [
+    index('repair_status_history_repair_id_idx').on(table.repairId),
+    index('repair_status_history_to_status_created_at_idx').on(table.toStatus, table.createdAt),
+  ],
 )
 
 export const repairsRelations = relations(repairs, ({ one, many }) => ({
