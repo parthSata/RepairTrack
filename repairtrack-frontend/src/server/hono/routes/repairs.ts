@@ -10,6 +10,7 @@ import {
   getRepairById,
   listRepairs,
   reassignTechnician,
+  regenerateTrackingToken,
   reopenRepairTicket,
   updateDiagnosis,
   updateExpectedCompletionDate,
@@ -231,4 +232,15 @@ export const repairsRouter = new Hono()
       return c.json(updated)
     },
   )
+  .post('/:id/regenerate-tracking-link', async (c) => {
+    const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+    const id = c.req.param('id')
+
+    const updated = await regenerateTrackingToken({
+      shopId,
+      userRole,
+      repairId: id,
+    })
+    return c.json(updated)
+  })
 

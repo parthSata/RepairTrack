@@ -70,6 +70,7 @@ export interface Repair {
   customerId: string
   deviceId: string
   ticketNumber: string
+  trackingToken: string | null
   status: string
   problemDescription: string | null
   issueDescription: string | null

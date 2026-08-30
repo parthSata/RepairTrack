@@ -52,6 +52,25 @@ body {
   animation: page-enter 180ms ease-out both;
 }
 
+@keyframes track-progress-fill {
+  from { transform: scaleX(0); transform-origin: left; }
+  to { transform: scaleX(1); transform-origin: left; }
+}
+
+@keyframes track-update-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.track-progress-fill {
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.track-update-enter {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

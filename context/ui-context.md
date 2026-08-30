@@ -345,6 +345,35 @@ understandable.
 
 ---
 
+# 11b. Customer-Facing Status Labels (Public Tracking)
+
+Public repair tracking maps internal repair statuses to customer-safe
+labels. Use this dictionary for the tracking page, progress indicator,
+and repair updates list — do not invent alternate labels in components.
+
+| Internal status | Customer-facing label |
+|---|---|
+| RECEIVED | Received |
+| DIAGNOSING | Diagnosing |
+| WAITING_FOR_APPROVAL | Repairing |
+| APPROVED | Repairing |
+| WAITING_FOR_PARTS | Repairing |
+| IN_REPAIR | Repairing |
+| QUALITY_CHECK | Repairing |
+| READY_FOR_PICKUP | Ready for Pickup |
+| COMPLETED | Delivered |
+| CANCELLED | Standalone cancelled message (not on progress bar) |
+
+Progress indicator stages (in order): Received → Diagnosing → Repairing
+→ Ready for Pickup → Delivered.
+
+`CANCELLED` replaces the entire progress indicator with a single
+cancelled message.
+
+Implementation source: `src/features/tracking/status-labels.ts`.
+
+---
+
 # 12. Animation Principles
 
 Animation is an important part of the product's visual identity.

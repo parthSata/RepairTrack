@@ -10,6 +10,7 @@ import {
   isExpectedCompletionDateInPast,
   overdueRepairCondition,
 } from '@/features/repairs/overdue'
+import { generateTicketNumber, generateTrackingToken } from '@/server/lib/tokens'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -18,13 +19,6 @@ export function applyTechnicianRepairScope(
   if (userRole === 'TECHNICIAN') {
     conditions.push(eq(repairs.assignedTechnicianId, userId))
   }
-}
-
-function generateTicketNumber(): string {
-  const array = new Uint32Array(1)
-  crypto.getRandomValues(array)
-  const num = 1000000000 + (array[0] % 9000000000)
-  return num.toString()
 }
 
 export async function createRepairTicket({
@@ -94,6 +88,7 @@ export async function createRepairTicket({
 
   while (retries > 0 && !createdRepair) {
     const ticketNumber = generateTicketNumber()
+    const trackingToken = generateTrackingToken()
     const repairId = crypto.randomUUID()
 
     try {
@@ -106,6 +101,7 @@ export async function createRepairTicket({
             customerId: data.customerId,
             deviceId: data.deviceId,
             ticketNumber,
+            trackingToken,
             status: 'RECEIVED',
             problemDescription: data.problemDescription,
             issueDescription: data.problemDescription,
@@ -325,6 +321,7 @@ export async function getRepairById({
       customerId: repairs.customerId,
       deviceId: repairs.deviceId,
       ticketNumber: repairs.ticketNumber,
+      trackingToken: repairs.trackingToken,
       status: repairs.status,
       priority: repairs.priority,
       problemDescription: repairs.problemDescription,
@@ -777,5 +774,50 @@ export async function updateExpectedCompletionDate({
     .returning()
 
   return updated
+}
+
+export async function regenerateTrackingToken({
+  shopId,
+  userRole,
+  repairId,
+}: {
+  shopId: string
+  userRole: string
+  repairId: string
+}) {
+  if (!['OWNER', 'STAFF'].includes(userRole)) {
+    throw new HTTPException(403, {
+      message: 'Not authorized to regenerate tracking links',
+    })
+  }
+
+  const [existing] = await db
+    .select({ id: repairs.id })
+    .from(repairs)
+    .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  let retries = 5
+  while (retries > 0) {
+    const trackingToken = generateTrackingToken()
+    try {
+      const [updated] = await db
+        .update(repairs)
+        .set({ trackingToken, updatedAt: new Date() })
+        .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
+        .returning({ trackingToken: repairs.trackingToken })
+
+      if (updated) {
+        return updated
+      }
+    } catch {
+      retries -= 1
+    }
+  }
+
+  throw new HTTPException(500, { message: 'Failed to regenerate tracking link' })
 }
 

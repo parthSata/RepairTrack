@@ -209,3 +209,33 @@ export function useUpdateExpectedCompletionDate(repairId: string) {
   })
 }
 
+export function useRegenerateTrackingLink(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ trackingToken: string | null }, Error, void>({
+    mutationFn: async () => {
+      const response = await apiClient.post<{ trackingToken: string | null }>(
+        `/repairs/${repairId}/regenerate-tracking-link`,
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to regenerate tracking link'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
