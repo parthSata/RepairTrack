@@ -366,6 +366,7 @@ API routes should be organized by domain:
 /api/auth
 /api/staff
 /api/invitations
+/api/dashboard
 /api/repairs
 /api/customers
 /api/devices

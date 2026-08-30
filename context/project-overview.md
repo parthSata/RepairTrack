@@ -300,14 +300,18 @@ Management.
 
 The dashboard should provide a quick overview of:
 
+- Today's repairs (created today)
 - Active repairs
 - Repairs ready for pickup
-- Pending approvals
-- Pending payments
-- Revenue overview
+- Completed today (via status history)
 - Recent repairs
 - Repair status distribution
 - Important operational information
+
+Pending approvals, pending payments, and revenue overview are
+intentionally excluded from the current MVP card set. Payments and
+revenue remain blocked until Sprint 2 Invoice/Payment tables exist;
+pending approvals are computable but out of this MVP scope.
 
 The dashboard should prioritize useful business information over
 decorative widgets.
