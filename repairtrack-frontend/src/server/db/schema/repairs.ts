@@ -79,6 +79,7 @@ export const repairs = pgTable(
       .notNull()
       .references(() => devices.id, { onDelete: 'restrict' }),
     ticketNumber: text('ticket_number').notNull().unique(),
+    trackingToken: text('tracking_token').unique(),
     status: repairStatusEnum('status').default('RECEIVED').notNull(),
     problemDescription: text('problem_description'),
     issueDescription: text('issue_description'),
@@ -101,6 +102,7 @@ export const repairs = pgTable(
     index('repairs_device_id_idx').on(table.deviceId),
     index('repairs_status_idx').on(table.status),
     index('repairs_assigned_technician_id_idx').on(table.assignedTechnicianId),
+    index('repairs_tracking_token_idx').on(table.trackingToken),
   ],
 )
 

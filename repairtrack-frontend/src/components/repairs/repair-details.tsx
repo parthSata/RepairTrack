@@ -54,6 +54,7 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/components/devices/device-table'
 import { ModelConfirmationCard } from './model-confirmation-card'
+import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
@@ -144,6 +145,7 @@ export function RepairDetails({ id }: { id: string }) {
   const isAssignedTechnician = repair.assignedTechnicianId === userId
   const canEditDiagnosisAndNotes = ['OWNER', 'STAFF'].includes(userRole) || isAssignedTechnician
   const canReassignTechnician = ['OWNER', 'STAFF'].includes(userRole)
+  const canShowCustomerTracking = ['OWNER', 'STAFF'].includes(userRole)
   const canEditExpectedDate = canEditDiagnosisAndNotes
   const todayDateMin = formatDateInputValue()
 
@@ -459,6 +461,14 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {canShowCustomerTracking ? (
+        <CustomerTrackingSection
+          repairId={repair.id}
+          trackingToken={repair.trackingToken}
+          onRegenerated={() => refetch()}
+        />
+      ) : null}
 
       {/* Diagnosis Section */}
       <Card>
