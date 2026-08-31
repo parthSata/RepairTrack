@@ -13,7 +13,7 @@ export function usePublicTrackingByToken(token: string, enabled: boolean) {
   return useQuery({
     queryKey: trackingKeys.byToken(token),
     queryFn: async () => {
-      const { data } = await apiClient.get<PublicTrackingResponse>(`/api/track/${encodeURIComponent(token)}`)
+      const { data } = await apiClient.get<PublicTrackingResponse>(`/track/${encodeURIComponent(token)}`)
       return data
     },
     enabled,
@@ -24,7 +24,7 @@ export function usePublicTrackingByToken(token: string, enabled: boolean) {
 export function useVerifyPublicTracking() {
   return useMutation({
     mutationFn: async (input: TrackVerifyInput) => {
-      const { data } = await apiClient.post<PublicTrackingResponse>('/api/track/verify', input)
+      const { data } = await apiClient.post<PublicTrackingResponse>('/track/verify', input)
       return data
     },
   })

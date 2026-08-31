@@ -12,10 +12,22 @@ export function generateTrackingToken(): string {
 }
 
 export function normalizePhoneForComparison(phone: string): string {
-  const trimmed = phone.trim()
-  const hasLeadingPlus = trimmed.startsWith('+')
-  const digits = trimmed.replace(/\D/g, '')
-  return hasLeadingPlus ? `+${digits}` : digits
+  return phone.trim().replace(/\D/g, '')
+}
+
+export function phonesMatch(storedPhone: string, inputPhone: string): boolean {
+  const stored = normalizePhoneForComparison(storedPhone)
+  const input = normalizePhoneForComparison(inputPhone)
+
+  if (!stored || !input) {
+    return false
+  }
+
+  if (stored === input) {
+    return true
+  }
+
+  return stored.endsWith(input) || input.endsWith(stored)
 }
 
 export { isTicketNumber, isTrackingToken } from '@/features/tracking/identifiers'

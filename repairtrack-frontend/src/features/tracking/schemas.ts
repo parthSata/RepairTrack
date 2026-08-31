@@ -4,13 +4,23 @@ export const trackVerifySchema = z.object({
   ticketNumber: z
     .string()
     .trim()
-    .regex(/^\d{10}$/, 'Enter a valid 10-digit repair number'),
+    .transform((value) => value.replace(/\D/g, ''))
+    .pipe(z.string().regex(/^\d{10}$/, 'Enter a valid 10-digit repair number')),
   phone: z
     .string()
     .trim()
-    .min(7, 'Enter a valid phone number')
-    .max(30, 'Enter a valid phone number')
-    .regex(/^[+\d][\d\s().-]{6,29}$/, 'Enter a valid phone number'),
+    .transform((value) => {
+      if (value.startsWith('+')) {
+        return `+${value.slice(1).replace(/\D/g, '')}`
+      }
+      return value.replace(/\D/g, '')
+    })
+    .pipe(
+      z
+        .string()
+        .min(1, 'Phone number is required')
+        .regex(/^\+?[0-9]{7,15}$/, 'Enter a valid phone number (7 to 15 digits)'),
+    ),
 })
 
 export type TrackVerifyInput = z.infer<typeof trackVerifySchema>

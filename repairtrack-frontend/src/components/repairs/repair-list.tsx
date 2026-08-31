@@ -9,7 +9,6 @@ import {
   Search, 
   User,
   AlertCircle,
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Eye,
@@ -503,15 +502,7 @@ export function RepairList() {
 
                       {/* Expected Completion */}
                       <td className="px-4 py-3.5 text-xs font-medium text-muted-foreground whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <span>{formatDate(repair.expectedCompletionDate)}</span>
-                          {repair.isOverdue ? (
-                            <Badge variant="warning" className="gap-1">
-                              <AlertTriangle className="h-3 w-3" />
-                              Overdue
-                            </Badge>
-                          ) : null}
-                        </div>
+                        {formatDate(repair.expectedCompletionDate)}
                       </td>
 
                       {/* Created Date */}

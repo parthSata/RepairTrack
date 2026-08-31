@@ -4,7 +4,7 @@ import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { mapRepairStatusToPublicLabel } from '@/features/tracking/status-labels'
-import { normalizePhoneForComparison } from '@/server/lib/tokens'
+import { phonesMatch } from '@/server/lib/tokens'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
 
 const PUBLIC_TRACKING_NOT_FOUND = "We couldn't find this repair."
@@ -121,8 +121,6 @@ export async function verifyPublicRepairByTicketAndPhone(
   ticketNumber: string,
   phone: string,
 ): Promise<PublicTrackingResponse> {
-  const normalizedPhone = normalizePhoneForComparison(phone)
-
   const rows = await db
     .select({
       repairId: repairs.id,
@@ -132,9 +130,7 @@ export async function verifyPublicRepairByTicketAndPhone(
     .innerJoin(customers, eq(customers.id, repairs.customerId))
     .where(eq(repairs.ticketNumber, ticketNumber))
 
-  const match = rows.find(
-    (row) => normalizePhoneForComparison(row.customerPhone) === normalizedPhone,
-  )
+  const match = rows.find((row) => phonesMatch(row.customerPhone, phone))
 
   if (!match) {
     throw new HTTPException(404, { message: PUBLIC_TRACKING_NOT_FOUND })

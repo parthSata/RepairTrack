@@ -16,7 +16,7 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
   const tokenQuery = usePublicTrackingByToken(ticketId, isToken)
   const verifyMutation = useVerifyPublicTracking()
   const [verifiedData, setVerifiedData] = React.useState<PublicTrackingResponse | null>(null)
-  const [verifyError, setVerifyError] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState(false)
 
   if (!isToken && !isTicket) {
     return (
@@ -81,25 +81,20 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
       title="Verify your repair"
       description="Confirm the phone number on file to view this repair."
     >
-      {verifyMutation.isPending ? <TrackSkeleton /> : null}
-
-      {!verifyMutation.isPending && verifyError ? <TrackErrorState /> : null}
-
-      {!verifyMutation.isPending && !verifyError ? (
-        <TrackSearchForm
-          defaultTicketNumber={ticketId}
-          isSubmitting={verifyMutation.isPending}
-          onSubmit={async (values) => {
-            setVerifyError(false)
-            try {
-              const data = await verifyMutation.mutateAsync(values)
-              setVerifiedData(data)
-            } catch {
-              setVerifyError(true)
-            }
-          }}
-        />
-      ) : null}
+      <TrackSearchForm
+        defaultTicketNumber={ticketId}
+        isSubmitting={verifyMutation.isPending}
+        submitError={submitError}
+        onSubmit={async (values) => {
+          setSubmitError(false)
+          try {
+            const data = await verifyMutation.mutateAsync(values)
+            setVerifiedData(data)
+          } catch {
+            setSubmitError(true)
+          }
+        }}
+      />
     </TrackPageShell>
   )
 }
