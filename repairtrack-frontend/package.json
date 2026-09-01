@@ -13,7 +13,8 @@
     "db:check-migration-url": "bun run scripts/check-migration-url.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "bun run scripts/seed.ts",
-    "verify:approval-schema": "bun run scripts/verify-approval-schema.ts"
+    "verify:approval-schema": "bun run scripts/verify-approval-schema.ts",
+    "verify:request-approval": "bun run scripts/verify-request-approval.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.1",

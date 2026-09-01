@@ -1,11 +1,13 @@
-import { eq, asc } from 'drizzle-orm'
+import { eq, asc, and } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
+import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { mapRepairStatusToPublicLabel } from '@/features/tracking/status-labels'
 import { phonesMatch } from '@/server/lib/tokens'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
+import { paiseToRupees } from '@/features/repairs/money'
 
 const PUBLIC_TRACKING_NOT_FOUND = "We couldn't find this repair."
 
@@ -27,10 +29,16 @@ type HistoryRow = {
   createdAt: Date
 }
 
+type PendingApprovalRow = {
+  diagnosisSnapshot: string
+  additionalEstimatedCost: number
+}
+
 export function buildPublicTrackingPayload(
   repair: RepairRow,
   device: DeviceRow,
   history: HistoryRow[],
+  pendingApproval?: PendingApprovalRow | null,
 ): PublicTrackingResponse {
   const payload: PublicTrackingResponse = {
     ticketNumber: repair.ticketNumber,
@@ -48,7 +56,14 @@ export function buildPublicTrackingPayload(
   }
 
   if (repair.estimatedCost !== null) {
-    payload.estimatedCost = repair.estimatedCost
+    payload.estimatedCost = paiseToRupees(repair.estimatedCost)
+  }
+
+  if (pendingApproval) {
+    payload.pendingApproval = {
+      diagnosis: pendingApproval.diagnosisSnapshot,
+      estimatedCost: paiseToRupees(pendingApproval.additionalEstimatedCost),
+    }
   }
 
   return payload
@@ -83,6 +98,15 @@ async function loadPublicRepairData(repairId: string) {
     .where(eq(repairStatusHistory.repairId, repairId))
     .orderBy(asc(repairStatusHistory.createdAt))
 
+  const [pendingApproval] = await db
+    .select({
+      diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
+      additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
+    })
+    .from(repairApprovals)
+    .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'PENDING')))
+    .limit(1)
+
   return buildPublicTrackingPayload(
     {
       ticketNumber: row.ticketNumber,
@@ -96,6 +120,7 @@ async function loadPublicRepairData(repairId: string) {
       model: row.model,
     },
     history,
+    pendingApproval ?? null,
   )
 }
 

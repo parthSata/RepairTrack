@@ -107,7 +107,8 @@ export async function createRepairTicket({
             problemDescription: data.problemDescription,
             issueDescription: data.problemDescription,
             initialCondition: data.initialCondition,
-            estimatedCost: data.estimatedCost ?? null,
+            estimatedCost:
+              data.estimatedCost != null ? Math.round(data.estimatedCost * 100) : null,
             priority: data.priority ?? 'MEDIUM',
             expectedCompletionDate: data.expectedCompletionDate
               ? new Date(data.expectedCompletionDate)
@@ -495,12 +496,9 @@ export async function updateRepairStatus({
     .select({
       id: repairs.id,
       status: repairs.status,
-      deviceId: repairs.deviceId,
       assignedTechnicianId: repairs.assignedTechnicianId,
-      modelVerified: devices.modelVerified,
     })
     .from(repairs)
-    .leftJoin(devices, eq(devices.id, repairs.deviceId))
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
 
   if (!existing) {
@@ -522,15 +520,9 @@ export async function updateRepairStatus({
     })
   }
 
-  // TRANSITION GATE: DIAGNOSING -> WAITING_FOR_APPROVAL
-  if (
-    existing.status === 'DIAGNOSING' &&
-    status === 'WAITING_FOR_APPROVAL' &&
-    existing.modelVerified === false &&
-    Boolean(existing.assignedTechnicianId)
-  ) {
+  if (status === 'WAITING_FOR_APPROVAL') {
     throw new HTTPException(400, {
-      message: 'Confirm the device model before sending an estimate',
+      message: 'Use Request Customer Approval to send an estimate for approval.',
     })
   }
 
@@ -558,6 +550,114 @@ export async function updateRepairStatus({
   })
 
   return updated
+}
+
+export async function requestCustomerApproval({
+  shopId,
+  userRole,
+  userId,
+  id,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+}) {
+  if (userRole === 'OWNER') {
+    throw new HTTPException(403, {
+      message:
+        'Owner cannot change repair status directly. Status changes belong to the technicians and staff working on the repair.',
+    })
+  }
+
+  const [existing] = await db
+    .select({
+      id: repairs.id,
+      status: repairs.status,
+      diagnosis: repairs.diagnosis,
+      estimatedCost: repairs.estimatedCost,
+      assignedTechnicianId: repairs.assignedTechnicianId,
+    })
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Technicians can only change status on repairs assigned to them.',
+    })
+  }
+
+  if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
+    throw new HTTPException(400, {
+      message:
+        'Completed or cancelled tickets cannot have status updated directly. Owner must reopen the ticket.',
+    })
+  }
+
+  if (!existing.diagnosis?.trim()) {
+    throw new HTTPException(400, {
+      message: 'Add a diagnosis before requesting customer approval',
+    })
+  }
+
+  if (existing.estimatedCost === null) {
+    throw new HTTPException(400, {
+      message: 'Set an estimated cost before requesting customer approval',
+    })
+  }
+
+  const [pendingApproval] = await db
+    .select({ id: repairApprovals.id })
+    .from(repairApprovals)
+    .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
+    .limit(1)
+
+  if (pendingApproval) {
+    throw new HTTPException(400, {
+      message: 'Customer approval is already pending for this repair',
+    })
+  }
+
+  const requestedAt = new Date()
+  const diagnosisSnapshot = existing.diagnosis.trim()
+
+  await db.transaction(async (tx) => {
+    await tx.insert(repairApprovals).values({
+      repairId: id,
+      status: 'PENDING',
+      diagnosisSnapshot,
+      additionalEstimatedCost: existing.estimatedCost!,
+      requestedBy: userId,
+      requestedAt,
+    })
+
+    await tx
+      .update(repairs)
+      .set({
+        status: 'WAITING_FOR_APPROVAL',
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+    await tx.insert(repairStatusHistory).values({
+      id: crypto.randomUUID(),
+      repairId: id,
+      fromStatus: existing.status,
+      toStatus: 'WAITING_FOR_APPROVAL',
+      changedBy: userId,
+      actorType: 'STAFF',
+    })
+  })
+
+  // Sprint 3 (Gmail): send "Repair Approval Required" transactional email via the shop's
+  // connected Gmail account. Do not call sendEmail until feature/send-for-approval (Gmail) merges.
+  // Pattern: staff.service.ts invite flow → buildXxxHtml + sendEmail + console.warn on failure.
+
+  return getRepairById({ shopId, userRole, userId, id })
 }
 
 export async function reopenRepairTicket({
@@ -711,6 +811,63 @@ export async function updateDiagnosis({
     .update(repairs)
     .set({
       diagnosis: diagnosis.trim() || null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+    .returning()
+
+  return updated
+}
+
+export async function updateEstimatedCost({
+  shopId,
+  userRole,
+  userId,
+  id,
+  estimatedCostRupees,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  estimatedCostRupees: number | null
+}) {
+  const [existing] = await db
+    .select({
+      id: repairs.id,
+      assignedTechnicianId: repairs.assignedTechnicianId,
+      approvalPending: repairApprovals.id,
+    })
+    .from(repairs)
+    .leftJoin(
+      repairApprovals,
+      and(eq(repairApprovals.repairId, repairs.id), eq(repairApprovals.status, 'PENDING')),
+    )
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Technicians can only edit repairs assigned to them.',
+    })
+  }
+
+  if (existing.approvalPending) {
+    throw new HTTPException(400, {
+      message: 'Estimated cost cannot be changed while customer approval is pending.',
+    })
+  }
+
+  const estimatedCostPaise =
+    estimatedCostRupees != null ? Math.round(estimatedCostRupees * 100) : null
+
+  const [updated] = await db
+    .update(repairs)
+    .set({
+      estimatedCost: estimatedCostPaise,
       updatedAt: new Date(),
     })
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))

@@ -209,6 +209,64 @@ export function useUpdateExpectedCompletionDate(repairId: string) {
   })
 }
 
+export function useUpdateEstimatedCost(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, { estimatedCost: number | null }>({
+    mutationFn: async ({ estimatedCost }) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/estimated-cost`, { estimatedCost })
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Estimated cost updated successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to update estimated cost'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
+export function useRequestCustomerApproval(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, void>({
+    mutationFn: async () => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/request-approval`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      toast.success('Customer approval requested successfully!')
+    },
+    onError: (error: unknown) => {
+      let message = 'Failed to request customer approval'
+      if (error && typeof error === 'object' && 'response' in error) {
+        const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
+        if (resData?.message) {
+          message = resData.message
+        } else if (resData?.error?.message) {
+          message = resData.error.message
+        }
+      } else if (error instanceof Error) {
+        message = error.message
+      }
+      toast.error(message)
+    },
+  })
+}
+
 export function useRegenerateTrackingLink(repairId: string) {
   const queryClient = useQueryClient()
 

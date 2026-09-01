@@ -18,7 +18,10 @@ function formatDateTime(dateStr?: string | null): string {
 
 export function getApprovalStatusLabel(approval: RepairApproval): string {
   if (approval.status === 'PENDING') {
-    return 'Pending'
+    const requestedAt = formatDateTime(approval.requestedAt)
+    return requestedAt
+      ? `Customer Approval — Pending, Requested: ${requestedAt}`
+      : 'Customer Approval — Pending'
   }
 
   if (approval.status === 'APPROVED') {

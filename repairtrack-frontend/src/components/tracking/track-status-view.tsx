@@ -1,9 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { AlertCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { ApprovalEstimateSummary } from '@/components/repairs/approval-estimate-summary'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
+import { formatINR } from '@/features/repairs/money'
 import {
   TrackProgressIndicator,
   TrackStatusIcon,
@@ -16,10 +19,6 @@ function formatDeviceLabel(device: PublicTrackingResponse['device']): string {
     return `${device.brand} ${device.model}`
   }
   return device.brand
-}
-
-function formatEstimatedCost(paise: number): string {
-  return `₹${(paise / 100).toFixed(2)}`
 }
 
 export function TrackStatusView({ data }: { data: PublicTrackingResponse }) {
@@ -42,6 +41,29 @@ export function TrackStatusView({ data }: { data: PublicTrackingResponse }) {
         </CardContent>
       </Card>
 
+      {data.pendingApproval ? (
+        <Card className="overflow-hidden border-amber-400/50 shadow-[0_12px_32px_rgba(245,158,11,0.15)]">
+          <div className="border-b border-amber-300/50 bg-amber-500 px-5 py-3 dark:border-amber-800 dark:bg-amber-700">
+            <div className="flex items-center gap-2 text-white">
+              <AlertCircle className="h-5 w-5 shrink-0" aria-hidden />
+              <div>
+                <p className="text-sm font-bold uppercase tracking-wide">Your approval is needed</p>
+                <p className="text-xs text-amber-50/90">
+                  Review the diagnosis and estimated cost below before we continue the repair.
+                </p>
+              </div>
+            </div>
+          </div>
+          <CardContent className="p-5 sm:p-6">
+            <ApprovalEstimateSummary
+              variant="prominent"
+              diagnosis={data.pendingApproval.diagnosis}
+              estimatedCostRupees={data.pendingApproval.estimatedCost}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="border-border">
         <CardContent className="space-y-4 p-6">
           <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-steel">Progress</h3>
@@ -59,9 +81,10 @@ export function TrackStatusView({ data }: { data: PublicTrackingResponse }) {
             ) : (
               <p className="text-sm text-muted-foreground">No problem description provided.</p>
             )}
-            {typeof data.estimatedCost === 'number' ? (
+            {typeof data.estimatedCost === 'number' && !data.pendingApproval ? (
               <p className="text-sm text-foreground">
-                Estimated cost: <span className="font-medium">{formatEstimatedCost(data.estimatedCost)}</span>
+                Estimated cost:{' '}
+                <span className="font-semibold text-base">{formatINR(data.estimatedCost)}</span>
               </p>
             ) : null}
           </div>

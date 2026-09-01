@@ -34,6 +34,13 @@ export const publicTrackingResponseSchema = z.object({
   }),
   problemDescription: z.string().nullable(),
   estimatedCost: z.number().optional(),
+  pendingApproval: z
+    .object({
+      diagnosis: z.string(),
+      /** Estimated cost in rupees for customer-facing display. */
+      estimatedCost: z.number(),
+    })
+    .optional(),
   createdAt: z.string(),
   updates: z.array(
     z.object({

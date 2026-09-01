@@ -172,8 +172,8 @@ async function testApprovalDisplay(
     const variant = getApprovalStatusBadgeVariant(repair.approval.status)
     const emoji = getApprovalStatusEmoji(repair.approval.status)
 
-    if (testCase.status === 'PENDING' && label !== 'Pending') {
-      throw new Error(`Test C failed for PENDING: expected label "Pending", got "${label}"`)
+    if (testCase.status === 'PENDING' && !label.startsWith('Customer Approval — Pending')) {
+      throw new Error(`Test C failed for PENDING: expected label starting with "Customer Approval — Pending", got "${label}"`)
     }
 
     if (testCase.status === 'APPROVED' && !label.startsWith('Approved ·')) {

@@ -56,14 +56,17 @@ import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/compon
 import { ModelConfirmationCard } from './model-confirmation-card'
 import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
+import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBadge } from './approval-status-badge'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
   useReassignTechnician,
   useUpdateDiagnosis,
+  useUpdateEstimatedCost,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
+import { formatINRFromPaise, formatRupeesInputValue, parseRupeesInput } from '@/features/repairs/money'
 import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
 import { toast } from 'sonner'
@@ -78,6 +81,7 @@ export function RepairDetails({ id }: { id: string }) {
 
   const reassignMutation = useReassignTechnician(id)
   const diagnosisMutation = useUpdateDiagnosis(id)
+  const estimatedCostMutation = useUpdateEstimatedCost(id)
   const addNoteMutation = useAddRepairNote(id)
   const updateExpectedDateMutation = useUpdateExpectedCompletionDate(id)
 
@@ -85,6 +89,8 @@ export function RepairDetails({ id }: { id: string }) {
   const [diagnosisText, setDiagnosisText] = React.useState<string>('')
   const [prevRepairId, setPrevRepairId] = React.useState<string | null>(null)
   const [isDiagnosisEditing, setIsDiagnosisEditing] = React.useState<boolean>(false)
+  const [isEstimatedCostEditing, setIsEstimatedCostEditing] = React.useState<boolean>(false)
+  const [estimatedCostValue, setEstimatedCostValue] = React.useState<string>('')
   const [newNoteText, setNewNoteText] = React.useState<string>('')
   const [isEditingExpectedDate, setIsEditingExpectedDate] = React.useState<boolean>(false)
   const [expectedDateValue, setExpectedDateValue] = React.useState<string>('')
@@ -93,6 +99,7 @@ export function RepairDetails({ id }: { id: string }) {
     setPrevRepairId(repair.id)
     setSelectedTechId(repair.assignedTechnicianId ?? '')
     setDiagnosisText(repair.diagnosis ?? '')
+    setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
     if (repair.expectedCompletionDate) {
       const dateObj = new Date(repair.expectedCompletionDate)
       if (!isNaN(dateObj.getTime())) {
@@ -164,6 +171,18 @@ export function RepairDetails({ id }: { id: string }) {
   const handleSaveDiagnosis = async () => {
     await diagnosisMutation.mutateAsync({ diagnosis: diagnosisText })
     setIsDiagnosisEditing(false)
+    refetch()
+  }
+
+  const handleSaveEstimatedCost = async () => {
+    const parsed = parseRupeesInput(estimatedCostValue)
+    if (estimatedCostValue.trim() && parsed === null) {
+      toast.error('Enter a valid estimated cost in rupees')
+      return
+    }
+
+    await estimatedCostMutation.mutateAsync({ estimatedCost: parsed })
+    setIsEstimatedCostEditing(false)
     refetch()
   }
 
@@ -248,13 +267,21 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Status Control Box */}
-            <div className="w-full lg:w-auto lg:min-w-70">
+            <div className="w-full lg:w-auto lg:min-w-70 space-y-3">
               <StatusChangeControl
                 repairId={repair.id}
                 currentStatus={repair.status}
-                modelVerified={repair.device.modelVerified}
                 assignedTechnicianId={repair.assignedTechnicianId}
                 onStatusUpdated={() => refetch()}
+              />
+              <RequestApprovalControl
+                repairId={repair.id}
+                diagnosis={repair.diagnosis}
+                estimatedCost={repair.estimatedCost}
+                approval={repair.approval}
+                currentStatus={repair.status}
+                assignedTechnicianId={repair.assignedTechnicianId}
+                onRequested={() => refetch()}
               />
             </div>
           </div>
@@ -535,6 +562,86 @@ export function RepairDetails({ id }: { id: string }) {
               )}
             </p>
           )}
+
+          <div className="pt-4 border-t border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                Estimated Cost
+                <span className="text-xs font-normal text-muted-foreground">(₹ Rupees)</span>
+              </h4>
+              {canEditDiagnosisAndNotes &&
+                !isEstimatedCostEditing &&
+                repair.approval?.status !== 'PENDING' && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
+                      setIsEstimatedCostEditing(true)
+                    }}
+                    className="h-8 text-xs gap-1.5"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit
+                  </Button>
+                )}
+            </div>
+
+            {isEstimatedCostEditing ? (
+              <div className="space-y-3">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 1500"
+                  value={estimatedCostValue}
+                  onChange={(e) => setEstimatedCostValue(e.target.value)}
+                  className="text-sm max-w-xs"
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
+                      setIsEstimatedCostEditing(false)
+                    }}
+                    className="h-8 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSaveEstimatedCost}
+                    disabled={estimatedCostMutation.isPending}
+                    className="h-8 text-xs"
+                  >
+                    {estimatedCostMutation.isPending ? 'Saving...' : 'Save Cost'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={
+                  repair.estimatedCost !== null
+                    ? 'rounded-lg border border-amber-200/80 bg-amber-50/40 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20'
+                    : undefined
+                }
+              >
+                <p className="text-sm text-foreground">
+                  {repair.estimatedCost !== null ? (
+                    <span className="text-xl font-bold text-amber-950 dark:text-amber-100">
+                      {formatINRFromPaise(repair.estimatedCost)}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground italic">
+                      Not set — enter amount in rupees before requesting approval
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 

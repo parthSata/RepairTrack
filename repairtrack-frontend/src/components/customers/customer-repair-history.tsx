@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { History, Wrench, ChevronRight } from 'lucide-react'
 import { useCustomerRepairHistory } from '@/features/customers/queries'
+import { formatINRFromPaise } from '@/features/repairs/money'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -94,11 +95,11 @@ export function CustomerRepairHistory({ customerId }: CustomerRepairHistoryProps
                 {new Date(repair.createdAt).toLocaleDateString()}
               </TableCell>
               <TableCell className="text-sm font-medium">
-                {repair.finalCost
-                  ? `₹${(repair.finalCost / 100).toFixed(2)}`
-                  : repair.estimatedCost
-                  ? `~₹${(repair.estimatedCost / 100).toFixed(2)}`
-                  : 'N/A'}
+                {repair.finalCost != null
+                  ? formatINRFromPaise(repair.finalCost)
+                  : repair.estimatedCost != null
+                    ? `~${formatINRFromPaise(repair.estimatedCost)}`
+                    : 'N/A'}
               </TableCell>
               <TableCell className="text-right">
                 <Link
