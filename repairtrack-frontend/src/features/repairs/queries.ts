@@ -54,6 +54,7 @@ export interface RepairStatusHistoryItem {
   id: string
   fromStatus: string | null
   toStatus: string
+  actorType: 'STAFF' | 'CUSTOMER'
   note: string | null
   createdAt: string
   changedBy: {
@@ -61,6 +62,21 @@ export interface RepairStatusHistoryItem {
     name: string
     email?: string
     role?: string
+  } | null
+}
+
+export interface RepairApproval {
+  id: string
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  additionalEstimatedCost: number
+  diagnosisSnapshot: string
+  requestedAt: string
+  decidedAt: string | null
+  rejectionReason: string | null
+  requestedBy: {
+    id: string
+    name: string
+    role: string
   }
 }
 
@@ -91,6 +107,7 @@ export interface Repair {
   creator?: RepairCreator | null
   notes?: RepairNote[]
   statusHistory?: RepairStatusHistoryItem[]
+  approval?: RepairApproval | null
 }
 
 export interface RepairListResponse {

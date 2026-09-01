@@ -56,6 +56,7 @@ import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/compon
 import { ModelConfirmationCard } from './model-confirmation-card'
 import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
+import { ApprovalStatusBadge } from './approval-status-badge'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
@@ -222,6 +223,7 @@ export function RepairDetails({ id }: { id: string }) {
                 <Badge variant="outline" className="font-semibold text-xs uppercase px-2.5 py-0.5">
                   {repair.status.replace(/_/g, ' ')}
                 </Badge>
+                {repair.approval ? <ApprovalStatusBadge approval={repair.approval} /> : null}
                 <Badge variant="secondary" className="font-medium text-xs">
                   {repair.priority} Priority
                 </Badge>
@@ -631,7 +633,17 @@ export function RepairDetails({ id }: { id: string }) {
                       <span className="text-muted-foreground">•</span>
 
                       <span className="text-muted-foreground">
-                        Changed by <strong className="text-foreground">{item.changedBy.name}</strong> ({item.changedBy.role})
+                        {item.actorType === 'CUSTOMER' ? (
+                          <>Changed by <strong className="text-foreground">Customer</strong></>
+                        ) : item.changedBy?.name ? (
+                          <>
+                            Changed by{' '}
+                            <strong className="text-foreground">{item.changedBy.name}</strong>
+                            {item.changedBy.role ? ` (${item.changedBy.role})` : ''}
+                          </>
+                        ) : (
+                          <>Changed by <strong className="text-foreground">Staff</strong></>
+                        )}
                       </span>
 
                       <span className="text-muted-foreground">•</span>

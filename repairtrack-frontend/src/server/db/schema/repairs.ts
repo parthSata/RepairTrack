@@ -2,6 +2,7 @@ import { boolean, index, integer, pgEnum, pgTable, text, timestamp } from 'drizz
 import { relations } from 'drizzle-orm'
 import { shops, users } from './users'
 import { customers } from './customers'
+import { repairApprovals } from './repair-approvals'
 
 export const repairStatusEnum = pgEnum('repair_status', [
   'RECEIVED',
@@ -35,6 +36,11 @@ export const deviceConditionEnum = pgEnum('device_condition', [
   'GOOD',
   'FAIR',
   'POOR',
+])
+
+export const repairStatusHistoryActorTypeEnum = pgEnum('repair_status_history_actor_type', [
+  'STAFF',
+  'CUSTOMER',
 ])
 
 export const devices = pgTable(
@@ -131,9 +137,8 @@ export const repairStatusHistory = pgTable(
       .references(() => repairs.id, { onDelete: 'cascade' }),
     fromStatus: repairStatusEnum('from_status'),
     toStatus: repairStatusEnum('to_status').notNull(),
-    changedBy: text('changed_by')
-      .notNull()
-      .references(() => users.id, { onDelete: 'restrict' }),
+    changedBy: text('changed_by').references(() => users.id, { onDelete: 'set null' }),
+    actorType: repairStatusHistoryActorTypeEnum('actor_type').default('STAFF').notNull(),
     note: text('note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -154,6 +159,7 @@ export const repairsRelations = relations(repairs, ({ one, many }) => ({
   creator: one(users, { fields: [repairs.createdBy], references: [users.id] }),
   notes: many(repairNotes),
   statusHistory: many(repairStatusHistory),
+  approvals: many(repairApprovals),
 }))
 
 export const repairNotesRelations = relations(repairNotes, ({ one }) => ({

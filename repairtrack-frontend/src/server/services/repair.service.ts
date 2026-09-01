@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
+import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
@@ -361,8 +362,9 @@ export async function getRepairById({
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
-  // Fetch creator info, assigned technician, notes, and status history concurrently in parallel
-  const [creatorResult, techResult, notes, statusHistory] = await Promise.all([
+  // Fetch creator info, assigned technician, notes, status history, and approval concurrently
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult] =
+    await Promise.all([
     repair.createdBy
       ? db
           .select({ id: users.id, name: users.name, email: users.email, role: users.role })
@@ -396,6 +398,7 @@ export async function getRepairById({
         id: repairStatusHistory.id,
         fromStatus: repairStatusHistory.fromStatus,
         toStatus: repairStatusHistory.toStatus,
+        actorType: repairStatusHistory.actorType,
         note: repairStatusHistory.note,
         createdAt: repairStatusHistory.createdAt,
         changedBy: {
@@ -409,10 +412,50 @@ export async function getRepairById({
       .leftJoin(users, eq(users.id, repairStatusHistory.changedBy))
       .where(eq(repairStatusHistory.repairId, id))
       .orderBy(asc(repairStatusHistory.createdAt)),
+    db
+      .select({
+        id: repairApprovals.id,
+        status: repairApprovals.status,
+        additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
+        diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
+        requestedAt: repairApprovals.requestedAt,
+        decidedAt: repairApprovals.decidedAt,
+        rejectionReason: repairApprovals.rejectionReason,
+        requestedBy: {
+          id: users.id,
+          name: users.name,
+          role: users.role,
+        },
+      })
+      .from(repairApprovals)
+      .leftJoin(users, eq(users.id, repairApprovals.requestedBy))
+      .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
+      .limit(1),
+    db
+      .select({
+        id: repairApprovals.id,
+        status: repairApprovals.status,
+        additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
+        diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
+        requestedAt: repairApprovals.requestedAt,
+        decidedAt: repairApprovals.decidedAt,
+        rejectionReason: repairApprovals.rejectionReason,
+        requestedBy: {
+          id: users.id,
+          name: users.name,
+          role: users.role,
+        },
+      })
+      .from(repairApprovals)
+      .leftJoin(users, eq(users.id, repairApprovals.requestedBy))
+      .where(eq(repairApprovals.repairId, id))
+      .orderBy(desc(repairApprovals.requestedAt))
+      .limit(1),
   ])
 
   const creator = creatorResult[0] || null
   const assignedTechnician = techResult[0] || null
+  const approval = pendingApprovalResult[0] ?? latestApprovalResult[0] ?? null
 
   return {
     ...repair,
@@ -421,6 +464,7 @@ export async function getRepairById({
     assignedTechnician,
     notes,
     statusHistory,
+    approval,
   }
 }
 
