@@ -169,6 +169,16 @@ The initial repair lifecycle should support:
 Do not introduce additional statuses without a clear business
 requirement.
 
+**Customer approval status mapping (footnotes):**
+
+1. **Customer rejection:** Do not add `REJECTED` to `repairs.status`.
+   Customer rejection sets `repairs.status = CANCELLED`; the decision
+   detail lives on `repair_approvals.status = REJECTED` (with
+   `rejection_reason` and `decided_at` on that row).
+2. **Customer approval:** On approval, `repairs.status` moves to the
+   existing `APPROVED` value (not `IN_REPAIR`). Staff manually advance
+   the repair to subsequent statuses afterward.
+
 This list is the single source of truth for the status enum. The
 diagram in `ui-context.md` §11 is a simplified visual grouping, not a
 second list — do not generate the enum from it.

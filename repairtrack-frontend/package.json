@@ -9,9 +9,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun run scripts/db-migrate.ts",
+    "db:check-migration-url": "bun run scripts/check-migration-url.ts",
     "db:studio": "drizzle-kit studio",
-    "seed": "bun run scripts/seed.ts"
+    "seed": "bun run scripts/seed.ts",
+    "verify:approval-schema": "bun run scripts/verify-approval-schema.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.1",
