@@ -48,6 +48,7 @@ async function testOnePendingPerRepair(repairId: string, requestedBy: string, di
     .values({
       repairId,
       status: 'PENDING',
+      initialEstimatedCost: 100000,
       additionalEstimatedCost: 150000,
       diagnosisSnapshot: snapshot,
       requestedBy,
@@ -60,6 +61,7 @@ async function testOnePendingPerRepair(repairId: string, requestedBy: string, di
     await db.insert(repairApprovals).values({
       repairId,
       status: 'PENDING',
+      initialEstimatedCost: 100000,
       additionalEstimatedCost: 200000,
       diagnosisSnapshot: snapshot,
       requestedBy,
@@ -138,6 +140,7 @@ async function testApprovalDisplay(
     await db.insert(repairApprovals).values({
       repairId,
       status: testCase.status,
+      initialEstimatedCost: 50000,
       additionalEstimatedCost: 99000,
       diagnosisSnapshot: snapshot,
       requestedBy,

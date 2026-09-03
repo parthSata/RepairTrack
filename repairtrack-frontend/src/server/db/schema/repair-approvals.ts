@@ -17,6 +17,7 @@ export const repairApprovals = pgTable(
       .notNull()
       .references(() => repairs.id, { onDelete: 'cascade' }),
     status: repairApprovalStatusEnum('status').notNull(),
+    initialEstimatedCost: integer('initial_estimated_cost').notNull(),
     additionalEstimatedCost: integer('additional_estimated_cost').notNull(),
     diagnosisSnapshot: text('diagnosis_snapshot').notNull(),
     requestedBy: text('requested_by')

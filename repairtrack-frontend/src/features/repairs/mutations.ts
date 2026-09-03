@@ -241,9 +241,11 @@ export function useUpdateEstimatedCost(repairId: string) {
 export function useRequestCustomerApproval(repairId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation<Repair, Error, void>({
-    mutationFn: async () => {
-      const response = await apiClient.post<Repair>(`/repairs/${repairId}/request-approval`)
+  return useMutation<Repair, Error, { additionalEstimatedCost: number }>({
+    mutationFn: async ({ additionalEstimatedCost }) => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/request-approval`, {
+        additionalEstimatedCost,
+      })
       return response.data
     },
     onSuccess: () => {

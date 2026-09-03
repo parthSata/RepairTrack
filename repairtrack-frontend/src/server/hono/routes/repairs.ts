@@ -125,18 +125,29 @@ export const repairsRouter = new Hono()
       return c.json(updated)
     },
   )
-  .post('/:id/request-approval', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
-    const id = c.req.param('id')
+  .post(
+    '/:id/request-approval',
+    zValidator(
+      'json',
+      z.object({
+        additionalEstimatedCost: z.number().min(0).max(1_000_000),
+      }),
+    ),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { additionalEstimatedCost } = c.req.valid('json')
 
-    const repair = await requestCustomerApproval({
-      shopId,
-      userRole,
-      userId,
-      id,
-    })
-    return c.json(repair)
-  })
+      const repair = await requestCustomerApproval({
+        shopId,
+        userRole,
+        userId,
+        id,
+        additionalEstimatedCostRupees: additionalEstimatedCost,
+      })
+      return c.json(repair)
+    },
+  )
   .post(
     '/:id/reopen',
     zValidator(
