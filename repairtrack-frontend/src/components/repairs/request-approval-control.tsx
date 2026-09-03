@@ -3,34 +3,30 @@
 import * as React from 'react'
 import { AlertCircle, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { ApprovalEstimateSummary } from '@/components/repairs/approval-estimate-summary'
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { ApprovalEstimateBreakdown } from '@/components/repairs/approval-estimate-summary'
 import { useRequestCustomerApproval } from '@/features/repairs/mutations'
+import { parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
 import type { RepairApproval } from '@/features/repairs/queries'
 import { useSession } from '@/lib/auth-client'
 
 function getDisabledReason({
   diagnosis,
-  estimatedCost,
   approval,
 }: {
   diagnosis: string | null
-  estimatedCost: number | null
   approval: RepairApproval | null | undefined
 }): string | null {
   if (!diagnosis?.trim()) {
     return 'Add a diagnosis before requesting customer approval'
-  }
-  if (estimatedCost === null) {
-    return 'Set an estimated cost (₹) before requesting customer approval'
   }
   if (approval?.status === 'PENDING') {
     return 'Customer approval is already pending for this repair'
@@ -69,20 +65,30 @@ export function RequestApprovalControl({
   const requestMutation = useRequestCustomerApproval(repairId)
   const [confirmOpen, setConfirmOpen] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
+  const [additionalCostValue, setAdditionalCostValue] = React.useState('')
 
   if (!canRequestApproval) {
     return null
   }
 
-  const disabledReason = getDisabledReason({ diagnosis, estimatedCost, approval })
+  const disabledReason = getDisabledReason({ diagnosis, approval })
   const isReady = !disabledReason
   const isDisabled = Boolean(disabledReason) || requestMutation.isPending
+  const parsedAdditionalRupees = parseRupeesInput(additionalCostValue)
+  const additionalPaise =
+    parsedAdditionalRupees != null ? rupeesToPaise(parsedAdditionalRupees) : null
 
   const handleConfirm = async () => {
+    if (parsedAdditionalRupees == null) {
+      setErrorMessage('Enter an additional repair cost in rupees')
+      return
+    }
+
     setErrorMessage(null)
     try {
-      await requestMutation.mutateAsync()
+      await requestMutation.mutateAsync({ additionalEstimatedCost: parsedAdditionalRupees })
       setConfirmOpen(false)
+      setAdditionalCostValue('')
       if (onRequested) onRequested()
     } catch (err: unknown) {
       const errorObj = err as {
@@ -107,6 +113,7 @@ export function RequestApprovalControl({
         disabled={isDisabled}
         onClick={() => {
           setErrorMessage(null)
+          setAdditionalCostValue('')
           setConfirmOpen(true)
         }}
         className={
@@ -125,46 +132,74 @@ export function RequestApprovalControl({
           <span>{disabledReason}</span>
         </p>
       ) : (
-        <p className="text-[11px] text-amber-700 dark:text-amber-400">
-          Sends diagnosis and estimated cost to the customer tracking page.
+        <p className="text-[11px] text-muted-foreground">
+          Sends diagnosis and cost breakdown to the customer tracking page.
         </p>
       )}
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Send estimate for customer approval?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The customer will see this diagnosis and cost on their tracking link. The repair moves
-            to Waiting for Approval until they respond (next update).
-          </AlertDialogDescription>
-        </AlertDialogHeader>
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogHeader>
+          <DialogTitle>Send estimate for customer approval?</DialogTitle>
+          <DialogDescription>The repair will wait for customer approval.</DialogDescription>
+        </DialogHeader>
 
-        {diagnosis?.trim() && estimatedCost !== null ? (
-          <ApprovalEstimateSummary
-            variant="prominent"
-            diagnosis={diagnosis.trim()}
-            estimatedCostPaise={estimatedCost}
-            className="my-3"
-          />
+        {diagnosis?.trim() ? (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Technician Diagnosis
+              </p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                {diagnosis.trim()}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="additionalEstimatedCost">Additional Repair Cost (₹)</Label>
+              <Input
+                id="additionalEstimatedCost"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 4500"
+                value={additionalCostValue}
+                onChange={(e) => setAdditionalCostValue(e.target.value)}
+              />
+            </div>
+
+            <ApprovalEstimateBreakdown
+              showDiagnosis={false}
+              originalEstimatedCostPaise={estimatedCost}
+              additionalEstimatedCostPaise={additionalPaise}
+            />
+          </div>
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+          <div className="mt-3 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
             {errorMessage}
           </div>
         ) : null}
 
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={requestMutation.isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleConfirm}
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
             disabled={requestMutation.isPending}
-            className="bg-amber-600 hover:bg-amber-700"
+            onClick={() => setConfirmOpen(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleConfirm}
+            disabled={requestMutation.isPending || parsedAdditionalRupees == null}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
           >
             {requestMutation.isPending ? 'Sending...' : 'Send to Customer'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   )
 }

@@ -58,6 +58,7 @@ import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
 import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBadge } from './approval-status-badge'
+import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
@@ -66,7 +67,8 @@ import {
   useUpdateEstimatedCost,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
-import { formatINRFromPaise, formatRupeesInputValue, parseRupeesInput } from '@/features/repairs/money'
+import { formatRupeesInputValue, parseRupeesInput } from '@/features/repairs/money'
+import { formatRupees } from '@/lib/format-money'
 import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
 import { toast } from 'sonner'
@@ -620,23 +622,21 @@ export function RepairDetails({ id }: { id: string }) {
                   </Button>
                 </div>
               </div>
+            ) : repair.approval?.status === 'PENDING' ? (
+              <ApprovalEstimateBreakdown
+                showDiagnosis={false}
+                originalEstimatedCostPaise={repair.estimatedCost}
+                additionalEstimatedCostPaise={repair.approval.additionalEstimatedCost}
+              />
             ) : (
-              <div
-                className={
-                  repair.estimatedCost !== null
-                    ? 'rounded-lg border border-amber-200/80 bg-amber-50/40 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20'
-                    : undefined
-                }
-              >
+              <div>
                 <p className="text-sm text-foreground">
                   {repair.estimatedCost !== null ? (
-                    <span className="text-xl font-bold text-amber-950 dark:text-amber-100">
-                      {formatINRFromPaise(repair.estimatedCost)}
+                    <span className="text-xl font-semibold text-foreground">
+                      {formatRupees(repair.estimatedCost)}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground italic">
-                      Not set — enter amount in rupees before requesting approval
-                    </span>
+                    <span className="text-muted-foreground italic">Not set</span>
                   )}
                 </p>
               </div>

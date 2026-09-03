@@ -18,6 +18,9 @@ export const repairApprovals = pgTable(
       .references(() => repairs.id, { onDelete: 'cascade' }),
     status: repairApprovalStatusEnum('status').notNull(),
     additionalEstimatedCost: integer('additional_estimated_cost').notNull(),
+    // Integer paise snapshot of repairs.estimated_cost at request time (0 if unset).
+    // Column already exists on the shared DB; display still reads repairs.estimated_cost.
+    initialEstimatedCost: integer('initial_estimated_cost').notNull(),
     diagnosisSnapshot: text('diagnosis_snapshot').notNull(),
     requestedBy: text('requested_by')
       .notNull()

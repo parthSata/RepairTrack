@@ -20,7 +20,7 @@ import {
 } from '@/server/services/repair.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
-import { createRepairSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
+import { createRepairSchema, requestCustomerApprovalSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -125,18 +125,28 @@ export const repairsRouter = new Hono()
       return c.json(updated)
     },
   )
-  .post('/:id/request-approval', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
-    const id = c.req.param('id')
+  .post(
+    '/:id/request-approval',
+    zValidator('json', requestCustomerApprovalSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { additionalEstimatedCost } = c.req.valid('json')
 
-    const repair = await requestCustomerApproval({
-      shopId,
-      userRole,
-      userId,
-      id,
-    })
-    return c.json(repair)
-  })
+      const repair = await requestCustomerApproval({
+        shopId,
+        userRole,
+        userId,
+        id,
+        additionalEstimatedCostRupees: additionalEstimatedCost,
+      })
+      return c.json(repair)
+    },
+  )
   .post(
     '/:id/reopen',
     zValidator(

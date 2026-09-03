@@ -4,7 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { History, Wrench, ChevronRight } from 'lucide-react'
 import { useCustomerRepairHistory } from '@/features/customers/queries'
-import { formatINRFromPaise } from '@/features/repairs/money'
+import { formatRupees } from '@/lib/format-money'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -96,9 +96,9 @@ export function CustomerRepairHistory({ customerId }: CustomerRepairHistoryProps
               </TableCell>
               <TableCell className="text-sm font-medium">
                 {repair.finalCost != null
-                  ? formatINRFromPaise(repair.finalCost)
+                  ? formatRupees(repair.finalCost)
                   : repair.estimatedCost != null
-                    ? `~${formatINRFromPaise(repair.estimatedCost)}`
+                    ? `~${formatRupees(repair.estimatedCost)}`
                     : 'N/A'}
               </TableCell>
               <TableCell className="text-right">

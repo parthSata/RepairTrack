@@ -7,7 +7,6 @@ import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { mapRepairStatusToPublicLabel } from '@/features/tracking/status-labels'
 import { phonesMatch } from '@/server/lib/tokens'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
-import { paiseToRupees } from '@/features/repairs/money'
 
 const PUBLIC_TRACKING_NOT_FOUND = "We couldn't find this repair."
 
@@ -56,13 +55,14 @@ export function buildPublicTrackingPayload(
   }
 
   if (repair.estimatedCost !== null) {
-    payload.estimatedCost = paiseToRupees(repair.estimatedCost)
+    payload.estimatedCost = repair.estimatedCost
   }
 
   if (pendingApproval) {
     payload.pendingApproval = {
       diagnosis: pendingApproval.diagnosisSnapshot,
-      estimatedCost: paiseToRupees(pendingApproval.additionalEstimatedCost),
+      originalEstimatedCost: repair.estimatedCost,
+      additionalEstimatedCost: pendingApproval.additionalEstimatedCost,
     }
   }
 
@@ -107,10 +107,42 @@ async function loadPublicRepairData(repairId: string) {
     .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'PENDING')))
     .limit(1)
 
+  let status = row.status
+  let statusHistory = history
+
+  if (pendingApproval && row.status !== 'WAITING_FOR_APPROVAL') {
+    const fromStatus = row.status
+    await db.transaction(async (tx) => {
+      await tx
+        .update(repairs)
+        .set({ status: 'WAITING_FOR_APPROVAL', updatedAt: new Date() })
+        .where(eq(repairs.id, repairId))
+
+      await tx.insert(repairStatusHistory).values({
+        id: crypto.randomUUID(),
+        repairId,
+        fromStatus,
+        toStatus: 'WAITING_FOR_APPROVAL',
+        actorType: 'STAFF',
+        note: 'Status restored to Waiting for Approval while customer approval is pending',
+      })
+    })
+
+    status = 'WAITING_FOR_APPROVAL'
+    statusHistory = await db
+      .select({
+        toStatus: repairStatusHistory.toStatus,
+        createdAt: repairStatusHistory.createdAt,
+      })
+      .from(repairStatusHistory)
+      .where(eq(repairStatusHistory.repairId, repairId))
+      .orderBy(asc(repairStatusHistory.createdAt))
+  }
+
   return buildPublicTrackingPayload(
     {
       ticketNumber: row.ticketNumber,
-      status: row.status,
+      status,
       problemDescription: row.problemDescription,
       estimatedCost: row.estimatedCost,
       createdAt: row.createdAt,
@@ -119,7 +151,7 @@ async function loadPublicRepairData(repairId: string) {
       brand: row.brand,
       model: row.model,
     },
-    history,
+    statusHistory,
     pendingApproval ?? null,
   )
 }

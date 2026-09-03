@@ -6,6 +6,7 @@ import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
+import { rupeesToPaise } from '@/features/repairs/money'
 import {
   computeIsRepairOverdue,
   isExpectedCompletionDateInPast,
@@ -108,7 +109,7 @@ export async function createRepairTicket({
             issueDescription: data.problemDescription,
             initialCondition: data.initialCondition,
             estimatedCost:
-              data.estimatedCost != null ? Math.round(data.estimatedCost * 100) : null,
+              data.estimatedCost != null ? rupeesToPaise(data.estimatedCost) : null,
             priority: data.priority ?? 'MEDIUM',
             expectedCompletionDate: data.expectedCompletionDate
               ? new Date(data.expectedCompletionDate)
@@ -458,13 +459,63 @@ export async function getRepairById({
   const assignedTechnician = techResult[0] || null
   const approval = pendingApprovalResult[0] ?? latestApprovalResult[0] ?? null
 
+  // Heal drift: PENDING approval must keep repairs.status at WAITING_FOR_APPROVAL
+  // (staff could previously change status away while the approval row stayed PENDING).
+  let resolvedStatus = repair.status
+  let resolvedStatusHistory = statusHistory
+  if (pendingApprovalResult[0] && repair.status !== 'WAITING_FOR_APPROVAL') {
+    const fromStatus = repair.status
+    await db.transaction(async (tx) => {
+      await tx
+        .update(repairs)
+        .set({ status: 'WAITING_FOR_APPROVAL', updatedAt: new Date() })
+        .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+      await tx.insert(repairStatusHistory).values({
+        id: crypto.randomUUID(),
+        repairId: id,
+        fromStatus,
+        toStatus: 'WAITING_FOR_APPROVAL',
+        changedBy: userId,
+        actorType: 'STAFF',
+        note: 'Status restored to Waiting for Approval while customer approval is pending',
+      })
+    })
+
+    resolvedStatus = 'WAITING_FOR_APPROVAL'
+    const refreshedHistory = await db
+      .select({
+        id: repairStatusHistory.id,
+        fromStatus: repairStatusHistory.fromStatus,
+        toStatus: repairStatusHistory.toStatus,
+        actorType: repairStatusHistory.actorType,
+        note: repairStatusHistory.note,
+        createdAt: repairStatusHistory.createdAt,
+        changedBy: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+          role: users.role,
+        },
+      })
+      .from(repairStatusHistory)
+      .leftJoin(users, eq(users.id, repairStatusHistory.changedBy))
+      .where(eq(repairStatusHistory.repairId, id))
+      .orderBy(asc(repairStatusHistory.createdAt))
+    resolvedStatusHistory = refreshedHistory
+  }
+
   return {
     ...repair,
-    isOverdue: computeIsRepairOverdue(repair.expectedCompletionDate, repair.status),
+    status: resolvedStatus,
+    isOverdue: computeIsRepairOverdue(
+      repair.expectedCompletionDate,
+      resolvedStatus,
+    ),
     creator,
     assignedTechnician,
     notes,
-    statusHistory,
+    statusHistory: resolvedStatusHistory,
     approval,
   }
 }
@@ -526,6 +577,19 @@ export async function updateRepairStatus({
     })
   }
 
+  const [pendingApproval] = await db
+    .select({ id: repairApprovals.id })
+    .from(repairApprovals)
+    .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
+    .limit(1)
+
+  if (pendingApproval) {
+    throw new HTTPException(400, {
+      message:
+        'Customer approval is pending. Status cannot be changed until the customer responds.',
+    })
+  }
+
   // Execute status update and status history logging in transaction
   const updated = await db.transaction(async (tx) => {
     const [res] = await tx
@@ -557,11 +621,13 @@ export async function requestCustomerApproval({
   userRole,
   userId,
   id,
+  additionalEstimatedCostRupees,
 }: {
   shopId: string
   userRole: string
   userId: string
   id: string
+  additionalEstimatedCostRupees: number
 }) {
   if (userRole === 'OWNER') {
     throw new HTTPException(403, {
@@ -604,12 +670,6 @@ export async function requestCustomerApproval({
     })
   }
 
-  if (existing.estimatedCost === null) {
-    throw new HTTPException(400, {
-      message: 'Set an estimated cost before requesting customer approval',
-    })
-  }
-
   const [pendingApproval] = await db
     .select({ id: repairApprovals.id })
     .from(repairApprovals)
@@ -630,7 +690,8 @@ export async function requestCustomerApproval({
       repairId: id,
       status: 'PENDING',
       diagnosisSnapshot,
-      additionalEstimatedCost: existing.estimatedCost!,
+      additionalEstimatedCost: rupeesToPaise(additionalEstimatedCostRupees),
+      initialEstimatedCost: existing.estimatedCost ?? 0,
       requestedBy: userId,
       requestedAt,
     })
@@ -862,7 +923,7 @@ export async function updateEstimatedCost({
   }
 
   const estimatedCostPaise =
-    estimatedCostRupees != null ? Math.round(estimatedCostRupees * 100) : null
+    estimatedCostRupees != null ? rupeesToPaise(estimatedCostRupees) : null
 
   const [updated] = await db
     .update(repairs)

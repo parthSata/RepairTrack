@@ -1,6 +1,7 @@
 /**
  * Money is stored in the database as integer paise (100 paise = ₹1).
- * All user-facing labels and public APIs should use rupees via the helpers below.
+ * Display uses formatRupees() in lib/format-money.ts. These helpers are
+ * for form input (rupees typed by the user) and integer totals only.
  */
 
 export function rupeesToPaise(rupees: number): number {
@@ -9,20 +10,6 @@ export function rupeesToPaise(rupees: number): number {
 
 export function paiseToRupees(paise: number): number {
   return paise / 100
-}
-
-/** Format a rupee amount for display (e.g. ₹1,500 or ₹1,500.50). */
-export function formatINR(rupees: number): string {
-  const hasFraction = Math.round(rupees * 100) % 100 !== 0
-  return `₹${rupees.toLocaleString('en-IN', {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-/** Format stored paise as rupees for display. */
-export function formatINRFromPaise(paise: number): string {
-  return formatINR(paiseToRupees(paise))
 }
 
 export function formatRupeesInputValue(paise: number | null): string {
@@ -37,4 +24,11 @@ export function parseRupeesInput(value: string): number | null {
   const parsed = Number.parseFloat(trimmed)
   if (Number.isNaN(parsed) || parsed < 0) return null
   return parsed
+}
+
+export function revisedEstimatedTotalPaise(
+  originalPaise: number | null | undefined,
+  additionalPaise: number | null | undefined,
+): number {
+  return (originalPaise ?? 0) + (additionalPaise ?? 0)
 }

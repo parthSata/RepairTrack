@@ -95,3 +95,12 @@ export const updateEstimatedCostSchema = z.object({
 })
 
 export type UpdateEstimatedCostInput = z.infer<typeof updateEstimatedCostSchema>
+
+export const requestCustomerApprovalSchema = z.object({
+  additionalEstimatedCost: z
+    .number()
+    .min(0, { message: 'Additional estimated cost cannot be negative' })
+    .max(1000000, { message: 'Estimated cost cannot exceed ₹1,000,000' }),
+})
+
+export type RequestCustomerApprovalInput = z.infer<typeof requestCustomerApprovalSchema>

@@ -37,8 +37,8 @@ export const publicTrackingResponseSchema = z.object({
   pendingApproval: z
     .object({
       diagnosis: z.string(),
-      /** Estimated cost in rupees for customer-facing display. */
-      estimatedCost: z.number(),
+      originalEstimatedCost: z.number().nullable(),
+      additionalEstimatedCost: z.number(),
     })
     .optional(),
   createdAt: z.string(),
