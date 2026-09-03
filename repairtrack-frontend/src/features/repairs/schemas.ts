@@ -85,3 +85,13 @@ export const updateExpectedCompletionDateSchema = z.object({
 })
 
 export type UpdateExpectedCompletionDateInput = z.infer<typeof updateExpectedCompletionDateSchema>
+
+export const updateEstimatedCostSchema = z.object({
+  estimatedCost: z
+    .number()
+    .min(0, { message: 'Estimated cost cannot be negative' })
+    .max(1000000, { message: 'Estimated cost cannot exceed ₹1,000,000' })
+    .nullable(),
+})
+
+export type UpdateEstimatedCostInput = z.infer<typeof updateEstimatedCostSchema>

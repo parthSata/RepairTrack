@@ -36,7 +36,6 @@ const ALL_STATUSES = [
 interface StatusChangeControlProps {
   repairId: string
   currentStatus: string
-  modelVerified: boolean
   assignedTechnicianId?: string | null
   onStatusUpdated?: () => void
 }
@@ -44,7 +43,6 @@ interface StatusChangeControlProps {
 export function StatusChangeControl({
   repairId,
   currentStatus,
-  modelVerified,
   assignedTechnicianId,
   onStatusUpdated,
 }: StatusChangeControlProps) {
@@ -71,18 +69,21 @@ export function StatusChangeControl({
     setSelectedStatus(currentStatus)
   }
 
-  const isTransitionBlocked =
-    currentStatus === 'DIAGNOSING' &&
-    selectedStatus === 'WAITING_FOR_APPROVAL' &&
-    !modelVerified
+  const isManualApprovalTransition =
+    selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
+
+  const selectableStatuses = ALL_STATUSES.filter(
+    (status) =>
+      status !== 'WAITING_FOR_APPROVAL' || status === currentStatus,
+  )
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value
     setSelectedStatus(newStatus)
     setValidationError(null)
 
-    if (currentStatus === 'DIAGNOSING' && newStatus === 'WAITING_FOR_APPROVAL' && !modelVerified) {
-      setValidationError('Confirm the device model before sending an estimate')
+    if (newStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL') {
+      setValidationError('Use Request Customer Approval to send an estimate for approval.')
     }
   }
 
@@ -96,8 +97,8 @@ export function StatusChangeControl({
       return
     }
 
-    if (isTransitionBlocked) {
-      setValidationError('Confirm the device model before sending an estimate')
+    if (isManualApprovalTransition) {
+      setValidationError('Use Request Customer Approval to send an estimate for approval.')
       return
     }
 
@@ -255,7 +256,7 @@ export function StatusChangeControl({
               disabled={isUpdating}
               className="w-full h-9 rounded-md border border-input bg-background pl-3 pr-8 text-xs font-medium ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
             >
-              {ALL_STATUSES.map((status) => (
+              {selectableStatuses.map((status) => (
                 <option key={status} value={status}>
                   {STATUS_LABELS[status]}
                 </option>
@@ -267,7 +268,7 @@ export function StatusChangeControl({
           <Button
             type="button"
             onClick={handleUpdate}
-            disabled={isUpdating || selectedStatus === currentStatus || isTransitionBlocked}
+            disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
             className="h-9 px-4 text-xs font-semibold"
           >
             {isUpdating ? 'Updating...' : 'Update Status'}

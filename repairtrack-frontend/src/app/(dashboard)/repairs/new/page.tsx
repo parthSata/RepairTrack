@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
 import { NewRepairWorkflow } from '@/components/repairs/new-repair-workflow'
+import { RepairPageShell } from '@/components/repairs/repair-page-shell'
 
 export const metadata: Metadata = {
   title: 'Create New Repair Ticket | RepairTrack',
@@ -18,5 +19,9 @@ export default async function NewRepairPage() {
     redirect('/dashboard')
   }
 
-  return <NewRepairWorkflow />
+  return (
+    <RepairPageShell>
+      <NewRepairWorkflow />
+    </RepairPageShell>
+  )
 }

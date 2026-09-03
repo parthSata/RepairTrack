@@ -12,13 +12,15 @@ import {
   reassignTechnician,
   regenerateTrackingToken,
   reopenRepairTicket,
+  requestCustomerApproval,
   updateDiagnosis,
+  updateEstimatedCost,
   updateExpectedCompletionDate,
   updateRepairStatus,
 } from '@/server/services/repair.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
-import { createRepairSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
+import { createRepairSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -124,6 +126,29 @@ export const repairsRouter = new Hono()
     },
   )
   .post(
+    '/:id/request-approval',
+    zValidator(
+      'json',
+      z.object({
+        additionalEstimatedCost: z.number().min(0).max(1_000_000),
+      }),
+    ),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { additionalEstimatedCost } = c.req.valid('json')
+
+      const repair = await requestCustomerApproval({
+        shopId,
+        userRole,
+        userId,
+        id,
+        additionalEstimatedCostRupees: additionalEstimatedCost,
+      })
+      return c.json(repair)
+    },
+  )
+  .post(
     '/:id/reopen',
     zValidator(
       'json',
@@ -187,6 +212,24 @@ export const repairsRouter = new Hono()
         userId,
         id,
         diagnosis,
+      })
+      return c.json(updated)
+    },
+  )
+  .patch(
+    '/:id/estimated-cost',
+    zValidator('json', updateEstimatedCostSchema),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { estimatedCost } = c.req.valid('json')
+
+      const updated = await updateEstimatedCost({
+        shopId,
+        userRole,
+        userId,
+        id,
+        estimatedCostRupees: estimatedCost,
       })
       return c.json(updated)
     },

@@ -56,8 +56,12 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
     return (
       <TrackPageShell
         wide
-        title="Your repair status"
-        description="Follow your device through each stage of service."
+        title={tokenQuery.data.pendingApproval ? 'Review your repair estimate' : 'Your repair status'}
+        description={
+          tokenQuery.data.pendingApproval
+            ? 'We need you to review the diagnosis and cost before we can continue with the repair.'
+            : 'Follow your device through each stage of service.'
+        }
       >
         <TrackStatusView data={tokenQuery.data} />
       </TrackPageShell>
@@ -68,8 +72,12 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
     return (
       <TrackPageShell
         wide
-        title="Your repair status"
-        description="Follow your device through each stage of service."
+        title={verifiedData.pendingApproval ? 'Review your repair estimate' : 'Your repair status'}
+        description={
+          verifiedData.pendingApproval
+            ? 'We need you to review the diagnosis and cost before we can continue with the repair.'
+            : 'Follow your device through each stage of service.'
+        }
       >
         <TrackStatusView data={verifiedData} />
       </TrackPageShell>

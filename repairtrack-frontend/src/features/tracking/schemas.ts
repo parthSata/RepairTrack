@@ -34,6 +34,17 @@ export const publicTrackingResponseSchema = z.object({
   }),
   problemDescription: z.string().nullable(),
   estimatedCost: z.number().optional(),
+  pendingApproval: z
+    .object({
+      diagnosis: z.string(),
+      /** Original estimate in rupees at time of approval request. */
+      initialEstimate: z.number(),
+      /** Additional repair cost in rupees. */
+      additionalCost: z.number(),
+      /** Revised total in rupees (initial + additional). */
+      revisedTotal: z.number(),
+    })
+    .optional(),
   createdAt: z.string(),
   updates: z.array(
     z.object({

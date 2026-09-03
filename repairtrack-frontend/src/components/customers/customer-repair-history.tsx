@@ -4,12 +4,66 @@ import * as React from 'react'
 import Link from 'next/link'
 import { History, Wrench, ChevronRight } from 'lucide-react'
 import { useCustomerRepairHistory } from '@/features/customers/queries'
+import type { CustomerRepairItem } from '@/features/customers/queries'
+import { formatINRFromPaise } from '@/features/repairs/money'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 interface CustomerRepairHistoryProps {
   customerId: string
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'COMPLETED':
+      return <Badge variant="success">Completed</Badge>
+    case 'READY_FOR_PICKUP':
+      return <Badge variant="warning">Ready for Pickup</Badge>
+    case 'IN_REPAIR':
+    case 'DIAGNOSING':
+      return <Badge variant="default">{status.replace('_', ' ')}</Badge>
+    case 'CANCELLED':
+      return <Badge variant="destructive">Cancelled</Badge>
+    default:
+      return <Badge variant="secondary">{status.replace('_', ' ')}</Badge>
+  }
+}
+
+function RepairHistoryCard({ repair }: { repair: CustomerRepairItem }) {
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-xs font-semibold text-foreground">#{repair.ticketNumber}</p>
+          <div className="mt-1 flex items-center gap-2">
+            <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-sm font-medium truncate">
+              {repair.device ? `${repair.device.brand} ${repair.device.model}` : 'Unknown Device'}
+            </span>
+          </div>
+        </div>
+        {getStatusBadge(repair.status)}
+      </div>
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>{new Date(repair.createdAt).toLocaleDateString()}</span>
+        <span className="font-medium text-foreground">
+          {repair.finalCost != null
+            ? formatINRFromPaise(repair.finalCost)
+            : repair.estimatedCost != null
+              ? `~${formatINRFromPaise(repair.estimatedCost)}`
+              : 'N/A'}
+        </span>
+      </div>
+      <Link
+        href={`/repairs/${repair.id}`}
+        className="inline-flex items-center gap-1 text-xs font-medium text-steel hover:text-foreground transition-colors"
+      >
+        View details
+        <ChevronRight className="h-3.5 w-3.5" />
+      </Link>
+    </div>
+  )
 }
 
 export function CustomerRepairHistory({ customerId }: CustomerRepairHistoryProps) {
@@ -46,73 +100,67 @@ export function CustomerRepairHistory({ customerId }: CustomerRepairHistoryProps
     )
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return <Badge variant="success">Completed</Badge>
-      case 'READY_FOR_PICKUP':
-        return <Badge variant="warning">Ready for Pickup</Badge>
-      case 'IN_REPAIR':
-      case 'DIAGNOSING':
-        return <Badge variant="default">{status.replace('_', ' ')}</Badge>
-      case 'CANCELLED':
-        return <Badge variant="destructive">Cancelled</Badge>
-      default:
-        return <Badge variant="secondary">{status.replace('_', ' ')}</Badge>
-    }
-  }
-
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden shadow-xs">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Ticket #</TableHead>
-            <TableHead>Device</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead>Cost</TableHead>
-            <TableHead className="text-right">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {repairs.map((repair) => (
-            <TableRow key={repair.id}>
-              <TableCell className="font-mono text-xs font-semibold text-foreground">
-                #{repair.ticketNumber}
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="text-sm font-medium">
-                    {repair.device ? `${repair.device.brand} ${repair.device.model}` : 'Unknown Device'}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>{getStatusBadge(repair.status)}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">
-                {new Date(repair.createdAt).toLocaleDateString()}
-              </TableCell>
-              <TableCell className="text-sm font-medium">
-                {repair.finalCost
-                  ? `₹${(repair.finalCost / 100).toFixed(2)}`
-                  : repair.estimatedCost
-                  ? `~₹${(repair.estimatedCost / 100).toFixed(2)}`
-                  : 'N/A'}
-              </TableCell>
-              <TableCell className="text-right">
-                <Link
-                  href={`/repairs/${repair.id}`}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-steel hover:text-foreground transition-colors"
-                >
-                  Details
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <>
+      <div className="space-y-3 md:hidden">
+        {repairs.map((repair) => (
+          <RepairHistoryCard key={repair.id} repair={repair} />
+        ))}
+      </div>
+
+      <div className="hidden md:block rounded-lg border border-border bg-card overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ticket #</TableHead>
+                <TableHead>Device</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>Cost</TableHead>
+                <TableHead className="text-right">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {repairs.map((repair) => (
+                <TableRow key={repair.id}>
+                  <TableCell className="font-mono text-xs font-semibold text-foreground">
+                    #{repair.ticketNumber}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Wrench className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium">
+                        {repair.device ? `${repair.device.brand} ${repair.device.model}` : 'Unknown Device'}
+                      </span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{getStatusBadge(repair.status)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {new Date(repair.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {repair.finalCost != null
+                      ? formatINRFromPaise(repair.finalCost)
+                      : repair.estimatedCost != null
+                        ? `~${formatINRFromPaise(repair.estimatedCost)}`
+                        : 'N/A'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/repairs/${repair.id}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-steel hover:text-foreground transition-colors"
+                    >
+                      Details
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </>
   )
 }

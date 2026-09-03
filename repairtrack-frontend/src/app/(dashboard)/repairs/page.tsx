@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
 import { RepairList } from '@/components/repairs/repair-list'
+import { RepairPageShell } from '@/components/repairs/repair-page-shell'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export const metadata: Metadata = {
@@ -16,16 +17,18 @@ export default async function RepairsPage() {
   if (!session?.user) redirect('/login')
 
   return (
-    <Suspense
-      fallback={
-        <div className="space-y-6">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-32 w-full rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-xl" />
-        </div>
-      }
-    >
-      <RepairList />
-    </Suspense>
+    <RepairPageShell>
+      <Suspense
+        fallback={
+          <div className="space-y-6">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-32 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-xl" />
+          </div>
+        }
+      >
+        <RepairList />
+      </Suspense>
+    </RepairPageShell>
   )
 }
