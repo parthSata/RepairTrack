@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ApprovalEstimateBreakdown } from '@/components/repairs/approval-estimate-summary'
 import { useRequestCustomerApproval } from '@/features/repairs/mutations'
+import { parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
 import type { RepairApproval } from '@/features/repairs/queries'
 import {
   formatINR,
@@ -27,11 +28,9 @@ import { useSession } from '@/lib/auth-client'
 
 function getDisabledReason({
   diagnosis,
-  estimatedCost,
   approval,
 }: {
   diagnosis: string | null
-  estimatedCost: number | null
   approval: RepairApproval | null | undefined
 }): string | null {
   if (!diagnosis?.trim()) {
@@ -83,9 +82,12 @@ export function RequestApprovalControl({
     return null
   }
 
-  const disabledReason = getDisabledReason({ diagnosis, estimatedCost, approval })
+  const disabledReason = getDisabledReason({ diagnosis, approval })
   const isReady = !disabledReason
   const isDisabled = Boolean(disabledReason) || requestMutation.isPending
+  const parsedAdditionalRupees = parseRupeesInput(additionalCostValue)
+  const additionalPaise =
+    parsedAdditionalRupees != null ? rupeesToPaise(parsedAdditionalRupees) : null
 
   const originalRupees =
     estimatedCost != null ? storedCostToRupees(estimatedCost) : null
@@ -237,7 +239,7 @@ export function RequestApprovalControl({
         ) : null}
 
         {errorMessage ? (
-          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
+          <div className="mt-3 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive font-medium">
             {errorMessage}
           </div>
         ) : null}
@@ -252,9 +254,9 @@ export function RequestApprovalControl({
             className="bg-amber-600 hover:bg-amber-700"
           >
             {requestMutation.isPending ? 'Sending...' : 'Send to Customer'}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   )
 }

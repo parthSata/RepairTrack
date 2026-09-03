@@ -5,6 +5,7 @@ import { db } from '@/server/db'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
+import { revisedEstimatedTotalPaise } from '@/features/repairs/money'
 import {
   buildPublicTrackingPayload,
   getPublicRepairByTrackingToken,
@@ -127,7 +128,7 @@ async function cleanupApprovalArtifacts(repairId: string) {
     )
 }
 
-async function testGuardMissingDiagnosisOrCost(
+async function testGuardMissingDiagnosis(
   repairId: string,
   shopId: string,
   staffId: string,
@@ -153,9 +154,25 @@ async function testGuardMissingDiagnosisOrCost(
     'Test A (missing diagnosis)',
   )
 
+  await restoreRepairSnapshot(repairId, original)
+  console.log('Test A passed: blocked when diagnosis is missing')
+}
+
+async function testNullOriginalAllowed(
+  repairId: string,
+  shopId: string,
+  staffId: string,
+  original: Awaited<ReturnType<typeof saveRepairSnapshot>>,
+) {
+  await cleanupApprovalArtifacts(repairId)
   await db
     .update(repairs)
-    .set({ diagnosis: 'Test diagnosis', estimatedCost: null, updatedAt: new Date() })
+    .set({
+      diagnosis: 'Board-level repair',
+      estimatedCost: null,
+      status: 'DIAGNOSING',
+      updatedAt: new Date(),
+    })
     .where(eq(repairs.id, repairId))
 
   await expectHttpError(
@@ -172,8 +189,9 @@ async function testGuardMissingDiagnosisOrCost(
     'Test A (missing estimated cost)',
   )
 
+  await cleanupApprovalArtifacts(repairId)
   await restoreRepairSnapshot(repairId, original)
-  console.log('Test A passed: blocked when diagnosis or estimated cost missing')
+  console.log('Test D passed: null original estimate allowed; additional + revised still correct')
 }
 
 async function testDuplicatePending(
@@ -212,12 +230,12 @@ async function testDuplicatePending(
       }),
     400,
     'Customer approval is already pending for this repair',
-    'Test B',
+    'Duplicate pending',
   )
 
   await cleanupApprovalArtifacts(repairId)
   await restoreRepairSnapshot(repairId, original)
-  console.log('Test B passed: blocked when PENDING approval already exists')
+  console.log('Duplicate pending passed: blocked when PENDING approval already exists')
 }
 
 async function testSuccessfulRequest(repairId: string, shopId: string, staffId: string) {
@@ -241,11 +259,17 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
   })
 
   if (result.status !== 'WAITING_FOR_APPROVAL') {
-    throw new Error(`Test C failed: expected status WAITING_FOR_APPROVAL, got ${result.status}`)
+    throw new Error(`Test B failed: expected status WAITING_FOR_APPROVAL, got ${result.status}`)
   }
 
   if (!result.approval || result.approval.status !== 'PENDING') {
-    throw new Error('Test C failed: expected PENDING approval on repair detail')
+    throw new Error('Test B failed: expected PENDING approval on repair detail')
+  }
+
+  if (result.estimatedCost !== ORIGINAL_PAISE) {
+    throw new Error(
+      `Test B failed: repairs.estimated_cost must stay ${ORIGINAL_PAISE}, got ${result.estimatedCost}`,
+    )
   }
 
   const [approvalRow] = await db
@@ -254,11 +278,17 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'PENDING')))
 
   if (!approvalRow) {
-    throw new Error('Test C failed: no PENDING repair_approvals row found')
+    throw new Error('Test B failed: no PENDING repair_approvals row found')
   }
 
   if (approvalRow.diagnosisSnapshot !== 'Screen replacement required') {
-    throw new Error('Test C failed: diagnosis snapshot mismatch')
+    throw new Error('Test B failed: diagnosis snapshot mismatch')
+  }
+
+  if (approvalRow.additionalEstimatedCost !== ADDITIONAL_PAISE) {
+    throw new Error(
+      `Test B failed: additional_estimated_cost should be posted paise ${ADDITIONAL_PAISE}, not a copy of estimated_cost`,
+    )
   }
 
   if (approvalRow.initialEstimatedCost !== TEST_INITIAL_PAISE) {
@@ -300,10 +330,10 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     .limit(1)
 
   if (!historyRow || historyRow.actorType !== 'STAFF') {
-    throw new Error('Test C failed: expected repair_status_history row with actor_type=STAFF')
+    throw new Error('Test B failed: expected repair_status_history row with actor_type=STAFF')
   }
 
-  console.log('Test C passed: creates approval row, transitions status, logs history')
+  console.log('Test B passed: original + additional stored separately; revised derived as integer paise')
   return approvalRow
 }
 
@@ -319,10 +349,10 @@ async function testOwnerForbidden(repairId: string, shopId: string, ownerId: str
       }),
     403,
     'Owner cannot change repair status directly',
-    'Test D',
+    'OWNER forbidden',
   )
 
-  console.log('Test D passed: OWNER cannot trigger request approval')
+  console.log('OWNER forbidden passed: OWNER cannot trigger request approval')
 }
 
 async function testManualStatusBlocked(repairId: string, shopId: string, staffId: string) {
@@ -345,17 +375,17 @@ async function testManualStatusBlocked(repairId: string, shopId: string, staffId
 
 async function testPublicTrackingPendingApproval(trackingToken: string | null) {
   if (!trackingToken) {
-    throw new Error('Test E skipped setup: repair has no tracking token')
+    throw new Error('Test C skipped setup: repair has no tracking token')
   }
 
   const payload = await getPublicRepairByTrackingToken(trackingToken)
 
   if (!payload.pendingApproval) {
-    throw new Error('Test E failed: expected pendingApproval on public tracking payload')
+    throw new Error('Test C failed: expected pendingApproval on public tracking payload')
   }
 
   if (!payload.pendingApproval.diagnosis.trim()) {
-    throw new Error('Test E failed: pendingApproval.diagnosis is empty')
+    throw new Error('Test C failed: pendingApproval.diagnosis is empty')
   }
 
   const { initialEstimate, additionalCost, revisedTotal } = payload.pendingApproval
@@ -376,7 +406,7 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
 
   const keys = Object.keys(payload.pendingApproval)
   if (keys.some((key) => ['approve', 'reject', 'action', 'requestedBy'].includes(key))) {
-    throw new Error('Test E failed: public payload exposes action fields')
+    throw new Error('Test C failed: public payload exposes action fields')
   }
 
   const unitPayload = buildPublicTrackingPayload(
@@ -400,7 +430,7 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
   )
 
   if (!unitPayload.pendingApproval) {
-    throw new Error('Test E failed: buildPublicTrackingPayload did not include pendingApproval')
+    throw new Error('Test C failed: buildPublicTrackingPayload did not include pendingApproval')
   }
 
   if (unitPayload.pendingApproval.revisedTotal !== 5700) {
@@ -414,22 +444,19 @@ async function main() {
   const fixture = await getFixtureUsers()
   const original = await saveRepairSnapshot(fixture.repairId)
 
-  await testGuardMissingDiagnosisOrCost(
-    fixture.repairId,
-    fixture.shopId,
-    fixture.staffId,
-    original,
-  )
-  await testDuplicatePending(fixture.repairId, fixture.shopId, fixture.staffId, original)
-  await testSuccessfulRequest(fixture.repairId, fixture.shopId, fixture.staffId)
-  await testOwnerForbidden(fixture.repairId, fixture.shopId, fixture.ownerId)
-  await testManualStatusBlocked(fixture.repairId, fixture.shopId, fixture.staffId)
-  await testPublicTrackingPendingApproval(fixture.trackingToken)
-
-  await cleanupApprovalArtifacts(fixture.repairId)
-  await restoreRepairSnapshot(fixture.repairId, original)
-
-  console.log('All request-approval verification tests passed.')
+  try {
+    await testGuardMissingDiagnosis(fixture.repairId, fixture.shopId, fixture.staffId, original)
+    await testNullOriginalAllowed(fixture.repairId, fixture.shopId, fixture.staffId, original)
+    await testDuplicatePending(fixture.repairId, fixture.shopId, fixture.staffId, original)
+    await testSuccessfulRequest(fixture.repairId, fixture.shopId, fixture.staffId)
+    await testOwnerForbidden(fixture.repairId, fixture.shopId, fixture.ownerId)
+    await testManualStatusBlocked(fixture.repairId, fixture.shopId, fixture.staffId)
+    await testPublicTrackingPendingApproval(fixture.trackingToken)
+    console.log('All request-approval verification tests passed.')
+  } finally {
+    await cleanupApprovalArtifacts(fixture.repairId)
+    await restoreRepairSnapshot(fixture.repairId, original)
+  }
 }
 
 main()

@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { History, ChevronRight, Calendar, DollarSign } from 'lucide-react'
+import { History, ChevronRight, Calendar, IndianRupee } from 'lucide-react'
+import { formatRupees } from '@/lib/format-money'
 import { useDeviceRepairHistory } from '@/features/devices/queries'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -89,10 +90,14 @@ export function DeviceRepairHistory({ deviceId }: DeviceRepairHistoryProps) {
                   <Calendar className="h-3 w-3" />
                   {new Date(repair.createdAt).toLocaleDateString()}
                 </span>
-                {(repair.finalCost || repair.estimatedCost) && (
+                {(repair.finalCost != null || repair.estimatedCost != null) && (
                   <span className="flex items-center gap-1 font-medium text-foreground">
-                    <DollarSign className="h-3 w-3 text-muted-foreground" />
-                    {repair.finalCost ? `$${repair.finalCost}` : `Est: $${repair.estimatedCost}`}
+                    <IndianRupee className="h-3 w-3 text-muted-foreground" />
+                    {repair.finalCost != null
+                      ? formatRupees(repair.finalCost)
+                      : repair.estimatedCost != null
+                        ? `Est: ${formatRupees(repair.estimatedCost)}`
+                        : null}
                   </span>
                 )}
               </div>

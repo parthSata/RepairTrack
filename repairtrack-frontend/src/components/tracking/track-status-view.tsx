@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { ApprovalEstimateBreakdown } from '@/components/repairs/approval-estimate-summary'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
-import { formatINR } from '@/features/repairs/money'
+import { formatRupees } from '@/lib/format-money'
 import {
   TrackProgressIndicator,
   TrackStatusIcon,

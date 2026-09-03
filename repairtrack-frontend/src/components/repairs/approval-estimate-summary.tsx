@@ -120,6 +120,7 @@ export function ApprovalEstimateBreakdown({
             </p>
           </div>
         </div>
+      ) : null}
 
         {initial != null && additional != null && revised != null ? (
           <div
@@ -145,7 +146,7 @@ export function ApprovalEstimateBreakdown({
             </div>
             <p className="text-xs text-muted-foreground mt-2">Amounts in Indian Rupees (₹)</p>
           </div>
-        ) : null}
+        </dl>
       </div>
     </div>
   )

@@ -54,8 +54,10 @@ export function StatusChangeControl({
   const isStaff = userRole === 'STAFF'
   const isAssignedTechnician = userRole === 'TECHNICIAN' && assignedTechnicianId === userId
 
-  const canChangeStatus = (isStaff || isAssignedTechnician) && !['COMPLETED', 'CANCELLED'].includes(currentStatus)
+  const canChangeStatus =
+    (isStaff || isAssignedTechnician) && !['COMPLETED', 'CANCELLED'].includes(currentStatus)
   const isClosed = ['COMPLETED', 'CANCELLED'].includes(currentStatus)
+  const isAwaitingCustomerApproval = currentStatus === 'WAITING_FOR_APPROVAL'
 
   const [selectedStatus, setSelectedStatus] = React.useState(currentStatus)
   const [prevStatus, setPrevStatus] = React.useState(currentStatus)
@@ -73,8 +75,7 @@ export function StatusChangeControl({
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
   const selectableStatuses = ALL_STATUSES.filter(
-    (status) =>
-      status !== 'WAITING_FOR_APPROVAL' || status === currentStatus,
+    (status) => status !== 'WAITING_FOR_APPROVAL' || status === currentStatus,
   )
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -150,6 +151,23 @@ export function StatusChangeControl({
     }
   }
 
+  if (isAwaitingCustomerApproval) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">Status:</span>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+            Waiting for Approval
+          </span>
+        </div>
+        <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
+          <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>Status is locked until the customer responds on their tracking page.</span>
+        </p>
+      </div>
+    )
+  }
+
   // Owner View: Read-only status badge + Reopen button if COMPLETED/CANCELLED
   if (isOwner) {
     return (
@@ -174,7 +192,6 @@ export function StatusChangeControl({
           )}
         </div>
 
-        {/* Reopen note input form */}
         {showReopenInput && (
           <div className="p-3 rounded-md border border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20 space-y-2 animate-in fade-in duration-150">
             <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
@@ -227,7 +244,6 @@ export function StatusChangeControl({
     )
   }
 
-  // If ticket is COMPLETED/CANCELLED for Staff or Technician: read-only
   if (isClosed) {
     return (
       <div className="space-y-1">
@@ -244,7 +260,6 @@ export function StatusChangeControl({
     )
   }
 
-  // Staff or Assigned Technician: Editable status dropdown
   if (canChangeStatus) {
     return (
       <div className="space-y-2">
@@ -285,7 +300,6 @@ export function StatusChangeControl({
     )
   }
 
-  // Unassigned technician or unauthorized role
   return (
     <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
       <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
