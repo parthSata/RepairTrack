@@ -6,16 +6,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Dialog,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { ApprovalEstimateBreakdown } from '@/components/repairs/approval-estimate-summary'
 import { useRequestCustomerApproval } from '@/features/repairs/mutations'
 import { parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
 import type { RepairApproval } from '@/features/repairs/queries'
+import {
+  formatINR,
+  formatINRFromPaise,
+  parseRupeesInput,
+  storedCostToRupees,
+} from '@/features/repairs/money'
 import { useSession } from '@/lib/auth-client'
 
 function getDisabledReason({
@@ -27,6 +35,9 @@ function getDisabledReason({
 }): string | null {
   if (!diagnosis?.trim()) {
     return 'Add a diagnosis before requesting customer approval'
+  }
+  if (estimatedCost === null) {
+    return 'Set an original estimate (₹) before requesting customer approval'
   }
   if (approval?.status === 'PENDING') {
     return 'Customer approval is already pending for this repair'
@@ -78,15 +89,27 @@ export function RequestApprovalControl({
   const additionalPaise =
     parsedAdditionalRupees != null ? rupeesToPaise(parsedAdditionalRupees) : null
 
+  const originalRupees =
+    estimatedCost != null ? storedCostToRupees(estimatedCost) : null
+  const additionalRupees = parseRupeesInput(additionalCostValue) ?? 0
+  const revisedRupees =
+    originalRupees != null ? originalRupees + additionalRupees : null
+
+  const canSubmit =
+    isReady &&
+    additionalCostValue.trim() !== '' &&
+    parseRupeesInput(additionalCostValue) !== null
+
   const handleConfirm = async () => {
-    if (parsedAdditionalRupees == null) {
-      setErrorMessage('Enter an additional repair cost in rupees')
+    const additionalEstimatedCost = parseRupeesInput(additionalCostValue)
+    if (additionalEstimatedCost === null) {
+      setErrorMessage('Enter a valid additional repair cost (₹0 or more)')
       return
     }
 
     setErrorMessage(null)
     try {
-      await requestMutation.mutateAsync({ additionalEstimatedCost: parsedAdditionalRupees })
+      await requestMutation.mutateAsync({ additionalEstimatedCost })
       setConfirmOpen(false)
       setAdditionalCostValue('')
       if (onRequested) onRequested()
@@ -132,46 +155,86 @@ export function RequestApprovalControl({
           <span>{disabledReason}</span>
         </p>
       ) : (
-        <p className="text-[11px] text-muted-foreground">
-          Sends diagnosis and cost breakdown to the customer tracking page.
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          Sends diagnosis and revised estimate to the customer tracking page.
         </p>
       )}
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogHeader>
-          <DialogTitle>Send estimate for customer approval?</DialogTitle>
-          <DialogDescription>The repair will wait for customer approval.</DialogDescription>
-        </DialogHeader>
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        contentClassName="max-w-xl sm:max-w-2xl p-6 sm:p-8"
+      >
+        <AlertDialogHeader className="mb-5">
+          <AlertDialogTitle className="text-xl">Send estimate for customer approval?</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm sm:text-base">
+            The technician found additional work required. The customer will see this information
+            on their tracking page.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
 
-        {diagnosis?.trim() ? (
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Technician Diagnosis
-              </p>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                {diagnosis.trim()}
-              </p>
+        {diagnosis?.trim() && estimatedCost !== null ? (
+          <div className="space-y-5">
+            <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-5 sm:p-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Diagnosis
+                  </Label>
+                  <p className="text-sm sm:text-base text-foreground whitespace-pre-wrap leading-relaxed">
+                    {diagnosis.trim()}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Original Estimate
+                  </Label>
+                  <p className="text-base sm:text-lg font-semibold text-foreground">
+                    {formatINRFromPaise(estimatedCost)}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="additional-repair-cost" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Additional Repair Cost <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="additional-repair-cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="e.g. 4500"
+                    value={additionalCostValue}
+                    onChange={(e) => setAdditionalCostValue(e.target.value)}
+                    className="h-10 text-sm sm:text-base"
+                  />
+                </div>
+              </div>
+              {revisedRupees != null ? (
+                <div className="flex items-center justify-between gap-4 rounded-lg border border-amber-200/80 bg-amber-50/50 px-4 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Revised Estimated Total
+                  </Label>
+                  <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400">
+                    {formatINR(revisedRupees)}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="additionalEstimatedCost">Additional Repair Cost (₹)</Label>
-              <Input
-                id="additionalEstimatedCost"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="e.g. 4500"
-                value={additionalCostValue}
-                onChange={(e) => setAdditionalCostValue(e.target.value)}
-              />
-            </div>
-
-            <ApprovalEstimateBreakdown
-              showDiagnosis={false}
-              originalEstimatedCostPaise={estimatedCost}
-              additionalEstimatedCostPaise={additionalPaise}
-            />
+            {canSubmit && originalRupees != null ? (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Customer preview
+                </p>
+                <ApprovalEstimateBreakdown
+                  variant="prominent"
+                  diagnosis={diagnosis.trim()}
+                  initialEstimateRupees={originalRupees}
+                  additionalCostRupees={additionalRupees}
+                  revisedTotalRupees={revisedRupees ?? originalRupees + additionalRupees}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -181,20 +244,14 @@ export function RequestApprovalControl({
           </div>
         ) : null}
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={requestMutation.isPending}
-            onClick={() => setConfirmOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
+        <p className="mt-5 text-sm text-muted-foreground">The repair will wait for customer approval.</p>
+
+        <AlertDialogFooter className="mt-6">
+          <AlertDialogCancel disabled={requestMutation.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
             onClick={handleConfirm}
-            disabled={requestMutation.isPending || parsedAdditionalRupees == null}
-            className="bg-amber-600 hover:bg-amber-700 text-white"
+            disabled={requestMutation.isPending || !canSubmit}
+            className="bg-amber-600 hover:bg-amber-700"
           >
             {requestMutation.isPending ? 'Sending...' : 'Send to Customer'}
           </Button>

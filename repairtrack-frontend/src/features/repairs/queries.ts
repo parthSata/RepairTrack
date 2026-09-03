@@ -68,6 +68,7 @@ export interface RepairStatusHistoryItem {
 export interface RepairApproval {
   id: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  initialEstimatedCost: number
   additionalEstimatedCost: number
   diagnosisSnapshot: string
   requestedAt: string

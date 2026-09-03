@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
 import { RepairDetails } from '@/components/repairs/repair-details'
+import { RepairPageShell } from '@/components/repairs/repair-page-shell'
 
 export const metadata: Metadata = {
   title: 'Repair Ticket Details | RepairTrack',
@@ -19,5 +20,9 @@ export default async function RepairDetailPage({
 
   const { id } = await params
 
-  return <RepairDetails id={id} />
+  return (
+    <RepairPageShell>
+      <RepairDetails id={id} />
+    </RepairPageShell>
+  )
 }

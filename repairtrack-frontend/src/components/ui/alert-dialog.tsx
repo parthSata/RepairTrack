@@ -8,11 +8,13 @@ interface AlertDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  /** Override the inner panel width/spacing (default: max-w-md). */
+  contentClassName?: string
 }
 
 const emptySubscribe = () => () => {}
 
-export function AlertDialog({ open, onOpenChange, children }: AlertDialogProps) {
+export function AlertDialog({ open, onOpenChange, children, contentClassName }: AlertDialogProps) {
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -48,7 +50,10 @@ export function AlertDialog({ open, onOpenChange, children }: AlertDialogProps) 
       <div
         role="alertdialog"
         aria-modal="true"
-        className="relative z-50 w-full max-w-md rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter"
+        className={cn(
+          'relative z-50 w-full max-w-md max-h-[min(90vh,900px)] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter',
+          contentClassName,
+        )}
       >
         {children}
       </div>

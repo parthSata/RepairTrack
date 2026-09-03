@@ -17,9 +17,10 @@ import {
 
 config({ path: '.env.local' })
 
-const ADDITIONAL_RUPEES = 4500
-const ADDITIONAL_PAISE = 450000
-const ORIGINAL_PAISE = 100000
+const TEST_INITIAL_PAISE = 120_000
+const TEST_ADDITIONAL_RUPEES = 4500
+const TEST_ADDITIONAL_PAISE = 450_000
+const TEST_REVISED_PAISE = TEST_INITIAL_PAISE + TEST_ADDITIONAL_PAISE
 
 async function expectHttpError(
   fn: () => Promise<unknown>,
@@ -146,7 +147,7 @@ async function testGuardMissingDiagnosis(
         userRole: 'STAFF',
         userId: staffId,
         id: repairId,
-        additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
+        additionalEstimatedCostRupees: 0,
       }),
     400,
     'Add a diagnosis before requesting customer approval',
@@ -174,28 +175,19 @@ async function testNullOriginalAllowed(
     })
     .where(eq(repairs.id, repairId))
 
-  const result = await requestCustomerApproval({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
-  })
-
-  if (result.estimatedCost !== null) {
-    throw new Error('Test D failed: original estimated_cost should remain null')
-  }
-
-  if (result.approval?.additionalEstimatedCost !== ADDITIONAL_PAISE) {
-    throw new Error(
-      `Test D failed: expected additional ${ADDITIONAL_PAISE} paise, got ${result.approval?.additionalEstimatedCost}`,
-    )
-  }
-
-  const revised = revisedEstimatedTotalPaise(result.estimatedCost, result.approval.additionalEstimatedCost)
-  if (revised !== ADDITIONAL_PAISE) {
-    throw new Error(`Test D failed: expected revised ${ADDITIONAL_PAISE}, got ${revised}`)
-  }
+  await expectHttpError(
+    () =>
+      requestCustomerApproval({
+        shopId,
+        userRole: 'STAFF',
+        userId: staffId,
+        id: repairId,
+        additionalEstimatedCostRupees: 0,
+      }),
+    400,
+    'Set an estimated cost before requesting customer approval',
+    'Test A (missing estimated cost)',
+  )
 
   await cleanupApprovalArtifacts(repairId)
   await restoreRepairSnapshot(repairId, original)
@@ -224,7 +216,7 @@ async function testDuplicatePending(
     userRole: 'STAFF',
     userId: staffId,
     id: repairId,
-    additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
+    additionalEstimatedCostRupees: 0,
   })
 
   await expectHttpError(
@@ -234,7 +226,7 @@ async function testDuplicatePending(
         userRole: 'STAFF',
         userId: staffId,
         id: repairId,
-        additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
+        additionalEstimatedCostRupees: 0,
       }),
     400,
     'Customer approval is already pending for this repair',
@@ -252,7 +244,7 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     .update(repairs)
     .set({
       diagnosis: 'Screen replacement required',
-      estimatedCost: ORIGINAL_PAISE,
+      estimatedCost: TEST_INITIAL_PAISE,
       status: 'DIAGNOSING',
       updatedAt: new Date(),
     })
@@ -263,7 +255,7 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     userRole: 'STAFF',
     userId: staffId,
     id: repairId,
-    additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
+    additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
   })
 
   if (result.status !== 'WAITING_FOR_APPROVAL') {
@@ -299,9 +291,27 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     )
   }
 
-  const revised = revisedEstimatedTotalPaise(ORIGINAL_PAISE, ADDITIONAL_PAISE)
-  if (revised !== 550000) {
-    throw new Error(`Test B failed: expected integer revised 550000, got ${revised}`)
+  if (approvalRow.initialEstimatedCost !== TEST_INITIAL_PAISE) {
+    throw new Error(
+      `Test C failed: initial_estimated_cost mismatch (expected ${TEST_INITIAL_PAISE}, got ${approvalRow.initialEstimatedCost})`,
+    )
+  }
+
+  if (approvalRow.additionalEstimatedCost !== TEST_ADDITIONAL_PAISE) {
+    throw new Error(
+      `Test C failed: additional_estimated_cost mismatch (expected ${TEST_ADDITIONAL_PAISE}, got ${approvalRow.additionalEstimatedCost})`,
+    )
+  }
+
+  const [repairRow] = await db
+    .select({ estimatedCost: repairs.estimatedCost })
+    .from(repairs)
+    .where(eq(repairs.id, repairId))
+
+  if (!repairRow || repairRow.estimatedCost !== TEST_REVISED_PAISE) {
+    throw new Error(
+      `Test C failed: repairs.estimatedCost should be revised total ${TEST_REVISED_PAISE}`,
+    )
   }
 
   const [historyRow] = await db
@@ -335,7 +345,7 @@ async function testOwnerForbidden(repairId: string, shopId: string, ownerId: str
         userRole: 'OWNER',
         userId: ownerId,
         id: repairId,
-        additionalEstimatedCostRupees: ADDITIONAL_RUPEES,
+        additionalEstimatedCostRupees: 0,
       }),
     403,
     'Owner cannot change repair status directly',
@@ -378,26 +388,20 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
     throw new Error('Test C failed: pendingApproval.diagnosis is empty')
   }
 
-  if (payload.estimatedCost !== ORIGINAL_PAISE) {
+  const { initialEstimate, additionalCost, revisedTotal } = payload.pendingApproval
+
+  if (initialEstimate !== 1200) {
+    throw new Error(`Test E failed: expected initialEstimate 1200 rupees, got ${initialEstimate}`)
+  }
+
+  if (additionalCost !== TEST_ADDITIONAL_RUPEES) {
     throw new Error(
-      `Test C failed: expected estimatedCost ${ORIGINAL_PAISE} paise, got ${payload.estimatedCost}`,
+      `Test E failed: expected additionalCost ${TEST_ADDITIONAL_RUPEES} rupees, got ${additionalCost}`,
     )
   }
 
-  if (payload.pendingApproval.originalEstimatedCost !== ORIGINAL_PAISE) {
-    throw new Error(
-      `Test C failed: expected originalEstimatedCost ${ORIGINAL_PAISE} paise, got ${payload.pendingApproval.originalEstimatedCost}`,
-    )
-  }
-
-  if (payload.pendingApproval.additionalEstimatedCost !== ADDITIONAL_PAISE) {
-    throw new Error(
-      `Test C failed: expected additionalEstimatedCost ${ADDITIONAL_PAISE} paise, got ${payload.pendingApproval.additionalEstimatedCost}`,
-    )
-  }
-
-  if ('estimatedCost' in payload.pendingApproval) {
-    throw new Error('Test C failed: pendingApproval should not expose a rupee estimatedCost field')
+  if (revisedTotal !== 5700) {
+    throw new Error(`Test E failed: expected revisedTotal 5700 rupees, got ${revisedTotal}`)
   }
 
   const keys = Object.keys(payload.pendingApproval)
@@ -410,7 +414,7 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
       ticketNumber: payload.ticketNumber,
       status: 'WAITING_FOR_APPROVAL',
       problemDescription: payload.problemDescription,
-      estimatedCost: ORIGINAL_PAISE,
+      estimatedCost: TEST_REVISED_PAISE,
       createdAt: new Date(payload.createdAt),
     },
     payload.device,
@@ -420,7 +424,8 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
     })),
     {
       diagnosisSnapshot: payload.pendingApproval.diagnosis,
-      additionalEstimatedCost: ADDITIONAL_PAISE,
+      initialEstimatedCost: TEST_INITIAL_PAISE,
+      additionalEstimatedCost: TEST_ADDITIONAL_PAISE,
     },
   )
 
@@ -428,15 +433,11 @@ async function testPublicTrackingPendingApproval(trackingToken: string | null) {
     throw new Error('Test C failed: buildPublicTrackingPayload did not include pendingApproval')
   }
 
-  if (unitPayload.pendingApproval.originalEstimatedCost !== ORIGINAL_PAISE) {
-    throw new Error('Test C failed: buildPublicTrackingPayload should expose original in paise')
+  if (unitPayload.pendingApproval.revisedTotal !== 5700) {
+    throw new Error('Test E failed: buildPublicTrackingPayload should expose breakdown in rupees')
   }
 
-  if (unitPayload.pendingApproval.additionalEstimatedCost !== ADDITIONAL_PAISE) {
-    throw new Error('Test C failed: buildPublicTrackingPayload should expose additional in paise')
-  }
-
-  console.log('Test C passed: public tracking returns paise original + additional, no action fields')
+  console.log('Test E passed: public tracking shows diagnosis + cost breakdown, no action fields')
 }
 
 async function main() {

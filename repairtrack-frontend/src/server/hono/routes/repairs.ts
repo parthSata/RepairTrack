@@ -127,11 +127,12 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/request-approval',
-    zValidator('json', requestCustomerApprovalSchema, (result, c) => {
-      if (!result.success) {
-        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
-      }
-    }),
+    zValidator(
+      'json',
+      z.object({
+        additionalEstimatedCost: z.number().min(0).max(1_000_000),
+      }),
+    ),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')

@@ -56,9 +56,9 @@ import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/compon
 import { ModelConfirmationCard } from './model-confirmation-card'
 import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
-import { RequestApprovalControl } from './request-approval-control'
-import { ApprovalStatusBadge } from './approval-status-badge'
 import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
+import { RequestApprovalControl } from './request-approval-control'
+import { ApprovalStatusBanner } from './approval-status-badge'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
@@ -67,8 +67,7 @@ import {
   useUpdateEstimatedCost,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
-import { formatRupeesInputValue, parseRupeesInput } from '@/features/repairs/money'
-import { formatRupees } from '@/lib/format-money'
+import { formatINRFromPaise, formatRupeesInputValue, getApprovalEstimateBreakdownRupees, parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
 import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
 import { toast } from 'sonner'
@@ -101,7 +100,15 @@ export function RepairDetails({ id }: { id: string }) {
     setPrevRepairId(repair.id)
     setSelectedTechId(repair.assignedTechnicianId ?? '')
     setDiagnosisText(repair.diagnosis ?? '')
-    setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
+    const pendingBreakdown =
+      repair.approval?.status === 'PENDING'
+        ? getApprovalEstimateBreakdownRupees(repair.approval)
+        : null
+    setEstimatedCostValue(
+      pendingBreakdown
+        ? formatRupeesInputValue(rupeesToPaise(pendingBreakdown.revised))
+        : formatRupeesInputValue(repair.estimatedCost),
+    )
     if (repair.expectedCompletionDate) {
       const dateObj = new Date(repair.expectedCompletionDate)
       if (!isNaN(dateObj.getTime())) {
@@ -164,6 +171,11 @@ export function RepairDetails({ id }: { id: string }) {
     repair.device.modelVerified === false &&
     Boolean(repair.assignedTechnicianId)
 
+  const pendingApprovalBreakdown =
+    repair.approval?.status === 'PENDING'
+      ? getApprovalEstimateBreakdownRupees(repair.approval)
+      : null
+
   const handleReassign = async () => {
     const techId = selectedTechId || null
     await reassignMutation.mutateAsync({ technicianId: techId })
@@ -210,22 +222,23 @@ export function RepairDetails({ id }: { id: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex w-full min-w-0 flex-col gap-6">
       {/* Top Header Navigation */}
-      <div className="flex items-center justify-between">
-        <Link href="/repairs">
-          <Button variant="ghost" className="h-8 px-3 text-xs gap-2 text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
+      <header className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Link href="/repairs" className="w-fit">
+          <Button
+            variant="ghost"
+            className="h-9 px-3 text-xs gap-2 text-muted-foreground hover:text-foreground -ml-3"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" />
             Back to Repair Tickets
           </Button>
         </Link>
 
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-md border border-border">
-            Ticket #{repair.ticketNumber}
-          </span>
-        </div>
-      </div>
+        <span className="w-fit max-w-full truncate font-mono text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-md border border-border">
+          Ticket #{repair.ticketNumber}
+        </span>
+      </header>
 
       {/* Model Confirmation Card (if unverified device in DIAGNOSING state) */}
       {showModelConfirmationCard && (
@@ -233,43 +246,46 @@ export function RepairDetails({ id }: { id: string }) {
       )}
 
       {/* Main Ticket Overview Header Card */}
-      <Card>
-        <CardContent className="pt-6 space-y-6">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-2xl font-bold text-foreground">
-                  Repair Ticket #{repair.ticketNumber}
+      <Card className="w-full min-w-0">
+        <CardContent className="flex w-full min-w-0 flex-col gap-6 pt-6">
+          <div className="flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
+              <div className="flex min-w-0 flex-col gap-3">
+                <h1 className="text-xl font-bold tracking-tight text-foreground break-words sm:text-2xl md:text-3xl">
+                  Repair Ticket
                 </h1>
-                <Badge variant="outline" className="font-semibold text-xs uppercase px-2.5 py-0.5">
-                  {repair.status.replace(/_/g, ' ')}
-                </Badge>
-                {repair.approval ? <ApprovalStatusBadge approval={repair.approval} /> : null}
-                <Badge variant="secondary" className="font-medium text-xs">
-                  {repair.priority} Priority
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="font-semibold text-xs uppercase px-2.5 py-0.5">
+                    {repair.status.replace(/_/g, ' ')}
+                  </Badge>
+                  <Badge variant="secondary" className="font-medium text-xs">
+                    {repair.priority} Priority
+                  </Badge>
+                </div>
               </div>
 
-              {/* Creator Info Line */}
+              {repair.approval ? <ApprovalStatusBanner approval={repair.approval} /> : null}
+
               <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                 <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <span>
                   Created by{' '}
                   <strong className="text-foreground font-semibold">
                     {repair.creator?.name ?? 'Shop User'}
-                  </strong>{' '}
+                  </strong>
                   {repair.creator?.role && (
-                    <span className="text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded border border-border">
+                    <span className="ml-1.5 text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded border border-border">
                       {repair.creator.role}
                     </span>
-                  )}{' '}
-                  on {formatDateTime(repair.createdAt)}
+                  )}
+                  {' · '}
+                  {formatDateTime(repair.createdAt)}
                 </span>
               </div>
             </div>
 
             {/* Status Control Box */}
-            <div className="w-full lg:w-auto lg:min-w-70 space-y-3">
+            <div className="flex w-full min-w-0 shrink-0 flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4 lg:max-w-sm">
               <StatusChangeControl
                 repairId={repair.id}
                 currentStatus={repair.status}
@@ -288,19 +304,19 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* Grid: Customer, Device, Technician Assignment, Expected Completion */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-border">
+          {/* Info cards grid */}
+          <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
             {/* Linked Device */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <HardDrive className="h-3.5 w-3.5" />
-                Linked Device
+                Linked device
               </span>
               <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted border border-border shrink-0 mt-0.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background border border-border shrink-0">
                   <DeviceTypeIcon type={repair.device.deviceType} />
                 </div>
-                <div className="flex flex-col">
+                <div className="min-w-0 flex flex-col">
                   <span className="font-semibold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
                     <span>{repair.device.brand}</span>
                     {repair.device.model ? (
@@ -313,12 +329,12 @@ export function RepairDetails({ id }: { id: string }) {
                       modelVerificationOverridden={repair.device.modelVerificationOverridden}
                     />
                   </span>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                     <span className="capitalize">{repair.device.deviceType.toLowerCase()}</span>
                     <ConditionBadge condition={repair.device.condition} />
                   </div>
                   {repair.device.serialNumber && (
-                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5">
+                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
                       S/N: {repair.device.serialNumber}
                     </span>
                   )}
@@ -327,35 +343,33 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Linked Customer */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5" />
                 Customer
               </span>
               <div className="flex flex-col">
-                <span className="font-semibold text-sm text-foreground">
-                  {repair.customer.name}
-                </span>
+                <span className="font-semibold text-sm text-foreground">{repair.customer.name}</span>
                 <span className="text-xs text-muted-foreground mt-0.5">{repair.customer.phone}</span>
                 {repair.customer.email && (
-                  <span className="text-xs text-muted-foreground">{repair.customer.email}</span>
+                  <span className="text-xs text-muted-foreground break-all">{repair.customer.email}</span>
                 )}
               </div>
             </div>
 
             {/* Technician Assignment */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <UserCheck className="h-3.5 w-3.5" />
-                Assigned Technician
+                Assigned technician
               </span>
 
               {canReassignTechnician ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <select
                     value={selectedTechId}
                     onChange={(e) => setSelectedTechId(e.target.value)}
-                    className="h-8 flex-1 rounded-md border border-input bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring sm:flex-1"
                   >
                     <option value="">-- Unassigned --</option>
                     {technicians?.map((tech) => (
@@ -374,7 +388,7 @@ export function RepairDetails({ id }: { id: string }) {
                       reassignMutation.isPending ||
                       (selectedTechId || null) === (repair.assignedTechnicianId || null)
                     }
-                    className="h-8 text-xs px-3"
+                    className="h-9 w-full text-xs px-3 sm:w-auto"
                   >
                     {reassignMutation.isPending ? 'Saving...' : 'Save'}
                   </Button>
@@ -394,43 +408,45 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Expected Completion Date */}
-            <div className="space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5" />
-                Expected Completion
+                Expected completion
               </span>
 
               {canEditExpectedDate ? (
                 isEditingExpectedDate ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Input
                       type="date"
                       value={expectedDateValue}
                       min={todayDateMin}
                       onChange={(e) => setExpectedDateValue(e.target.value)}
-                      className="h-8 text-xs flex-1 px-2"
+                      className="h-9 text-xs flex-1 px-2"
                     />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsEditingExpectedDate(false)}
-                      className="h-8 text-xs px-2"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={handleSaveExpectedDate}
-                      disabled={updateExpectedDateMutation.isPending}
-                      className="h-8 text-xs px-2.5"
-                    >
-                      {updateExpectedDateMutation.isPending ? 'Saving...' : 'Save'}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingExpectedDate(false)}
+                        className="h-9 flex-1 text-xs px-2 sm:flex-none"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveExpectedDate}
+                        disabled={updateExpectedDateMutation.isPending}
+                        className="h-9 flex-1 text-xs px-2.5 sm:flex-none"
+                      >
+                        {updateExpectedDateMutation.isPending ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-2 min-h-8">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-semibold text-foreground">
                         {formatDate(repair.expectedCompletionDate)}
@@ -447,7 +463,7 @@ export function RepairDetails({ id }: { id: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => setIsEditingExpectedDate(true)}
-                      className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+                      className="h-8 w-full text-xs px-2 gap-1 text-muted-foreground hover:text-foreground sm:w-auto"
                     >
                       <Pencil className="h-3 w-3" />
                       Edit
@@ -455,7 +471,7 @@ export function RepairDetails({ id }: { id: string }) {
                   </div>
                 )
               ) : (
-                <div className="text-sm font-semibold text-foreground min-h-8 flex items-center gap-2 flex-wrap">
+                <div className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
                   <span>{formatDate(repair.expectedCompletionDate)}</span>
                   {repair.isOverdue ? (
                     <Badge variant="warning" className="gap-1">
@@ -469,23 +485,23 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
 
           {/* Issue & Initial Physical Condition */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border">
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-1">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Wrench className="h-3.5 w-3.5" />
-                Problem Description
+                Problem description
               </span>
-              <p className="text-sm text-foreground bg-muted/30 p-3 rounded-md border border-border">
+              <p className="text-sm text-foreground leading-relaxed">
                 {repair.problemDescription || repair.issueDescription || 'No description provided.'}
               </p>
             </div>
 
-            <div>
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-1">
+            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5" />
-                Initial Condition & Accessories
+                Initial condition & accessories
               </span>
-              <p className="text-sm text-foreground bg-muted/30 p-3 rounded-md border border-border">
+              <p className="text-sm text-foreground leading-relaxed">
                 {repair.initialCondition || 'No condition notes recorded.'}
               </p>
             </div>
@@ -566,28 +582,41 @@ export function RepairDetails({ id }: { id: string }) {
           )}
 
           <div className="pt-4 border-t border-border space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                Estimated Cost
-                <span className="text-xs font-normal text-muted-foreground">(₹ Rupees)</span>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h4 className="text-sm font-semibold text-foreground">
+                {pendingApprovalBreakdown ? 'Repair estimate' : 'Original Estimate'}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹ Rupees)</span>
               </h4>
-              {canEditDiagnosisAndNotes &&
-                !isEstimatedCostEditing &&
-                repair.approval?.status !== 'PENDING' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
-                      setIsEstimatedCostEditing(true)
-                    }}
-                    className="h-8 text-xs gap-1.5"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    Edit
-                  </Button>
-                )}
+              {canEditDiagnosisAndNotes && !isEstimatedCostEditing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEstimatedCostValue(
+                      pendingApprovalBreakdown
+                        ? formatRupeesInputValue(rupeesToPaise(pendingApprovalBreakdown.revised))
+                        : formatRupeesInputValue(repair.estimatedCost),
+                    )
+                    setIsEstimatedCostEditing(true)
+                  }}
+                  className="h-8 w-full text-xs gap-1.5 sm:w-auto"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {pendingApprovalBreakdown ? 'Edit revised total' : 'Edit'}
+                </Button>
+              )}
             </div>
+
+            {pendingApprovalBreakdown ? (
+              <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                Breakdown sent to the customer. Editing the revised total updates their tracking
+                page.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Set at intake; additional costs are added when requesting approval.
+              </p>
+            )}
 
             {isEstimatedCostEditing ? (
               <div className="space-y-3">
@@ -595,17 +624,21 @@ export function RepairDetails({ id }: { id: string }) {
                   type="number"
                   step="0.01"
                   min="0"
-                  placeholder="e.g. 1500"
+                  placeholder={pendingApprovalBreakdown ? 'Revised total e.g. 10000' : 'e.g. 1500'}
                   value={estimatedCostValue}
                   onChange={(e) => setEstimatedCostValue(e.target.value)}
-                  className="text-sm max-w-xs"
+                  className="text-sm w-full max-w-sm"
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      setEstimatedCostValue(formatRupeesInputValue(repair.estimatedCost))
+                      setEstimatedCostValue(
+                        pendingApprovalBreakdown
+                          ? formatRupeesInputValue(rupeesToPaise(pendingApprovalBreakdown.revised))
+                          : formatRupeesInputValue(repair.estimatedCost),
+                      )
                       setIsEstimatedCostEditing(false)
                     }}
                     className="h-8 text-xs"
@@ -622,23 +655,31 @@ export function RepairDetails({ id }: { id: string }) {
                   </Button>
                 </div>
               </div>
-            ) : repair.approval?.status === 'PENDING' ? (
+            ) : pendingApprovalBreakdown ? (
               <ApprovalEstimateBreakdown
-                showDiagnosis={false}
-                originalEstimatedCostPaise={repair.estimatedCost}
-                additionalEstimatedCostPaise={repair.approval.additionalEstimatedCost}
+                variant="default"
+                diagnosis={repair.diagnosis?.trim() || 'No diagnosis recorded.'}
+                initialEstimateRupees={pendingApprovalBreakdown.initial}
+                additionalCostRupees={pendingApprovalBreakdown.additional}
+                revisedTotalRupees={pendingApprovalBreakdown.revised}
               />
             ) : (
-              <div>
-                <p className="text-sm text-foreground">
-                  {repair.estimatedCost !== null ? (
-                    <span className="text-xl font-semibold text-foreground">
-                      {formatRupees(repair.estimatedCost)}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground italic">Not set</span>
-                  )}
-                </p>
+              <div
+                className={
+                  repair.estimatedCost !== null
+                    ? 'rounded-lg border border-amber-300/80 bg-amber-50 px-4 py-4 dark:border-amber-800 dark:bg-amber-950/30'
+                    : undefined
+                }
+              >
+                {repair.estimatedCost !== null ? (
+                  <p className="text-2xl font-bold text-amber-950 dark:text-amber-50">
+                    {formatINRFromPaise(repair.estimatedCost)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Not set — enter amount in rupees before requesting approval
+                  </p>
+                )}
               </div>
             )}
           </div>

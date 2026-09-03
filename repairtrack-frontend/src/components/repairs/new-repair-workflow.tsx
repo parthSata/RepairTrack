@@ -250,10 +250,10 @@ export function NewRepairWorkflow() {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <Wrench className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Wrench className="h-6 w-6 text-primary shrink-0" />
             Create Repair Ticket
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -261,8 +261,11 @@ export function NewRepairWorkflow() {
           </p>
         </div>
 
-        <Link href="/dashboard">
-          <Button variant="ghost" className="h-8 px-3 text-xs gap-2 text-muted-foreground hover:text-foreground">
+        <Link href="/dashboard" className="w-full sm:w-auto">
+          <Button
+            variant="ghost"
+            className="h-9 w-full sm:w-auto px-3 text-xs gap-2 text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             Cancel & Exit
           </Button>

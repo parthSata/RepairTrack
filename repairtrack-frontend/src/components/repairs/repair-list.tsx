@@ -19,8 +19,8 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { useRepairs, useTechnicians } from '@/features/repairs/queries'
+import { RepairListCard } from '@/components/repairs/repair-list-card'
 import { useSession } from '@/lib/auth-client'
 
 function formatDate(dateStr?: string | null): string {
@@ -333,7 +333,7 @@ export function RepairList() {
                 setTechnicianId('')
                 setPage(1)
               }}
-              className="h-10 text-xs font-semibold gap-1.5 rounded-lg border-dashed"
+              className="col-span-full h-10 text-xs font-semibold gap-1.5 rounded-lg border-dashed sm:col-span-1"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               Reset Filters
@@ -359,30 +359,46 @@ export function RepairList() {
 
       {/* Loading Skeleton */}
       {isLoading && (
-        <div className="rounded-xl border border-border bg-card shadow-xs overflow-hidden">
-          <div className="p-4 bg-muted/30 font-bold text-[11px] uppercase tracking-wider text-muted-foreground grid grid-cols-8 gap-4 border-b border-border">
-            <div>Ticket #</div>
-            <div>Customer</div>
-            <div>Device</div>
-            <div>Status</div>
-            <div>Priority</div>
-            <div>Technician</div>
-            <div>Completion</div>
-            <div>Actions</div>
+        <>
+          <div className="space-y-3 md:hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border bg-card p-4 space-y-3 animate-pulse">
+                <div className="h-4 bg-muted rounded w-24" />
+                <div className="h-4 bg-muted rounded w-40" />
+                <div className="h-6 bg-muted rounded-full w-28" />
+              </div>
+            ))}
           </div>
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="p-4 grid grid-cols-8 gap-4 items-center animate-pulse border-b border-border/50 last:border-0">
-              <div className="h-4 bg-muted rounded w-20"></div>
-              <div className="h-4 bg-muted rounded w-24"></div>
-              <div className="h-4 bg-muted rounded w-20"></div>
-              <div className="h-6 bg-muted rounded-full w-24"></div>
-              <div className="h-6 bg-muted rounded-md w-16"></div>
-              <div className="h-4 bg-muted rounded w-24"></div>
-              <div className="h-4 bg-muted rounded w-16"></div>
-              <div className="h-8 bg-muted rounded-md w-8 justify-self-end"></div>
+          <div className="hidden md:block rounded-xl border border-border bg-card shadow-xs overflow-hidden">
+            <div className="p-4 bg-muted/30 font-bold text-[11px] uppercase tracking-wider text-muted-foreground grid grid-cols-9 gap-4 border-b border-border">
+              <div>Ticket #</div>
+              <div>Customer</div>
+              <div>Device</div>
+              <div>Status</div>
+              <div>Priority</div>
+              <div>Technician</div>
+              <div>Completion</div>
+              <div>Created</div>
+              <div>Actions</div>
             </div>
-          ))}
-        </div>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div
+                key={i}
+                className="p-4 grid grid-cols-9 gap-4 items-center animate-pulse border-b border-border/50 last:border-0"
+              >
+                <div className="h-4 bg-muted rounded w-20" />
+                <div className="h-4 bg-muted rounded w-24" />
+                <div className="h-4 bg-muted rounded w-20" />
+                <div className="h-6 bg-muted rounded-full w-24" />
+                <div className="h-6 bg-muted rounded-md w-16" />
+                <div className="h-4 bg-muted rounded w-24" />
+                <div className="h-4 bg-muted rounded w-16" />
+                <div className="h-4 bg-muted rounded w-16" />
+                <div className="h-8 bg-muted rounded-md w-8 justify-self-end" />
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Empty State */}
@@ -414,7 +430,23 @@ export function RepairList() {
 
       {/* Data Table */}
       {!isLoading && !isError && items.length > 0 && (
-        <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
+        <>
+          {/* Mobile card list */}
+          <div className="space-y-3 md:hidden">
+            {items.map((repair) => (
+              <RepairListCard
+                key={repair.id}
+                repair={repair}
+                formatStatusLabel={formatStatusLabel}
+                formatPriorityLabel={formatPriorityLabel}
+                getStatusBadgeConfig={getStatusBadgeConfig}
+                getPriorityBadgeClass={getPriorityBadgeClass}
+              />
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm border-collapse">
               <thead className="bg-muted/40 border-b border-border text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
@@ -529,9 +561,10 @@ export function RepairList() {
               </tbody>
             </table>
           </div>
+          </div>
 
-          {/* Pagination */}
-          <div className="px-4 py-3 border-t border-border bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          {/* Pagination — shared across mobile cards and desktop table */}
+          <div className="rounded-xl border border-border/80 bg-card px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground shadow-xs">
             <div className="font-medium">
               Showing {items.length > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0} to{' '}
               {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}{' '}
@@ -566,7 +599,7 @@ export function RepairList() {
               </Button>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

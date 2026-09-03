@@ -12,6 +12,11 @@ import {
   isExpectedCompletionDateInPast,
   overdueRepairCondition,
 } from '@/features/repairs/overdue'
+import {
+  normalizeStoredCostToPaise,
+  rupeesInputToStoredPaise,
+  rupeesToPaise,
+} from '@/features/repairs/money'
 import { generateTicketNumber, generateTrackingToken } from '@/server/lib/tokens'
 
 export function applyTechnicianRepairScope(
@@ -108,8 +113,7 @@ export async function createRepairTicket({
             problemDescription: data.problemDescription,
             issueDescription: data.problemDescription,
             initialCondition: data.initialCondition,
-            estimatedCost:
-              data.estimatedCost != null ? rupeesToPaise(data.estimatedCost) : null,
+            estimatedCost: rupeesInputToStoredPaise(data.estimatedCost ?? null),
             priority: data.priority ?? 'MEDIUM',
             expectedCompletionDate: data.expectedCompletionDate
               ? new Date(data.expectedCompletionDate)
@@ -418,6 +422,7 @@ export async function getRepairById({
       .select({
         id: repairApprovals.id,
         status: repairApprovals.status,
+        initialEstimatedCost: repairApprovals.initialEstimatedCost,
         additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
         diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
         requestedAt: repairApprovals.requestedAt,
@@ -437,6 +442,7 @@ export async function getRepairById({
       .select({
         id: repairApprovals.id,
         status: repairApprovals.status,
+        initialEstimatedCost: repairApprovals.initialEstimatedCost,
         additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
         diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
         requestedAt: repairApprovals.requestedAt,
@@ -670,6 +676,18 @@ export async function requestCustomerApproval({
     })
   }
 
+  if (existing.estimatedCost === null) {
+    throw new HTTPException(400, {
+      message: 'Set an estimated cost before requesting customer approval',
+    })
+  }
+
+  if (additionalEstimatedCostRupees < 0 || additionalEstimatedCostRupees > 1_000_000) {
+    throw new HTTPException(400, {
+      message: 'Additional repair cost must be between ₹0 and ₹10,00,000',
+    })
+  }
+
   const [pendingApproval] = await db
     .select({ id: repairApprovals.id })
     .from(repairApprovals)
@@ -684,14 +702,22 @@ export async function requestCustomerApproval({
 
   const requestedAt = new Date()
   const diagnosisSnapshot = existing.diagnosis.trim()
+  const initialEstimatedCost = normalizeStoredCostToPaise(existing.estimatedCost)
+  if (initialEstimatedCost == null) {
+    throw new HTTPException(400, {
+      message: 'Set an estimated cost before requesting customer approval',
+    })
+  }
+  const additionalEstimatedCost = rupeesToPaise(additionalEstimatedCostRupees)
+  const revisedEstimatedCost = initialEstimatedCost + additionalEstimatedCost
 
   await db.transaction(async (tx) => {
     await tx.insert(repairApprovals).values({
       repairId: id,
       status: 'PENDING',
       diagnosisSnapshot,
-      additionalEstimatedCost: rupeesToPaise(additionalEstimatedCostRupees),
-      initialEstimatedCost: existing.estimatedCost ?? 0,
+      initialEstimatedCost,
+      additionalEstimatedCost,
       requestedBy: userId,
       requestedAt,
     })
@@ -700,6 +726,7 @@ export async function requestCustomerApproval({
       .update(repairs)
       .set({
         status: 'WAITING_FOR_APPROVAL',
+        estimatedCost: revisedEstimatedCost,
         updatedAt: new Date(),
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
@@ -868,16 +895,35 @@ export async function updateDiagnosis({
     })
   }
 
-  const [updated] = await db
-    .update(repairs)
-    .set({
-      diagnosis: diagnosis.trim() || null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
-    .returning()
+  const trimmedDiagnosis = diagnosis.trim() || null
 
-  return updated
+  await db.transaction(async (tx) => {
+    await tx
+      .update(repairs)
+      .set({
+        diagnosis: trimmedDiagnosis,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+    if (trimmedDiagnosis) {
+      await tx
+        .update(repairApprovals)
+        .set({
+          diagnosisSnapshot: trimmedDiagnosis,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
+    }
+  })
+
+  const [updated] = await db
+    .select()
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+    .limit(1)
+
+  return updated!
 }
 
 export async function updateEstimatedCost({
@@ -897,7 +943,8 @@ export async function updateEstimatedCost({
     .select({
       id: repairs.id,
       assignedTechnicianId: repairs.assignedTechnicianId,
-      approvalPending: repairApprovals.id,
+      approvalPendingId: repairApprovals.id,
+      approvalInitialEstimatedCost: repairApprovals.initialEstimatedCost,
     })
     .from(repairs)
     .leftJoin(
@@ -916,25 +963,39 @@ export async function updateEstimatedCost({
     })
   }
 
-  if (existing.approvalPending) {
-    throw new HTTPException(400, {
-      message: 'Estimated cost cannot be changed while customer approval is pending.',
-    })
-  }
+  const estimatedCostPaise = rupeesInputToStoredPaise(estimatedCostRupees)
 
-  const estimatedCostPaise =
-    estimatedCostRupees != null ? rupeesToPaise(estimatedCostRupees) : null
+  await db.transaction(async (tx) => {
+    await tx
+      .update(repairs)
+      .set({
+        estimatedCost: estimatedCostPaise,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+    if (existing.approvalPendingId && estimatedCostPaise != null) {
+      const initialEstimatedCost =
+        normalizeStoredCostToPaise(existing.approvalInitialEstimatedCost) ?? estimatedCostPaise
+      const additionalEstimatedCost = Math.max(0, estimatedCostPaise - initialEstimatedCost)
+
+      await tx
+        .update(repairApprovals)
+        .set({
+          additionalEstimatedCost,
+          updatedAt: new Date(),
+        })
+        .where(eq(repairApprovals.id, existing.approvalPendingId))
+    }
+  })
 
   const [updated] = await db
-    .update(repairs)
-    .set({
-      estimatedCost: estimatedCostPaise,
-      updatedAt: new Date(),
-    })
+    .select()
+    .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
-    .returning()
+    .limit(1)
 
-  return updated
+  return updated!
 }
 
 export async function addRepairNote({
