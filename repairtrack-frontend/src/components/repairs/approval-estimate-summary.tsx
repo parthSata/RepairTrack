@@ -74,8 +74,7 @@ export function ApprovalEstimateBreakdown({
   const revisedFromParts =
     initial != null && additional != null ? initial + additional : null
   const revised =
-    revisedFromParts ??
-    resolveRupees(revisedTotalPaise, revisedTotalRupees)
+    revisedFromParts ?? resolveRupees(revisedTotalPaise, revisedTotalRupees)
 
   const isProminent = variant === 'prominent'
 
@@ -120,7 +119,6 @@ export function ApprovalEstimateBreakdown({
             </p>
           </div>
         </div>
-      ) : null}
 
         {initial != null && additional != null && revised != null ? (
           <div
@@ -144,9 +142,9 @@ export function ApprovalEstimateBreakdown({
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Amounts in Indian Rupees (₹)</p>
+            <p className="mt-2 text-xs text-muted-foreground">Amounts in Indian Rupees (₹)</p>
           </div>
-        </dl>
+        ) : null}
       </div>
     </div>
   )
@@ -167,7 +165,8 @@ export function ApprovalEstimateSummary({
   className?: string
 }) {
   const revised =
-    estimatedCostRupees ?? (estimatedCostPaise != null ? storedCostToRupees(estimatedCostPaise) : null)
+    estimatedCostRupees ??
+    (estimatedCostPaise != null ? storedCostToRupees(estimatedCostPaise) : null)
 
   return (
     <ApprovalEstimateBreakdown

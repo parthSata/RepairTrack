@@ -16,21 +16,22 @@ import {
 } from '@/components/ui/alert-dialog'
 import { ApprovalEstimateBreakdown } from '@/components/repairs/approval-estimate-summary'
 import { useRequestCustomerApproval } from '@/features/repairs/mutations'
-import { parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
-import type { RepairApproval } from '@/features/repairs/queries'
 import {
   formatINR,
   formatINRFromPaise,
   parseRupeesInput,
   storedCostToRupees,
 } from '@/features/repairs/money'
+import type { RepairApproval } from '@/features/repairs/queries'
 import { useSession } from '@/lib/auth-client'
 
 function getDisabledReason({
   diagnosis,
+  estimatedCost,
   approval,
 }: {
   diagnosis: string | null
+  estimatedCost: number | null
   approval: RepairApproval | null | undefined
 }): string | null {
   if (!diagnosis?.trim()) {
@@ -82,18 +83,13 @@ export function RequestApprovalControl({
     return null
   }
 
-  const disabledReason = getDisabledReason({ diagnosis, approval })
+  const disabledReason = getDisabledReason({ diagnosis, estimatedCost, approval })
   const isReady = !disabledReason
   const isDisabled = Boolean(disabledReason) || requestMutation.isPending
-  const parsedAdditionalRupees = parseRupeesInput(additionalCostValue)
-  const additionalPaise =
-    parsedAdditionalRupees != null ? rupeesToPaise(parsedAdditionalRupees) : null
 
-  const originalRupees =
-    estimatedCost != null ? storedCostToRupees(estimatedCost) : null
+  const originalRupees = estimatedCost != null ? storedCostToRupees(estimatedCost) : null
   const additionalRupees = parseRupeesInput(additionalCostValue) ?? 0
-  const revisedRupees =
-    originalRupees != null ? originalRupees + additionalRupees : null
+  const revisedRupees = originalRupees != null ? originalRupees + additionalRupees : null
 
   const canSubmit =
     isReady &&
@@ -194,7 +190,10 @@ export function RequestApprovalControl({
                   </p>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="additional-repair-cost" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <Label
+                    htmlFor="additional-repair-cost"
+                    className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                  >
                     Additional Repair Cost <span className="text-destructive">*</span>
                   </Label>
                   <Input
@@ -254,9 +253,9 @@ export function RequestApprovalControl({
             className="bg-amber-600 hover:bg-amber-700"
           >
             {requestMutation.isPending ? 'Sending...' : 'Send to Customer'}
-          </Button>
-        </DialogFooter>
-      </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialog>
     </div>
   )
 }
