@@ -5,7 +5,6 @@ import { db } from '@/server/db'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
-import { revisedEstimatedTotalPaise } from '@/features/repairs/money'
 import {
   buildPublicTrackingPayload,
   getPublicRepairByTrackingToken,
@@ -266,9 +265,9 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     throw new Error('Test B failed: expected PENDING approval on repair detail')
   }
 
-  if (result.estimatedCost !== ORIGINAL_PAISE) {
+  if (result.estimatedCost !== TEST_INITIAL_PAISE) {
     throw new Error(
-      `Test B failed: repairs.estimated_cost must stay ${ORIGINAL_PAISE}, got ${result.estimatedCost}`,
+      `Test B failed: repairs.estimated_cost must stay ${TEST_INITIAL_PAISE}, got ${result.estimatedCost}`,
     )
   }
 
@@ -285,9 +284,9 @@ async function testSuccessfulRequest(repairId: string, shopId: string, staffId: 
     throw new Error('Test B failed: diagnosis snapshot mismatch')
   }
 
-  if (approvalRow.additionalEstimatedCost !== ADDITIONAL_PAISE) {
+  if (approvalRow.additionalEstimatedCost !== TEST_ADDITIONAL_PAISE) {
     throw new Error(
-      `Test B failed: additional_estimated_cost should be posted paise ${ADDITIONAL_PAISE}, not a copy of estimated_cost`,
+      `Test B failed: additional_estimated_cost should be posted paise ${TEST_ADDITIONAL_PAISE}, not a copy of estimated_cost`,
     )
   }
 

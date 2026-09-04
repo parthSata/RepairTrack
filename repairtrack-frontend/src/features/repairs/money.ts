@@ -61,6 +61,14 @@ export function formatINRFromPaise(stored: number | null | undefined): string {
   return formatINR(rupees)
 }
 
+/** Integer-paise revised total: (original ?? 0) + (additional ?? 0). */
+export function revisedEstimatedTotalPaise(
+  originalPaise: number | null | undefined,
+  additionalPaise: number | null | undefined,
+): number {
+  return (originalPaise ?? 0) + (additionalPaise ?? 0)
+}
+
 export function formatRupeesInputValue(stored: number | null): string {
   const rupees = storedCostToRupees(stored)
   if (rupees == null) return ''
