@@ -3,6 +3,7 @@ import { relations } from 'drizzle-orm'
 import { shops, users } from './users'
 import { customers } from './customers'
 import { repairApprovals } from './repair-approvals'
+import { repairAssignments } from './repair-assignments'
 
 export const repairStatusEnum = pgEnum('repair_status', [
   'RECEIVED',
@@ -160,6 +161,7 @@ export const repairsRelations = relations(repairs, ({ one, many }) => ({
   notes: many(repairNotes),
   statusHistory: many(repairStatusHistory),
   approvals: many(repairApprovals),
+  assignments: many(repairAssignments),
 }))
 
 export const repairNotesRelations = relations(repairNotes, ({ one }) => ({

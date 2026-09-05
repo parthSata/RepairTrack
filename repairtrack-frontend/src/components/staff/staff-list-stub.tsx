@@ -2,26 +2,63 @@
 
 import * as React from 'react'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Copy, Search, ShieldAlert, UserCheck, UserX, Users } from 'lucide-react'
+import { Check, Copy, Search, ShieldAlert, UserCheck, UserX, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table/data-table'
 import { Input } from '@/components/ui/input'
-import { useChangeStaffRole, useSetStaffStatus } from '@/features/staff/mutations'
+import {
+  useChangeStaffRole,
+  useResumeAssignments,
+  useSetStaffStatus,
+  useStaffHeldAssignments,
+} from '@/features/staff/mutations'
 import { useStaffList } from '@/features/staff/queries'
-import type { UnifiedStaffMember } from '@/features/staff/schemas'
+import type { StaffAssignmentItem, UnifiedStaffMember } from '@/features/staff/schemas'
+import { useTechnicians } from '@/features/repairs/queries'
 import { AddStaffDialog } from './add-staff-dialog'
+import { RoleChangeAssignmentsDialog } from './role-change-assignments-dialog'
+import { ResumeAssignmentsDialog } from './resume-assignments-dialog'
+import { apiClient } from '@/lib/api-client'
+
+type PendingRoleChange = {
+  member: UnifiedStaffMember
+  newRole: 'STAFF' | 'TECHNICIAN'
+  assignments: StaffAssignmentItem[]
+}
+
+type ResumeBanner = {
+  memberId: string
+  memberName: string
+  count: number
+}
+
+function extractErrorMessage(err: unknown, fallback: string) {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const data = (err as { response?: { data?: { message?: string; error?: { message?: string } } } })
+      .response?.data
+    return data?.error?.message || data?.message || fallback
+  }
+  return fallback
+}
 
 export function StaffListStub() {
   const { data: staffList = [], isLoading, isError } = useStaffList()
+  const { data: technicians = [] } = useTechnicians()
   const setStatusMutation = useSetStaffStatus()
   const changeRoleMutation = useChangeStaffRole()
+  const resumeMutation = useResumeAssignments()
 
   const [roleFilter, setRoleFilter] = React.useState<'ALL' | 'STAFF' | 'TECHNICIAN'>('ALL')
   const [searchQuery, setSearchQuery] = React.useState('')
   const [copiedToken, setCopiedToken] = React.useState<string | null>(null)
+  const [pendingRoleChange, setPendingRoleChange] = React.useState<PendingRoleChange | null>(null)
+  const [dismissedBanners, setDismissedBanners] = React.useState<Set<string>>(new Set())
+  const [resumeTarget, setResumeTarget] = React.useState<ResumeBanner | null>(null)
+
+  const heldQuery = useStaffHeldAssignments(resumeTarget?.memberId ?? null, Boolean(resumeTarget))
 
   const handleCopyLink = async (token?: string) => {
     if (!token) return
@@ -43,27 +80,87 @@ export function StaffListStub() {
       await setStatusMutation.mutateAsync({ id: member.id, status: nextStatus })
       toast.success(`Staff status updated to ${nextStatus.toLowerCase()}`)
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : null
-      toast.error(msg || 'Failed to update staff status')
+      toast.error(extractErrorMessage(err, 'Failed to update staff status'))
+    }
+  }
+
+  const applyRoleChange = async (
+    member: UnifiedStaffMember,
+    newRole: 'STAFF' | 'TECHNICIAN',
+    extras?: {
+      assignmentAction?: 'HOLD' | 'REASSIGN'
+      reassignments?: { repairId: string; technicianId: string }[]
+    },
+  ) => {
+    const result = await changeRoleMutation.mutateAsync({
+      id: member.id,
+      role: newRole,
+      ...extras,
+    })
+
+    if (extras?.assignmentAction === 'HOLD') {
+      toast.success(
+        `Held ${result.affectedCount ?? 0} assignments and updated ${member.name} to Staff`,
+      )
+    } else if (extras?.assignmentAction === 'REASSIGN') {
+      toast.success(
+        `Reassigned ${result.affectedCount ?? 0} repairs and updated ${member.name} to Staff`,
+      )
+    } else if (newRole === 'TECHNICIAN') {
+      toast.success(`Role updated to Technician`)
+      if ((result.heldAssignmentCount ?? 0) > 0) {
+        setDismissedBanners((prev) => {
+          const next = new Set(prev)
+          next.delete(member.id)
+          return next
+        })
+      }
+    } else {
+      toast.success(`Role updated to ${newRole === 'STAFF' ? 'Staff' : newRole}`)
     }
   }
 
   const handleRoleChange = async (member: UnifiedStaffMember, newRole: 'STAFF' | 'TECHNICIAN') => {
     if (member.role === newRole) return
+
+    // Demotion from Technician on a real user — check active assignments first
+    if (!member.isInvitation && member.role === 'TECHNICIAN' && newRole === 'STAFF') {
+      try {
+        const response = await apiClient.get<{ assignments: StaffAssignmentItem[] }>(
+          `staff/${member.id}/active-assignments`,
+        )
+        const assignments = response.data.assignments
+        if (assignments.length > 0) {
+          setPendingRoleChange({ member, newRole, assignments })
+          return
+        }
+      } catch (err: unknown) {
+        toast.error(extractErrorMessage(err, 'Failed to check active assignments'))
+        return
+      }
+    }
+
     try {
-      await changeRoleMutation.mutateAsync({ id: member.id, role: newRole })
-      toast.success(`Role updated to ${newRole}`)
+      await applyRoleChange(member, newRole)
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : null
-      toast.error(msg || 'Failed to update role')
+      toast.error(extractErrorMessage(err, 'Failed to update role'))
     }
   }
+
+  const resumeBanners: ResumeBanner[] = staffList
+    .filter(
+      (m) =>
+        !m.isInvitation &&
+        m.role === 'TECHNICIAN' &&
+        m.status === 'ACTIVE' &&
+        (m.heldAssignmentCount ?? 0) > 0 &&
+        !dismissedBanners.has(m.id),
+    )
+    .map((m) => ({
+      memberId: m.id,
+      memberName: m.name,
+      count: m.heldAssignmentCount ?? 0,
+    }))
 
   const filteredData = React.useMemo(() => {
     return staffList.filter((member) => {
@@ -185,7 +282,8 @@ export function StaffListStub() {
         },
       },
     ],
-    [changeRoleMutation.isPending, setStatusMutation.isPending, copiedToken, handleRoleChange, handleStatusToggle],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [changeRoleMutation.isPending, setStatusMutation.isPending, copiedToken],
   )
 
   return (
@@ -193,10 +291,47 @@ export function StaffListStub() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight text-foreground">Team Members</h2>
-          <p className="text-sm text-muted-foreground">Manage your shop staff and technician access permissions.</p>
+          <p className="text-sm text-muted-foreground">
+            Manage your shop staff and technician access permissions.
+          </p>
         </div>
         <AddStaffDialog />
       </div>
+
+      {resumeBanners.map((banner) => (
+        <div
+          key={banner.memberId}
+          className="flex flex-col gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          role="status"
+        >
+          <p className="text-sm text-foreground">
+            <span className="font-medium">{banner.memberName}</span> is a Technician again.{' '}
+            {banner.count} previously held repair assignment{banner.count === 1 ? '' : 's'} can be
+            resumed.
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="accent"
+              size="sm"
+              onClick={() => setResumeTarget(banner)}
+            >
+              Review & Resume
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Dismiss notice"
+              onClick={() =>
+                setDismissedBanners((prev) => new Set(prev).add(banner.memberId))
+              }
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ))}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center rounded-lg border border-border bg-card p-1">
@@ -251,7 +386,9 @@ export function StaffListStub() {
           <CardContent className="flex flex-col items-center justify-center p-8 text-center">
             <ShieldAlert className="h-8 w-8 text-destructive mb-2" />
             <h3 className="text-base font-semibold text-foreground">Failed to load staff list</h3>
-            <p className="text-xs text-muted-foreground mt-1">Please refresh the page or try again later.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Please refresh the page or try again later.
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -272,6 +409,62 @@ export function StaffListStub() {
           }
         />
       )}
+
+      <RoleChangeAssignmentsDialog
+        open={Boolean(pendingRoleChange)}
+        memberName={pendingRoleChange?.member.name ?? ''}
+        assignments={pendingRoleChange?.assignments ?? []}
+        technicians={technicians}
+        excludeTechnicianId={pendingRoleChange?.member.id ?? ''}
+        isPending={changeRoleMutation.isPending}
+        onCancel={() => setPendingRoleChange(null)}
+        onConfirm={async ({ assignmentAction, reassignments }) => {
+          if (!pendingRoleChange) return
+          if (assignmentAction === 'REASSIGN') {
+            const missing = pendingRoleChange.assignments.some(
+              (a) => !reassignments?.find((r) => r.repairId === a.repairId)?.technicianId,
+            )
+            if (missing) {
+              toast.error('Pick a technician for every repair before confirming')
+              return
+            }
+          }
+          try {
+            await applyRoleChange(pendingRoleChange.member, pendingRoleChange.newRole, {
+              assignmentAction,
+              reassignments,
+            })
+            setPendingRoleChange(null)
+          } catch (err: unknown) {
+            toast.error(extractErrorMessage(err, 'Failed to update role'))
+          }
+        }}
+      />
+
+      <ResumeAssignmentsDialog
+        open={Boolean(resumeTarget)}
+        onOpenChange={(open) => {
+          if (!open) setResumeTarget(null)
+        }}
+        memberName={resumeTarget?.memberName ?? ''}
+        assignments={heldQuery.data ?? []}
+        isPending={resumeMutation.isPending || heldQuery.isLoading}
+        onConfirm={async (assignmentIds) => {
+          if (!resumeTarget) return
+          try {
+            const result = await resumeMutation.mutateAsync({
+              id: resumeTarget.memberId,
+              assignmentIds,
+            })
+            toast.success(
+              `Resumed ${result.resumedCount} of ${resumeTarget.count} held assignments`,
+            )
+            setResumeTarget(null)
+          } catch (err: unknown) {
+            toast.error(extractErrorMessage(err, 'Failed to resume assignments'))
+          }
+        }}
+      />
     </div>
   )
 }

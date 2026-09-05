@@ -180,13 +180,14 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
       const { technicianId } = c.req.valid('json')
 
       const updated = await reassignTechnician({
         shopId,
         userRole,
+        userId,
         id,
         technicianId,
       })

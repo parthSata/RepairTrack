@@ -45,11 +45,38 @@ export const setStaffStatusSchema = z.object({
 
 export type SetStaffStatusInput = z.infer<typeof setStaffStatusSchema>
 
-export const changeStaffRoleSchema = z.object({
-  role: z.enum(['STAFF', 'TECHNICIAN']),
-})
+export const changeStaffRoleSchema = z
+  .object({
+    role: z.enum(['STAFF', 'TECHNICIAN']),
+    assignmentAction: z.enum(['HOLD', 'REASSIGN']).optional(),
+    reassignments: z
+      .array(
+        z.object({
+          repairId: z.string().min(1),
+          technicianId: z.string().min(1),
+        }),
+      )
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.assignmentAction === 'REASSIGN') {
+      if (!data.reassignments || data.reassignments.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Reassignments are required when assignmentAction is REASSIGN',
+          path: ['reassignments'],
+        })
+      }
+    }
+  })
 
 export type ChangeStaffRoleInput = z.infer<typeof changeStaffRoleSchema>
+
+export const resumeAssignmentsSchema = z.object({
+  assignmentIds: z.array(z.string().uuid()).min(1, 'Select at least one assignment'),
+})
+
+export type ResumeAssignmentsInput = z.infer<typeof resumeAssignmentsSchema>
 
 export interface UnifiedStaffMember {
   id: string
@@ -61,4 +88,14 @@ export interface UnifiedStaffMember {
   token?: string
   expiresAt?: string
   createdAt: string
+  heldAssignmentCount?: number
+}
+
+export interface StaffAssignmentItem {
+  assignmentId: string
+  repairId: string
+  ticketNumber: string
+  deviceLabel: string
+  heldAt?: string | null
+  heldReason?: string | null
 }

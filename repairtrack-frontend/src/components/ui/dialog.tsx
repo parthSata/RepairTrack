@@ -9,11 +9,14 @@ interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  /** When true, Esc / overlay / X do not close — caller must provide explicit Cancel. */
+  preventDismiss?: boolean
+  className?: string
 }
 
 const emptySubscribe = () => () => {}
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, preventDismiss = false, className }: DialogProps) {
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -22,7 +25,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open) {
+      if (e.key === 'Escape' && open && !preventDismiss) {
         onOpenChange(false)
       }
     }
@@ -36,7 +39,7 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
       document.body.style.overflow = ''
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open, onOpenChange])
+  }, [open, onOpenChange, preventDismiss])
 
   if (!open || !mounted) return null
 
@@ -44,14 +47,19 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       <div
         className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200"
-        onClick={() => onOpenChange(false)}
+        onClick={() => {
+          if (!preventDismiss) onOpenChange(false)
+        }}
       />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter"
+        className={cn(
+          'relative z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter',
+          className,
+        )}
       >
-        <DialogClose onClick={() => onOpenChange(false)} />
+        {!preventDismiss && <DialogClose onClick={() => onOpenChange(false)} />}
         {children}
       </div>
     </div>,

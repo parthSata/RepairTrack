@@ -8,7 +8,8 @@ export interface TechnicianUser {
   id: string
   name: string
   email: string
-  role: 'TECHNICIAN' | 'STAFF'
+  role: 'TECHNICIAN'
+  activeRepairCount?: number
 }
 
 export interface RepairCreator {
@@ -109,6 +110,16 @@ export interface Repair {
   notes?: RepairNote[]
   statusHistory?: RepairStatusHistoryItem[]
   approval?: RepairApproval | null
+  currentAssignment?: {
+    id: string
+    status: 'ACTIVE' | 'ON_HOLD' | 'REASSIGNED' | 'COMPLETED'
+    technicianId: string
+    technicianName: string
+    technicianRole: string
+    technicianIsEligible: boolean
+    heldAt: string | null
+    heldReason: string | null
+  } | null
 }
 
 export interface RepairListResponse {

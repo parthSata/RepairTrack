@@ -101,9 +101,13 @@ export function useReassignTechnician(repairId: string) {
       const response = await apiClient.patch<Repair>(`/repairs/${repairId}/technician`, { technicianId })
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: repairKeys.all })
-      toast.success('Technician assignment updated!')
+      if (variables.technicianId) {
+        toast.success('Technician assignment updated!')
+      } else {
+        toast.success('Technician unassigned')
+      }
     },
     onError: (error: unknown) => {
       let message = 'Failed to reassign technician'
