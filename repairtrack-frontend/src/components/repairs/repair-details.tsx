@@ -382,7 +382,7 @@ export function RepairDetails({ id }: { id: string }) {
                 </div>
               )}
 
-              {canReassignTechnician ? (
+              {canReassignTechnician && repair.currentAssignment?.status !== 'ON_HOLD' ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="w-full sm:flex-1">
                     <TechnicianCombobox

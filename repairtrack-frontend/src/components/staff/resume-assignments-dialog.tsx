@@ -16,6 +16,8 @@ type ResumeAssignmentsDialogProps = {
   onOpenChange: (open: boolean) => void
   memberName: string
   assignments: StaffAssignmentItem[]
+  isLoading: boolean
+  isError?: boolean
   isPending: boolean
   onConfirm: (assignmentIds: string[]) => void
 }
@@ -35,6 +37,8 @@ function ResumeAssignmentsDialogInner({
   onOpenChange,
   memberName,
   assignments,
+  isLoading,
+  isError,
   isPending,
   onConfirm,
 }: ResumeAssignmentsDialogProps) {
@@ -62,8 +66,12 @@ function ResumeAssignmentsDialogInner({
       </DialogHeader>
 
       <div className="max-h-72 space-y-2 overflow-y-auto">
-        {assignments.length === 0 ? (
+        {isLoading ? (
           <p className="py-6 text-center text-sm text-muted-foreground">Loading held assignments…</p>
+        ) : isError ? (
+          <p className="py-6 text-center text-sm text-destructive">Failed to load held assignments.</p>
+        ) : assignments.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">No held assignments to resume.</p>
         ) : (
           assignments.map((item) => {
             const checked = selected.has(item.assignmentId)
@@ -105,7 +113,7 @@ function ResumeAssignmentsDialogInner({
         <Button
           type="button"
           variant="accent"
-          disabled={selected.size === 0 || isPending || assignments.length === 0}
+          disabled={selected.size === 0 || isPending || isLoading || assignments.length === 0}
           onClick={() => onConfirm([...selected])}
         >
           {isPending ? 'Resuming…' : `Resume ${selected.size} selected`}

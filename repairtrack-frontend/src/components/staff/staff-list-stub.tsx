@@ -448,7 +448,9 @@ export function StaffListStub() {
         }}
         memberName={resumeTarget?.memberName ?? ''}
         assignments={heldQuery.data ?? []}
-        isPending={resumeMutation.isPending || heldQuery.isLoading}
+        isLoading={heldQuery.isLoading}
+        isError={heldQuery.isError}
+        isPending={resumeMutation.isPending}
         onConfirm={async (assignmentIds) => {
           if (!resumeTarget) return
           try {

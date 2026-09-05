@@ -18,36 +18,76 @@ import { sendEmail } from '@/server/services/gmail.service'
 import { buildStaffInvitationEmailHtml, buildVerificationEmailHtml } from '@/server/services/email-templates'
 import {
   NON_TERMINAL_REPAIR_STATUSES,
-  countActiveAssignmentsForTechnician,
   syncAssignmentOnReassign,
 } from '@/server/services/repair-assignment.helpers'
 
 const INVITE_TTL_MS = 10 * 60 * 1000
 
-export async function getTechnicians(shopId: string) {
-  const techs = await db
+async function getAssignmentCountsByTechnicianStatus(
+  shopId: string,
+  assignmentStatus: 'ACTIVE' | 'ON_HOLD',
+) {
+  const rows = await db
     .select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
+      technicianId: repairAssignments.technicianId,
+      count: sql<number>`count(*)::int`,
     })
-    .from(users)
+    .from(repairAssignments)
+    .innerJoin(repairs, eq(repairs.id, repairAssignments.repairId))
     .where(
-      and(eq(users.shopId, shopId), eq(users.role, 'TECHNICIAN'), eq(users.status, 'ACTIVE')),
+      and(
+        eq(repairAssignments.shopId, shopId),
+        eq(repairAssignments.status, assignmentStatus),
+        inArray(repairs.status, [...NON_TERMINAL_REPAIR_STATUSES]),
+      ),
     )
+    .groupBy(repairAssignments.technicianId)
 
-  const withCounts = await Promise.all(
-    techs.map(async (tech) => ({
-      ...tech,
-      activeRepairCount: await countActiveAssignmentsForTechnician(db, {
-        shopId,
-        technicianId: tech.id,
-      }),
-    })),
-  )
+  return new Map(rows.map((row) => [row.technicianId, row.count]))
+}
 
-  return withCounts
+function mapAssignmentPreview(
+  row: {
+    assignmentId: string
+    repairId: string
+    ticketNumber: string
+    brand: string | null
+    model: string | null
+    heldAt?: Date | null
+    heldReason?: string | null
+  },
+  includeHoldMeta = false,
+): StaffAssignmentPreview {
+  return {
+    assignmentId: row.assignmentId,
+    repairId: row.repairId,
+    ticketNumber: row.ticketNumber,
+    deviceLabel: [row.brand, row.model].filter(Boolean).join(' ') || 'Unknown device',
+    heldAt: includeHoldMeta ? row.heldAt?.toISOString() ?? null : undefined,
+    heldReason: includeHoldMeta ? row.heldReason ?? null : undefined,
+  }
+}
+
+export async function getTechnicians(shopId: string) {
+  const [techs, activeCounts] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+      })
+      .from(users)
+      .where(
+        and(eq(users.shopId, shopId), eq(users.role, 'TECHNICIAN'), eq(users.status, 'ACTIVE')),
+      ),
+    getAssignmentCountsByTechnicianStatus(shopId, 'ACTIVE'),
+  ])
+
+  return techs.map((tech) => ({
+    ...tech,
+    activeRepairCount: activeCounts.get(tech.id) ?? 0,
+  }))
 }
 
 export type StaffAssignmentPreview = {
@@ -80,12 +120,7 @@ async function getActiveAssignmentsForTechnician(shopId: string, technicianId: s
       ),
     )
 
-  return rows.map((row) => ({
-    assignmentId: row.assignmentId,
-    repairId: row.repairId,
-    ticketNumber: row.ticketNumber,
-    deviceLabel: [row.brand, row.model].filter(Boolean).join(' ') || 'Unknown device',
-  })) satisfies StaffAssignmentPreview[]
+  return rows.map((row) => mapAssignmentPreview(row)) satisfies StaffAssignmentPreview[]
 }
 
 export async function getStaffActiveAssignments(shopId: string, technicianId: string) {
@@ -115,14 +150,7 @@ export async function getStaffHeldAssignments(shopId: string, technicianId: stri
       ),
     )
 
-  return rows.map((row) => ({
-    assignmentId: row.assignmentId,
-    repairId: row.repairId,
-    ticketNumber: row.ticketNumber,
-    deviceLabel: [row.brand, row.model].filter(Boolean).join(' ') || 'Unknown device',
-    heldAt: row.heldAt?.toISOString() ?? null,
-    heldReason: row.heldReason,
-  })) satisfies StaffAssignmentPreview[]
+  return rows.map((row) => mapAssignmentPreview(row, true)) satisfies StaffAssignmentPreview[]
 }
 
 export async function countHeldAssignments(shopId: string, technicianId: string) {
@@ -167,12 +195,14 @@ export async function resumeHeldAssignments(
     const held = await tx
       .select({ id: repairAssignments.id })
       .from(repairAssignments)
+      .innerJoin(repairs, eq(repairs.id, repairAssignments.repairId))
       .where(
         and(
           eq(repairAssignments.shopId, shopId),
           eq(repairAssignments.technicianId, technicianId),
           eq(repairAssignments.status, 'ON_HOLD'),
           inArray(repairAssignments.id, assignmentIds),
+          inArray(repairs.status, [...NON_TERMINAL_REPAIR_STATUSES]),
         ),
       )
 
@@ -312,20 +342,21 @@ export async function inviteStaff(shopId: string, invitedBy: string, input: Invi
 }
 
 export async function listStaff(shopId: string): Promise<UnifiedStaffMember[]> {
-  const staffUsers = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.shopId, shopId), inArray(users.role, ['STAFF', 'TECHNICIAN'])))
-
-  const pendingInvitations = await db
-    .select()
-    .from(staffInvitations)
-    .where(and(eq(staffInvitations.shopId, shopId), eq(staffInvitations.status, 'pending')))
+  const [staffUsers, pendingInvitations, heldCounts] = await Promise.all([
+    db
+      .select()
+      .from(users)
+      .where(and(eq(users.shopId, shopId), inArray(users.role, ['STAFF', 'TECHNICIAN']))),
+    db
+      .select()
+      .from(staffInvitations)
+      .where(and(eq(staffInvitations.shopId, shopId), eq(staffInvitations.status, 'pending'))),
+    getAssignmentCountsByTechnicianStatus(shopId, 'ON_HOLD'),
+  ])
 
   const now = new Date()
 
-  const userItems: UnifiedStaffMember[] = await Promise.all(
-    staffUsers.map(async (u) => ({
+  const userItems: UnifiedStaffMember[] = staffUsers.map((u) => ({
       id: u.id,
       name: u.name,
       email: u.email,
@@ -333,10 +364,8 @@ export async function listStaff(shopId: string): Promise<UnifiedStaffMember[]> {
       status: (u.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as 'ACTIVE' | 'INACTIVE',
       isInvitation: false,
       createdAt: u.createdAt.toISOString(),
-      heldAssignmentCount:
-        u.role === 'TECHNICIAN' ? await countHeldAssignments(shopId, u.id) : 0,
-    })),
-  )
+      heldAssignmentCount: u.role === 'TECHNICIAN' ? (heldCounts.get(u.id) ?? 0) : 0,
+    }))
 
   const inviteItems: UnifiedStaffMember[] = pendingInvitations.map((inv) => ({
     id: inv.id,

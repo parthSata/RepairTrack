@@ -382,8 +382,8 @@ export async function getRepairById({
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
-  // Fetch creator info, assigned technician, notes, status history, and approval concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult] =
+  // Fetch creator info, assignment context, notes, status history, and approval concurrently
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -473,33 +473,33 @@ export async function getRepairById({
       .where(eq(repairApprovals.repairId, id))
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
+    db
+      .select({
+        id: repairAssignments.id,
+        status: repairAssignments.status,
+        technicianId: repairAssignments.technicianId,
+        heldAt: repairAssignments.heldAt,
+        heldReason: repairAssignments.heldReason,
+        technicianRole: users.role,
+        technicianName: users.name,
+        technicianStatus: users.status,
+      })
+      .from(repairAssignments)
+      .innerJoin(users, eq(users.id, repairAssignments.technicianId))
+      .where(
+        and(
+          eq(repairAssignments.shopId, shopId),
+          eq(repairAssignments.repairId, id),
+          inArray(repairAssignments.status, ['ACTIVE', 'ON_HOLD']),
+        ),
+      )
+      .limit(1),
   ])
 
   const creator = creatorResult[0] || null
   const assignedTechnician = techResult[0] || null
   const approval = pendingApprovalResult[0] ?? latestApprovalResult[0] ?? null
-
-  const [currentAssignment] = await db
-    .select({
-      id: repairAssignments.id,
-      status: repairAssignments.status,
-      technicianId: repairAssignments.technicianId,
-      heldAt: repairAssignments.heldAt,
-      heldReason: repairAssignments.heldReason,
-      technicianRole: users.role,
-      technicianName: users.name,
-      technicianStatus: users.status,
-    })
-    .from(repairAssignments)
-    .innerJoin(users, eq(users.id, repairAssignments.technicianId))
-    .where(
-      and(
-        eq(repairAssignments.shopId, shopId),
-        eq(repairAssignments.repairId, id),
-        inArray(repairAssignments.status, ['ACTIVE', 'ON_HOLD']),
-      ),
-    )
-    .limit(1)
+  const currentAssignment = currentAssignmentResult[0] || null
 
   // Heal drift: PENDING approval must keep repairs.status at WAITING_FOR_APPROVAL
   // (staff could previously change status away while the approval row stayed PENDING).
@@ -648,14 +648,19 @@ export async function updateRepairStatus({
 
   // Execute status update and status history logging in transaction
   const updated = await db.transaction(async (tx) => {
+    const now = new Date()
     const [res] = await tx
       .update(repairs)
       .set({
         status,
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
       .returning()
+
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+      await markActiveOrHeldAssignmentCompleted(tx, { shopId, repairId: id })
+    }
 
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
@@ -664,6 +669,7 @@ export async function updateRepairStatus({
       toStatus: status,
       changedBy: userId,
       note: note || null,
+      createdAt: now,
     })
 
     return res

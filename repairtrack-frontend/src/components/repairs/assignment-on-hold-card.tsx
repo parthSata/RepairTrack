@@ -71,8 +71,9 @@ export function AssignmentOnHoldCard({
             <div>
               <p className="text-sm font-semibold text-foreground">Assignment On Hold</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {assignment.technicianName} is currently not a Technician. This assignment can be
-                resumed if they become a Technician again, or reassigned to another Technician.
+                {assignment.technicianIsEligible
+                  ? `${assignment.technicianName} is a Technician again. You can resume this assignment now or reassign it to someone else.`
+                  : `${assignment.technicianName} is currently not a Technician. This assignment can be resumed if they become a Technician again, or reassigned to another Technician.`}
               </p>
               {assignment.heldReason ? (
                 <p className="mt-1 text-xs text-muted-foreground">{assignment.heldReason}</p>
@@ -92,7 +93,11 @@ export function AssignmentOnHoldCard({
                     disabled={!assignment.technicianIsEligible || resumeMutation.isPending}
                     onClick={handleResume}
                   >
-                    {resumeMutation.isPending ? 'Resuming…' : 'Resume when eligible'}
+                    {resumeMutation.isPending
+                      ? 'Resuming…'
+                      : assignment.technicianIsEligible
+                        ? 'Resume assignment'
+                        : 'Resume when eligible'}
                   </Button>
                 </span>
                 <Button
