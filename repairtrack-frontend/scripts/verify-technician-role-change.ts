@@ -61,7 +61,7 @@ async function main() {
     .where(eq(repairAssignments.status, 'REASSIGNED'))
     .limit(50)
 
-  let gOk = true
+  const gOk = true
   for (const row of reassigned) {
     const heldAgain = await db
       .select({ id: repairAssignments.id })
