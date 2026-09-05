@@ -7,13 +7,18 @@ import { TrackSearchForm } from '@/components/tracking/track-search-form'
 import { TrackSkeleton } from '@/components/tracking/track-skeleton'
 import { TrackStatusView } from '@/components/tracking/track-status-view'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
-import { usePublicTrackingByToken, useVerifyPublicTracking } from '@/features/tracking/queries'
+import {
+  usePublicTrackingByToken,
+  useTrackDecision,
+  useVerifyPublicTracking,
+} from '@/features/tracking/queries'
 import { isTicketNumber, isTrackingToken } from '@/features/tracking/identifiers'
 
 export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
   const isToken = isTrackingToken(ticketId)
   const isTicket = isTicketNumber(ticketId)
   const tokenQuery = usePublicTrackingByToken(ticketId, isToken)
+  const decisionMutation = useTrackDecision(ticketId)
   const verifyMutation = useVerifyPublicTracking()
   const [verifiedData, setVerifiedData] = React.useState<PublicTrackingResponse | null>(null)
   const [submitError, setSubmitError] = React.useState(false)
@@ -56,14 +61,26 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
     return (
       <TrackPageShell
         wide
-        title={tokenQuery.data.pendingApproval ? 'Review your repair estimate' : 'Your repair status'}
+        title={tokenQuery.data.approval?.status === 'PENDING' ? 'Review your repair estimate' : 'Your repair status'}
         description={
-          tokenQuery.data.pendingApproval
+          tokenQuery.data.approval?.status === 'PENDING'
             ? 'We need you to review the diagnosis and cost before we can continue with the repair.'
             : 'Follow your device through each stage of service.'
         }
       >
-        <TrackStatusView data={tokenQuery.data} />
+        <TrackStatusView
+          data={tokenQuery.data}
+          accessMode="token"
+          isSubmittingDecision={decisionMutation.isPending}
+          onApprove={async () => {
+            if (decisionMutation.isPending) return
+            await decisionMutation.mutateAsync({ decision: 'APPROVE' })
+          }}
+          onReject={async (reason) => {
+            if (decisionMutation.isPending) return
+            await decisionMutation.mutateAsync({ decision: 'REJECT', reason })
+          }}
+        />
       </TrackPageShell>
     )
   }
@@ -72,14 +89,14 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
     return (
       <TrackPageShell
         wide
-        title={verifiedData.pendingApproval ? 'Review your repair estimate' : 'Your repair status'}
+        title={verifiedData.approval?.status === 'PENDING' ? 'Review your repair estimate' : 'Your repair status'}
         description={
-          verifiedData.pendingApproval
+          verifiedData.approval?.status === 'PENDING'
             ? 'We need you to review the diagnosis and cost before we can continue with the repair.'
             : 'Follow your device through each stage of service.'
         }
       >
-        <TrackStatusView data={verifiedData} />
+        <TrackStatusView data={verifiedData} accessMode="manual" />
       </TrackPageShell>
     )
   }

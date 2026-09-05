@@ -19,7 +19,7 @@ export function TrackLandingPage() {
         title="Your repair status"
         description="Follow your device through each stage of service."
       >
-        <TrackStatusView data={trackingData} />
+        <TrackStatusView data={trackingData} accessMode="manual" />
       </TrackPageShell>
     )
   }

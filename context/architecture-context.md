@@ -556,6 +556,13 @@ Because it is unauthenticated, it must:
   id or the date. Do not expose the database uuid, and do not use an
   incrementing or year-prefixed number such as `RT-2026-00124`.
 - Be rate-limited per IP.
+- Stay read-only **except** for the one named public mutation:
+  `POST /api/track/[trackingToken]/decision`. That endpoint exists
+  only for customer approve/reject on a currently pending
+  `repair_approvals` row, is reachable only by a valid tracking token
+  (never by ticket+phone manual search), determines the target repair
+  entirely from that token, and must not be generalized into any other
+  unauthenticated write capability.
 
 Treat this as a separate read model, not a filtered version of the
 internal repair query.

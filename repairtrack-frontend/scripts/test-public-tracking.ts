@@ -15,7 +15,6 @@ config({ path: '.env.local' })
 const FORBIDDEN_KEYS = [
   'id',
   'shopId',
-  'diagnosis',
   'repairNotes',
   'initialCondition',
   'serialNumber',
@@ -60,6 +59,7 @@ async function main() {
 
   const verifyPayload = await verifyPublicRepairByTicketAndPhone(repair.ticketNumber, repair.phone)
   publicTrackingResponseSchema.parse(verifyPayload)
+  assertNoForbiddenKeys(verifyPayload)
 
   let wrongPhoneFailed = false
   try {
