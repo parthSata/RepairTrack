@@ -48,6 +48,7 @@ import {
 import { CustomerForm } from '@/components/customers/customer-form'
 import { DeviceForm } from '@/components/devices/device-form'
 import { DeviceTypeIcon, ConditionBadge } from '@/components/devices/device-table'
+import { TechnicianCombobox } from '@/components/repairs/technician-combobox'
 
 export function NewRepairWorkflow() {
   const [selectedCustomer, setSelectedCustomer] = React.useState<Customer | null>(null)
@@ -701,18 +702,17 @@ export function NewRepairWorkflow() {
                         <span>Assigned Technician</span>
                         <span className="text-[11px] text-muted-foreground">Optional</span>
                       </Label>
-                      <select
+                      <TechnicianCombobox
                         id="assignedTechnicianId"
-                        {...register('assignedTechnicianId')}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        <option value="">{isLoadingTechs ? 'Loading technicians...' : 'Unassigned (Default)'}</option>
-                        {technicians?.map((tech) => (
-                          <option key={tech.id} value={tech.id}>
-                            {tech.name} ({tech.email})
-                          </option>
-                        ))}
-                      </select>
+                        technicians={technicians ?? []}
+                        value={watchTechId || null}
+                        allowUnassigned
+                        disabled={isLoadingTechs}
+                        onChange={(id) =>
+                          setValue('assignedTechnicianId', id ?? undefined, { shouldValidate: true })
+                        }
+                        aria-label="Assigned technician"
+                      />
                     </div>
                   </div>
 

@@ -14,18 +14,21 @@
     "db:studio": "drizzle-kit studio",
     "seed": "bun run scripts/seed.ts",
     "verify:approval-schema": "bun run scripts/verify-approval-schema.ts",
-    "verify:request-approval": "bun run scripts/verify-request-approval.ts"
+    "verify:request-approval": "bun run scripts/verify-request-approval.ts",
+    "verify:technician-role-change": "bun run scripts/verify-technician-role-change.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.1",
     "@hono/zod-validator": "^0.9.0",
     "@hookform/resolvers": "^5.9.1",
+    "@radix-ui/react-popover": "^1.1.23",
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-table": "^8.20.5",
     "axios": "^1.19.0",
     "better-auth": "^1.7.1",
     "cloudinary": "^2.10.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "googleapis": "^176.0.0",

@@ -4,6 +4,7 @@ import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
+import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
@@ -17,6 +18,11 @@ import {
   overdueRepairCondition,
 } from '@/features/repairs/overdue'
 import { generateTicketNumber, generateTrackingToken } from '@/server/lib/tokens'
+import {
+  insertActiveAssignment,
+  markActiveOrHeldAssignmentCompleted,
+  syncAssignmentOnReassign,
+} from '@/server/services/repair-assignment.helpers'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -67,7 +73,7 @@ export async function createRepairTicket({
     })
   }
 
-  // 4. Verify Technician (if provided) is an active TECHNICIAN or STAFF in current shop
+  // 4. Verify Technician (if provided) is an active TECHNICIAN in current shop
   if (data.assignedTechnicianId) {
     const [tech] = await db
       .select({ id: users.id })
@@ -76,7 +82,7 @@ export async function createRepairTicket({
         and(
           eq(users.id, data.assignedTechnicianId),
           eq(users.shopId, shopId),
-          inArray(users.role, ['TECHNICIAN', 'STAFF']),
+          eq(users.role, 'TECHNICIAN'),
           eq(users.status, 'ACTIVE'),
         ),
       )
@@ -138,6 +144,15 @@ export async function createRepairTicket({
             repairId,
             authorId: createdBy,
             note: data.initialNote.trim(),
+          })
+        }
+
+        if (data.assignedTechnicianId) {
+          await insertActiveAssignment(tx, {
+            shopId,
+            repairId,
+            technicianId: data.assignedTechnicianId,
+            createdBy,
           })
         }
 
@@ -367,8 +382,8 @@ export async function getRepairById({
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
-  // Fetch creator info, assigned technician, notes, status history, and approval concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult] =
+  // Fetch creator info, assignment context, notes, status history, and approval concurrently
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -378,7 +393,7 @@ export async function getRepairById({
       : Promise.resolve([]),
     repair.assignedTechnicianId
       ? db
-          .select({ id: users.id, name: users.name, email: users.email })
+          .select({ id: users.id, name: users.name, email: users.email, role: users.role })
           .from(users)
           .where(eq(users.id, repair.assignedTechnicianId))
       : Promise.resolve([]),
@@ -458,11 +473,33 @@ export async function getRepairById({
       .where(eq(repairApprovals.repairId, id))
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
+    db
+      .select({
+        id: repairAssignments.id,
+        status: repairAssignments.status,
+        technicianId: repairAssignments.technicianId,
+        heldAt: repairAssignments.heldAt,
+        heldReason: repairAssignments.heldReason,
+        technicianRole: users.role,
+        technicianName: users.name,
+        technicianStatus: users.status,
+      })
+      .from(repairAssignments)
+      .innerJoin(users, eq(users.id, repairAssignments.technicianId))
+      .where(
+        and(
+          eq(repairAssignments.shopId, shopId),
+          eq(repairAssignments.repairId, id),
+          inArray(repairAssignments.status, ['ACTIVE', 'ON_HOLD']),
+        ),
+      )
+      .limit(1),
   ])
 
   const creator = creatorResult[0] || null
   const assignedTechnician = techResult[0] || null
   const approval = pendingApprovalResult[0] ?? latestApprovalResult[0] ?? null
+  const currentAssignment = currentAssignmentResult[0] || null
 
   // Heal drift: PENDING approval must keep repairs.status at WAITING_FOR_APPROVAL
   // (staff could previously change status away while the approval row stayed PENDING).
@@ -522,6 +559,20 @@ export async function getRepairById({
     notes,
     statusHistory: resolvedStatusHistory,
     approval,
+    currentAssignment: currentAssignment
+      ? {
+          id: currentAssignment.id,
+          status: currentAssignment.status,
+          technicianId: currentAssignment.technicianId,
+          technicianName: currentAssignment.technicianName,
+          technicianRole: currentAssignment.technicianRole,
+          technicianIsEligible:
+            currentAssignment.technicianRole === 'TECHNICIAN' &&
+            currentAssignment.technicianStatus === 'ACTIVE',
+          heldAt: currentAssignment.heldAt?.toISOString() ?? null,
+          heldReason: currentAssignment.heldReason,
+        }
+      : null,
   }
 }
 
@@ -597,14 +648,19 @@ export async function updateRepairStatus({
 
   // Execute status update and status history logging in transaction
   const updated = await db.transaction(async (tx) => {
+    const now = new Date()
     const [res] = await tx
       .update(repairs)
       .set({
         status,
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
       .returning()
+
+    if (status === 'COMPLETED' || status === 'CANCELLED') {
+      await markActiveOrHeldAssignmentCompleted(tx, { shopId, repairId: id })
+    }
 
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
@@ -613,6 +669,7 @@ export async function updateRepairStatus({
       toStatus: status,
       changedBy: userId,
       note: note || null,
+      createdAt: now,
     })
 
     return res
@@ -810,11 +867,13 @@ export async function reopenRepairTicket({
 export async function reassignTechnician({
   shopId,
   userRole,
+  userId,
   id,
   technicianId,
 }: {
   shopId: string
   userRole: string
+  userId: string
   id: string
   technicianId: string | null
 }) {
@@ -842,7 +901,7 @@ export async function reassignTechnician({
         and(
           eq(users.id, technicianId),
           eq(users.shopId, shopId),
-          inArray(users.role, ['TECHNICIAN', 'STAFF']),
+          eq(users.role, 'TECHNICIAN'),
           eq(users.status, 'ACTIVE'),
         ),
       )
@@ -854,14 +913,29 @@ export async function reassignTechnician({
     }
   }
 
-  const [updated] = await db
-    .update(repairs)
-    .set({
-      assignedTechnicianId: technicianId || null,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
-    .returning()
+  const updated = await db.transaction(async (tx) => {
+    if (technicianId) {
+      await syncAssignmentOnReassign(tx, {
+        shopId,
+        repairId: id,
+        technicianId,
+        createdBy: userId,
+      })
+    } else {
+      await markActiveOrHeldAssignmentCompleted(tx, { shopId, repairId: id })
+    }
+
+    const [row] = await tx
+      .update(repairs)
+      .set({
+        assignedTechnicianId: technicianId || null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+      .returning()
+
+    return row
+  })
 
   return updated
 }

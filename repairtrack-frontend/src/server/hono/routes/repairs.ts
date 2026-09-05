@@ -20,7 +20,7 @@ import {
 } from '@/server/services/repair.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
-import { createRepairSchema, requestCustomerApprovalSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
+import { createRepairSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -180,13 +180,14 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
       const { technicianId } = c.req.valid('json')
 
       const updated = await reassignTechnician({
         shopId,
         userRole,
+        userId,
         id,
         technicianId,
       })

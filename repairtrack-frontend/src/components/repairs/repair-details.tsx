@@ -59,6 +59,8 @@ import { StatusChangeControl } from './status-change-control'
 import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
 import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBanner } from './approval-status-badge'
+import { TechnicianCombobox } from './technician-combobox'
+import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
@@ -364,20 +366,33 @@ export function RepairDetails({ id }: { id: string }) {
                 Assigned technician
               </span>
 
-              {canReassignTechnician ? (
+              {repair.currentAssignment?.status === 'ON_HOLD' && (
+                <div className="space-y-2">
+                  <Badge variant="warning">Assignment On Hold</Badge>
+                  <AssignmentOnHoldCard
+                    assignment={repair.currentAssignment}
+                    technicians={technicians ?? []}
+                    canManage={canReassignTechnician}
+                    isReassignPending={reassignMutation.isPending}
+                    onReassigned={async (technicianId) => {
+                      await reassignMutation.mutateAsync({ technicianId })
+                      setSelectedTechId(technicianId)
+                    }}
+                  />
+                </div>
+              )}
+
+              {canReassignTechnician && repair.currentAssignment?.status !== 'ON_HOLD' ? (
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <select
-                    value={selectedTechId}
-                    onChange={(e) => setSelectedTechId(e.target.value)}
-                    className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring sm:flex-1"
-                  >
-                    <option value="">-- Unassigned --</option>
-                    {technicians?.map((tech) => (
-                      <option key={tech.id} value={tech.id}>
-                        {tech.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="w-full sm:flex-1">
+                    <TechnicianCombobox
+                      technicians={technicians ?? []}
+                      value={selectedTechId || null}
+                      allowUnassigned
+                      onChange={(id) => setSelectedTechId(id ?? '')}
+                      aria-label="Assign technician"
+                    />
+                  </div>
 
                   <Button
                     type="button"
