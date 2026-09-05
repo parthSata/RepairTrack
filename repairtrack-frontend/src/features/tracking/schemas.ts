@@ -25,6 +25,32 @@ export const trackVerifySchema = z.object({
 
 export type TrackVerifyInput = z.infer<typeof trackVerifySchema>
 
+export const trackDecisionParamSchema = z.object({
+  trackingToken: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{40,48}$/, 'Enter a valid tracking token'),
+})
+
+export const trackDecisionSchema = z
+  .object({
+    decision: z.enum(['APPROVE', 'REJECT']),
+    reason: z.string().trim().max(500, 'Reason must be 500 characters or less').optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.decision === 'APPROVE' && value.reason && value.reason.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['reason'],
+        message: 'Reason can only be provided when rejecting the estimate',
+      })
+    }
+  })
+
+export type TrackDecisionParamInput = z.infer<typeof trackDecisionParamSchema>
+export type TrackDecisionInput = z.infer<typeof trackDecisionSchema>
+
 export const publicTrackingResponseSchema = z.object({
   ticketNumber: z.string(),
   status: z.string(),
@@ -34,8 +60,9 @@ export const publicTrackingResponseSchema = z.object({
   }),
   problemDescription: z.string().nullable(),
   estimatedCost: z.number().optional(),
-  pendingApproval: z
+  approval: z
     .object({
+      status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),
       diagnosis: z.string(),
       /** Original estimate in rupees at time of approval request. */
       initialEstimate: z.number(),
@@ -43,6 +70,8 @@ export const publicTrackingResponseSchema = z.object({
       additionalCost: z.number(),
       /** Revised total in rupees (initial + additional). */
       revisedTotal: z.number(),
+      decidedAt: z.string().nullable(),
+      rejectionReason: z.string().nullable(),
     })
     .optional(),
   createdAt: z.string(),

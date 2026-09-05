@@ -21,12 +21,17 @@ function getClientIp(c: Context): string {
   return 'unknown'
 }
 
-export function createRateLimitMiddleware(options?: { windowMs?: number; max?: number }) {
+export function createRateLimitMiddleware(options?: {
+  windowMs?: number
+  max?: number
+  key?: (c: Context) => string
+}) {
   const windowMs = options?.windowMs ?? 60_000
   const max = options?.max ?? 30
+  const keyFn = options?.key ?? getClientIp
 
   return async (c: Context, next: Next) => {
-    const ip = getClientIp(c)
+    const ip = keyFn(c)
     const now = Date.now()
     const existing = store.get(ip)
 

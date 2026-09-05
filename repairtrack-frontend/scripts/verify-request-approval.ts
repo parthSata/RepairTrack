@@ -1,50 +1,40 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { config } from 'dotenv'
-import { HTTPException } from 'hono/http-exception'
+import { Hono } from 'hono'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { db } from '@/server/db'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
-import {
-  buildPublicTrackingPayload,
-  getPublicRepairByTrackingToken,
-} from '@/server/services/tracking.service'
-import {
-  requestCustomerApproval,
-  updateRepairStatus,
-} from '@/server/services/repair.service'
+import { TrackStatusView } from '@/components/tracking/track-status-view'
+import { publicTrackingResponseSchema, trackDecisionSchema } from '@/features/tracking/schemas'
+import { trackRouter } from '@/server/hono/routes/track'
+import { requestCustomerApproval, updateRepairStatus } from '@/server/services/repair.service'
+import { getPublicRepairByTrackingToken } from '@/server/services/tracking.service'
 
 config({ path: '.env.local' })
 
 const TEST_INITIAL_PAISE = 120_000
 const TEST_ADDITIONAL_RUPEES = 4500
-const TEST_ADDITIONAL_PAISE = 450_000
-const TEST_REVISED_PAISE = TEST_INITIAL_PAISE + TEST_ADDITIONAL_PAISE
+const GENERIC_PUBLIC_ERROR = "We couldn't find this repair."
+const testApp = new Hono().route('/api/track', trackRouter)
 
-async function expectHttpError(
-  fn: () => Promise<unknown>,
-  expectedStatus: number,
-  messageIncludes: string,
-  testLabel: string,
-) {
-  try {
-    await fn()
-    throw new Error(`${testLabel} failed: expected HTTP ${expectedStatus}, but call succeeded`)
-  } catch (error) {
-    if (error instanceof HTTPException) {
-      if (error.status !== expectedStatus) {
-        throw new Error(
-          `${testLabel} failed: expected HTTP ${expectedStatus}, got ${error.status} (${error.message})`,
-        )
-      }
-      if (!error.message.includes(messageIncludes)) {
-        throw new Error(
-          `${testLabel} failed: expected message to include "${messageIncludes}", got "${error.message}"`,
-        )
-      }
-      return
-    }
-    throw error
+type RepairSnapshot = {
+  repair: {
+    diagnosis: string | null
+    estimatedCost: number | null
+    status: typeof repairs.$inferSelect.status
+    trackingToken: string | null
+    updatedAt: Date
+  }
+  approvals: typeof repairApprovals.$inferSelect[]
+  statusHistory: typeof repairStatusHistory.$inferSelect[]
+}
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message)
   }
 }
 
@@ -83,63 +73,144 @@ async function getFixtureUsers() {
   }
 }
 
-async function saveRepairSnapshot(repairId: string) {
-  const [row] = await db
+async function saveSnapshot(repairId: string): Promise<RepairSnapshot> {
+  const [repair] = await db
     .select({
       diagnosis: repairs.diagnosis,
       estimatedCost: repairs.estimatedCost,
       status: repairs.status,
+      trackingToken: repairs.trackingToken,
+      updatedAt: repairs.updatedAt,
     })
     .from(repairs)
     .where(eq(repairs.id, repairId))
 
-  if (!row) {
+  if (!repair) {
     throw new Error(`Repair ${repairId} not found`)
   }
 
-  return row
+  const [approvals, statusHistory] = await Promise.all([
+    db.select().from(repairApprovals).where(eq(repairApprovals.repairId, repairId)),
+    db.select().from(repairStatusHistory).where(eq(repairStatusHistory.repairId, repairId)),
+  ])
+
+  return { repair, approvals, statusHistory }
 }
 
-async function restoreRepairSnapshot(
-  repairId: string,
-  snapshot: { diagnosis: string | null; estimatedCost: number | null; status: string },
+async function restoreSnapshot(repairId: string, snapshot: RepairSnapshot) {
+  await db.transaction(async (tx) => {
+    await tx.delete(repairApprovals).where(eq(repairApprovals.repairId, repairId))
+    if (snapshot.approvals.length > 0) {
+      await tx.insert(repairApprovals).values(snapshot.approvals)
+    }
+
+    await tx.delete(repairStatusHistory).where(eq(repairStatusHistory.repairId, repairId))
+    if (snapshot.statusHistory.length > 0) {
+      await tx.insert(repairStatusHistory).values(snapshot.statusHistory)
+    }
+
+    await tx
+      .update(repairs)
+      .set({
+        diagnosis: snapshot.repair.diagnosis,
+        estimatedCost: snapshot.repair.estimatedCost,
+        status: snapshot.repair.status,
+        trackingToken: snapshot.repair.trackingToken,
+        updatedAt: snapshot.repair.updatedAt,
+      })
+      .where(eq(repairs.id, repairId))
+  })
+}
+
+async function resetForApprovalFlow({
+  repairId,
+  trackingToken,
+}: {
+  repairId: string
+  trackingToken: string
+}) {
+  await db.transaction(async (tx) => {
+    await tx.delete(repairApprovals).where(eq(repairApprovals.repairId, repairId))
+    await tx.delete(repairStatusHistory).where(eq(repairStatusHistory.repairId, repairId))
+    await tx
+      .update(repairs)
+      .set({
+        diagnosis: 'Screen replacement required',
+        estimatedCost: TEST_INITIAL_PAISE,
+        status: 'DIAGNOSING',
+        trackingToken,
+        updatedAt: new Date(),
+      })
+      .where(eq(repairs.id, repairId))
+  })
+}
+
+async function expectServiceError(
+  fn: () => Promise<unknown>,
+  expectedStatus: number,
+  expectedMessage: string,
+  label: string,
 ) {
-  await db
-    .update(repairs)
-    .set({
-      diagnosis: snapshot.diagnosis,
-      estimatedCost: snapshot.estimatedCost,
-      status: snapshot.status as typeof repairs.$inferSelect.status,
-      updatedAt: new Date(),
-    })
-    .where(eq(repairs.id, repairId))
+  try {
+    await fn()
+    throw new Error(`${label} failed: expected HTTP ${expectedStatus}, but call succeeded`)
+  } catch (error) {
+    if (!(error instanceof Error) || !('status' in error)) {
+      throw error
+    }
+    const status = (error as { status: number }).status
+    if (status !== expectedStatus) {
+      throw new Error(`${label} failed: expected HTTP ${expectedStatus}, got ${status}`)
+    }
+    if (!error.message.includes(expectedMessage)) {
+      throw new Error(
+        `${label} failed: expected message to include "${expectedMessage}", got "${error.message}"`,
+      )
+    }
+  }
 }
 
-async function cleanupApprovalArtifacts(repairId: string) {
-  await db.delete(repairApprovals).where(eq(repairApprovals.repairId, repairId))
-  await db
-    .delete(repairStatusHistory)
-    .where(
-      and(
-        eq(repairStatusHistory.repairId, repairId),
-        eq(repairStatusHistory.toStatus, 'WAITING_FOR_APPROVAL'),
-      ),
-    )
+async function jsonRequest(path: string, body?: object) {
+  const response = await testApp.request(`http://repairtrack.local${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: body
+      ? {
+          'content-type': 'application/json',
+          'x-forwarded-for': '203.0.113.10',
+        }
+      : { 'x-forwarded-for': '203.0.113.10' },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+
+  const rawText = await response.text()
+  let payload: Record<string, unknown>
+  try {
+    payload = JSON.parse(rawText) as Record<string, unknown>
+  } catch {
+    payload = { message: rawText }
+  }
+  return { response, payload }
 }
 
-async function testGuardMissingDiagnosis(
+function renderTrackingViewMarkup(
+  data: ReturnType<typeof publicTrackingResponseSchema.parse>,
+  accessMode: 'token' | 'manual',
+) {
+  return renderToStaticMarkup(React.createElement(TrackStatusView, { data, accessMode }))
+}
+
+async function testRequestApprovalGuards(
   repairId: string,
   shopId: string,
   staffId: string,
-  original: Awaited<ReturnType<typeof saveRepairSnapshot>>,
+  ownerId: string,
 ) {
-  await cleanupApprovalArtifacts(repairId)
   await db
     .update(repairs)
-    .set({ diagnosis: null, estimatedCost: 50000, status: 'DIAGNOSING', updatedAt: new Date() })
+    .set({ diagnosis: null, estimatedCost: 50_000, status: 'DIAGNOSING', updatedAt: new Date() })
     .where(eq(repairs.id, repairId))
 
-  await expectHttpError(
+  await expectServiceError(
     () =>
       requestCustomerApproval({
         shopId,
@@ -150,20 +221,9 @@ async function testGuardMissingDiagnosis(
       }),
     400,
     'Add a diagnosis before requesting customer approval',
-    'Test A (missing diagnosis)',
+    'Guard missing diagnosis',
   )
 
-  await restoreRepairSnapshot(repairId, original)
-  console.log('Test A passed: blocked when diagnosis is missing')
-}
-
-async function testNullOriginalAllowed(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-  original: Awaited<ReturnType<typeof saveRepairSnapshot>>,
-) {
-  await cleanupApprovalArtifacts(repairId)
   await db
     .update(repairs)
     .set({
@@ -174,7 +234,7 @@ async function testNullOriginalAllowed(
     })
     .where(eq(repairs.id, repairId))
 
-  await expectHttpError(
+  await expectServiceError(
     () =>
       requestCustomerApproval({
         shopId,
@@ -185,159 +245,10 @@ async function testNullOriginalAllowed(
       }),
     400,
     'Set an estimated cost before requesting customer approval',
-    'Test A (missing estimated cost)',
+    'Guard missing estimated cost',
   )
 
-  await cleanupApprovalArtifacts(repairId)
-  await restoreRepairSnapshot(repairId, original)
-  console.log('Test D passed: null original estimate allowed; additional + revised still correct')
-}
-
-async function testDuplicatePending(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-  original: Awaited<ReturnType<typeof saveRepairSnapshot>>,
-) {
-  await cleanupApprovalArtifacts(repairId)
-  await db
-    .update(repairs)
-    .set({
-      diagnosis: 'Duplicate pending test diagnosis',
-      estimatedCost: 75000,
-      status: 'DIAGNOSING',
-      updatedAt: new Date(),
-    })
-    .where(eq(repairs.id, repairId))
-
-  await requestCustomerApproval({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    additionalEstimatedCostRupees: 0,
-  })
-
-  await expectHttpError(
-    () =>
-      requestCustomerApproval({
-        shopId,
-        userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
-        additionalEstimatedCostRupees: 0,
-      }),
-    400,
-    'Customer approval is already pending for this repair',
-    'Duplicate pending',
-  )
-
-  await cleanupApprovalArtifacts(repairId)
-  await restoreRepairSnapshot(repairId, original)
-  console.log('Duplicate pending passed: blocked when PENDING approval already exists')
-}
-
-async function testSuccessfulRequest(repairId: string, shopId: string, staffId: string) {
-  await cleanupApprovalArtifacts(repairId)
-  await db
-    .update(repairs)
-    .set({
-      diagnosis: 'Screen replacement required',
-      estimatedCost: TEST_INITIAL_PAISE,
-      status: 'DIAGNOSING',
-      updatedAt: new Date(),
-    })
-    .where(eq(repairs.id, repairId))
-
-  const result = await requestCustomerApproval({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
-  })
-
-  if (result.status !== 'WAITING_FOR_APPROVAL') {
-    throw new Error(`Test B failed: expected status WAITING_FOR_APPROVAL, got ${result.status}`)
-  }
-
-  if (!result.approval || result.approval.status !== 'PENDING') {
-    throw new Error('Test B failed: expected PENDING approval on repair detail')
-  }
-
-  if (result.estimatedCost !== TEST_INITIAL_PAISE) {
-    throw new Error(
-      `Test B failed: repairs.estimated_cost must stay ${TEST_INITIAL_PAISE}, got ${result.estimatedCost}`,
-    )
-  }
-
-  const [approvalRow] = await db
-    .select()
-    .from(repairApprovals)
-    .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'PENDING')))
-
-  if (!approvalRow) {
-    throw new Error('Test B failed: no PENDING repair_approvals row found')
-  }
-
-  if (approvalRow.diagnosisSnapshot !== 'Screen replacement required') {
-    throw new Error('Test B failed: diagnosis snapshot mismatch')
-  }
-
-  if (approvalRow.additionalEstimatedCost !== TEST_ADDITIONAL_PAISE) {
-    throw new Error(
-      `Test B failed: additional_estimated_cost should be posted paise ${TEST_ADDITIONAL_PAISE}, not a copy of estimated_cost`,
-    )
-  }
-
-  if (approvalRow.initialEstimatedCost !== TEST_INITIAL_PAISE) {
-    throw new Error(
-      `Test C failed: initial_estimated_cost mismatch (expected ${TEST_INITIAL_PAISE}, got ${approvalRow.initialEstimatedCost})`,
-    )
-  }
-
-  if (approvalRow.additionalEstimatedCost !== TEST_ADDITIONAL_PAISE) {
-    throw new Error(
-      `Test C failed: additional_estimated_cost mismatch (expected ${TEST_ADDITIONAL_PAISE}, got ${approvalRow.additionalEstimatedCost})`,
-    )
-  }
-
-  const [repairRow] = await db
-    .select({ estimatedCost: repairs.estimatedCost })
-    .from(repairs)
-    .where(eq(repairs.id, repairId))
-
-  if (!repairRow || repairRow.estimatedCost !== TEST_REVISED_PAISE) {
-    throw new Error(
-      `Test C failed: repairs.estimatedCost should be revised total ${TEST_REVISED_PAISE}`,
-    )
-  }
-
-  const [historyRow] = await db
-    .select({
-      toStatus: repairStatusHistory.toStatus,
-      actorType: repairStatusHistory.actorType,
-    })
-    .from(repairStatusHistory)
-    .where(
-      and(
-        eq(repairStatusHistory.repairId, repairId),
-        eq(repairStatusHistory.toStatus, 'WAITING_FOR_APPROVAL'),
-      ),
-    )
-    .orderBy(desc(repairStatusHistory.createdAt))
-    .limit(1)
-
-  if (!historyRow || historyRow.actorType !== 'STAFF') {
-    throw new Error('Test B failed: expected repair_status_history row with actor_type=STAFF')
-  }
-
-  console.log('Test B passed: original + additional stored separately; revised derived as integer paise')
-  return approvalRow
-}
-
-async function testOwnerForbidden(repairId: string, shopId: string, ownerId: string) {
-  await expectHttpError(
+  await expectServiceError(
     () =>
       requestCustomerApproval({
         shopId,
@@ -348,14 +259,10 @@ async function testOwnerForbidden(repairId: string, shopId: string, ownerId: str
       }),
     403,
     'Owner cannot change repair status directly',
-    'OWNER forbidden',
+    'Guard owner forbidden',
   )
 
-  console.log('OWNER forbidden passed: OWNER cannot trigger request approval')
-}
-
-async function testManualStatusBlocked(repairId: string, shopId: string, staffId: string) {
-  await expectHttpError(
+  await expectServiceError(
     () =>
       updateRepairStatus({
         shopId,
@@ -366,95 +273,268 @@ async function testManualStatusBlocked(repairId: string, shopId: string, staffId
       }),
     400,
     'Use Request Customer Approval',
-    'Manual status bypass',
+    'Guard manual status bypass',
   )
 
-  console.log('Manual bypass blocked: WAITING_FOR_APPROVAL cannot be set via status PATCH')
+  console.log('Guard checks passed: diagnosis/original estimate required, OWNER blocked, direct WAITING_FOR_APPROVAL blocked')
 }
 
-async function testPublicTrackingPendingApproval(trackingToken: string | null) {
-  if (!trackingToken) {
-    throw new Error('Test C skipped setup: repair has no tracking token')
-  }
+async function testNoApprovalRequired(trackingToken: string) {
+  const payload = publicTrackingResponseSchema.parse(await getPublicRepairByTrackingToken(trackingToken))
+  assert(!payload.approval, 'Test 1 failed: approval data should be absent when no approval is required')
+  const tokenMarkup = renderTrackingViewMarkup(payload, 'token')
+  assert(!tokenMarkup.includes('Approve Repair'), 'Test 1 failed: token view should not show action buttons')
+  console.log('Test 1 passed: normal tracking page remains unaffected when no approval is required')
+}
 
-  const payload = await getPublicRepairByTrackingToken(trackingToken)
+async function testRequestApprovalAndViews({
+  repairId,
+  shopId,
+  staffId,
+  trackingToken,
+}: {
+  repairId: string
+  shopId: string
+  staffId: string
+  trackingToken: string
+}) {
+  const result = await requestCustomerApproval({
+    shopId,
+    userRole: 'STAFF',
+    userId: staffId,
+    id: repairId,
+    additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
+  })
 
-  if (!payload.pendingApproval) {
-    throw new Error('Test C failed: expected pendingApproval on public tracking payload')
-  }
+  assert(result.status === 'WAITING_FOR_APPROVAL', 'Test 2 failed: repair must enter WAITING_FOR_APPROVAL')
+  assert(result.approval?.status === 'PENDING', 'Test 2 failed: repair detail approval must be PENDING')
+  console.log('Test 2 passed: request approval sets WAITING_FOR_APPROVAL correctly')
 
-  if (!payload.pendingApproval.diagnosis.trim()) {
-    throw new Error('Test C failed: pendingApproval.diagnosis is empty')
-  }
+  const payload = publicTrackingResponseSchema.parse(await getPublicRepairByTrackingToken(trackingToken))
+  assert(payload.approval?.status === 'PENDING', 'Test 3 failed: public payload must expose pending approval')
+  assert(payload.approval.decidedAt === null, 'Test 3 failed: pending approval must not have decidedAt')
 
-  const { initialEstimate, additionalCost, revisedTotal } = payload.pendingApproval
+  const tokenMarkup = renderTrackingViewMarkup(payload, 'token')
+  assert(tokenMarkup.includes('Action Required'), 'Test 3 failed: token view must render the action card')
+  assert(tokenMarkup.includes('Approve Repair'), 'Test 3 failed: token view must render approve button')
+  assert(tokenMarkup.includes('Reject Repair'), 'Test 3 failed: token view must render reject button')
+  console.log('Test 3 passed: valid token + pending approval renders the action card')
 
-  if (initialEstimate !== 1200) {
-    throw new Error(`Test E failed: expected initialEstimate 1200 rupees, got ${initialEstimate}`)
-  }
+  const manualPayload = publicTrackingResponseSchema.parse(
+    await getPublicRepairByTrackingToken(trackingToken),
+  )
+  const manualMarkup = renderTrackingViewMarkup(manualPayload, 'manual')
+  assert(
+    manualMarkup.includes('Approve or reject from the link sent to you'),
+    'Test 4 failed: manual tracking should show the read-only pending message',
+  )
+  assert(!manualMarkup.includes('Approve Repair'), 'Test 4 failed: manual tracking must not render approve button')
+  assert(!manualMarkup.includes('Reject Repair'), 'Test 4 failed: manual tracking must not render reject button')
+  console.log('Test 4 passed: manual /track access stays view-only for pending approval')
 
-  if (additionalCost !== TEST_ADDITIONAL_RUPEES) {
-    throw new Error(
-      `Test E failed: expected additionalCost ${TEST_ADDITIONAL_RUPEES} rupees, got ${additionalCost}`,
-    )
-  }
+  assert(
+    tokenMarkup.includes('sm:grid-cols-2') &&
+      tokenMarkup.includes('w-full') &&
+      tokenMarkup.includes('min-[420px]:flex-row'),
+    'Test 11 failed: pending approval UI is missing expected mobile-responsive utility classes',
+  )
+  console.log('Test 11 passed: pending decision UI includes the expected mobile-responsive layout classes')
+}
 
-  if (revisedTotal !== 5700) {
-    throw new Error(`Test E failed: expected revisedTotal 5700 rupees, got ${revisedTotal}`)
-  }
+async function testApproveFlow(trackingToken: string, repairId: string) {
+  const { response, payload } = await jsonRequest(`/api/track/${encodeURIComponent(trackingToken)}/decision`, {
+    decision: 'APPROVE',
+  })
+  assert(response.status === 200, `Test 5 failed: expected approve to succeed, got HTTP ${response.status}`)
 
-  const keys = Object.keys(payload.pendingApproval)
-  if (keys.some((key) => ['approve', 'reject', 'action', 'requestedBy'].includes(key))) {
-    throw new Error('Test C failed: public payload exposes action fields')
-  }
+  const approvedPayload = publicTrackingResponseSchema.parse(payload)
+  assert(approvedPayload.approval?.status === 'APPROVED', 'Test 5 failed: approval status should be APPROVED')
+  assert(Boolean(approvedPayload.approval.decidedAt), 'Test 5 failed: decidedAt should be recorded')
 
-  const unitPayload = buildPublicTrackingPayload(
-    {
-      ticketNumber: payload.ticketNumber,
-      status: 'WAITING_FOR_APPROVAL',
-      problemDescription: payload.problemDescription,
-      estimatedCost: TEST_REVISED_PAISE,
-      createdAt: new Date(payload.createdAt),
-    },
-    payload.device,
-    payload.updates.map((update) => ({
-      toStatus: 'WAITING_FOR_APPROVAL',
-      createdAt: new Date(update.timestamp),
-    })),
-    {
-      diagnosisSnapshot: payload.pendingApproval.diagnosis,
-      initialEstimatedCost: TEST_INITIAL_PAISE,
-      additionalEstimatedCost: TEST_ADDITIONAL_PAISE,
-    },
+  const [approvedRow, repairRow, historyRow] = await Promise.all([
+    db
+      .select()
+      .from(repairApprovals)
+      .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'APPROVED')))
+      .limit(1),
+    db.select({ status: repairs.status }).from(repairs).where(eq(repairs.id, repairId)).limit(1),
+    db
+      .select({
+        actorType: repairStatusHistory.actorType,
+        changedBy: repairStatusHistory.changedBy,
+      })
+      .from(repairStatusHistory)
+      .where(and(eq(repairStatusHistory.repairId, repairId), eq(repairStatusHistory.toStatus, 'APPROVED')))
+      .limit(1),
+  ])
+
+  assert(approvedRow[0]?.decidedAt, 'Test 5 failed: approval row decidedAt missing')
+  assert(repairRow[0]?.status === 'APPROVED', 'Test 5 failed: repair status should be APPROVED')
+  assert(historyRow[0]?.actorType === 'CUSTOMER', 'Test 5 failed: status history actorType should be CUSTOMER')
+  assert(historyRow[0]?.changedBy === null, 'Test 5 failed: status history changedBy must be null')
+  console.log('Test 5 passed: approve records APPROVED and timestamp correctly')
+
+  const retry = await jsonRequest(`/api/track/${encodeURIComponent(trackingToken)}/decision`, {
+    decision: 'APPROVE',
+  })
+  assert(retry.response.status === 409, 'Test 6 failed: second approve should be blocked')
+  assert(
+    JSON.stringify(retry.payload).includes('already been decided'),
+    'Test 6 failed: second approve should report already decided',
+  )
+  console.log('Test 6 passed: second approve attempt is blocked as already decided')
+}
+
+async function testRejectFlow(trackingToken: string, repairId: string) {
+  const rejectionReason = 'Price is too high for this repair.'
+  const { response, payload } = await jsonRequest(`/api/track/${encodeURIComponent(trackingToken)}/decision`, {
+    decision: 'REJECT',
+    reason: rejectionReason,
+  })
+  assert(response.status === 200, `Test 7 failed: expected reject to succeed, got HTTP ${response.status}`)
+
+  const rejectedPayload = publicTrackingResponseSchema.parse(payload)
+  assert(rejectedPayload.approval?.status === 'REJECTED', 'Test 7 failed: approval status should be REJECTED')
+  assert(Boolean(rejectedPayload.approval.decidedAt), 'Test 7 failed: reject decidedAt should be recorded')
+  assert(
+    rejectedPayload.approval.rejectionReason === rejectionReason,
+    'Test 7 failed: rejection reason should round-trip in public payload',
   )
 
-  if (!unitPayload.pendingApproval) {
-    throw new Error('Test C failed: buildPublicTrackingPayload did not include pendingApproval')
-  }
+  const [rejectedRow, repairRow, historyRow] = await Promise.all([
+    db
+      .select()
+      .from(repairApprovals)
+      .where(and(eq(repairApprovals.repairId, repairId), eq(repairApprovals.status, 'REJECTED')))
+      .limit(1),
+    db.select({ status: repairs.status }).from(repairs).where(eq(repairs.id, repairId)).limit(1),
+    db
+      .select({
+        actorType: repairStatusHistory.actorType,
+        changedBy: repairStatusHistory.changedBy,
+        note: repairStatusHistory.note,
+      })
+      .from(repairStatusHistory)
+      .where(and(eq(repairStatusHistory.repairId, repairId), eq(repairStatusHistory.toStatus, 'CANCELLED')))
+      .limit(1),
+  ])
 
-  if (unitPayload.pendingApproval.revisedTotal !== 5700) {
-    throw new Error('Test E failed: buildPublicTrackingPayload should expose breakdown in rupees')
-  }
+  assert(rejectedRow[0]?.decidedAt, 'Test 7 failed: rejected approval row decidedAt missing')
+  assert(repairRow[0]?.status === 'CANCELLED', 'Test 7 failed: repair status should be CANCELLED')
+  assert(historyRow[0]?.actorType === 'CUSTOMER', 'Test 7 failed: rejection actorType should be CUSTOMER')
+  assert(historyRow[0]?.changedBy === null, 'Test 7 failed: rejection changedBy must be null')
+  assert(historyRow[0]?.note === rejectionReason, 'Test 7 failed: rejection note should use provided reason')
+  console.log('Test 7 passed: reject records REJECTED and timestamp correctly')
 
-  console.log('Test E passed: public tracking shows diagnosis + cost breakdown, no action fields')
+  const retry = await jsonRequest(`/api/track/${encodeURIComponent(trackingToken)}/decision`, {
+    decision: 'APPROVE',
+  })
+  assert(retry.response.status === 409, 'Test 8 failed: approve-after-reject should be blocked')
+  assert(
+    JSON.stringify(retry.payload).includes('already been decided'),
+    'Test 8 failed: approve-after-reject should report already decided',
+  )
+  console.log('Test 8 passed: approve attempt after reject is blocked')
+}
+
+async function testInvalidTokenAndPayload(trackingToken: string) {
+  const invalidTokenResult = await jsonRequest('/api/track/not-a-valid-token/decision', {
+    decision: 'APPROVE',
+  })
+  assert(invalidTokenResult.response.status === 404, 'Test 9 failed: invalid token should return 404')
+  assert(
+    JSON.stringify(invalidTokenResult.payload).includes(GENERIC_PUBLIC_ERROR),
+    'Test 9 failed: invalid token should use the generic public error',
+  )
+  console.log('Test 9 passed: invalid token returns the generic friendly error')
+
+  const strictValidation = trackDecisionSchema.safeParse({
+    decision: 'APPROVE',
+    repairId: 'foreign-id',
+    customerId: 'other-id',
+  })
+  assert(!strictValidation.success, 'Test 10 failed: schema should reject foreign identifiers')
+
+  const payloadResult = await jsonRequest(`/api/track/${encodeURIComponent(trackingToken)}/decision`, {
+    decision: 'APPROVE',
+    repairId: 'foreign-id',
+  })
+  assert(payloadResult.response.status === 400, 'Test 10 failed: route should reject foreign identifiers')
+  assert(
+    JSON.stringify(payloadResult.payload).includes('Validation failed'),
+    'Test 10 failed: foreign identifier payload should fail validation',
+  )
+  console.log('Test 10 passed: server ignores/rejects foreign identifiers and trusts only the token')
 }
 
 async function main() {
   const fixture = await getFixtureUsers()
-  const original = await saveRepairSnapshot(fixture.repairId)
+  if (!fixture.trackingToken) {
+    throw new Error('No repair with tracking token found for request-approval verification')
+  }
+
+  const snapshot = await saveSnapshot(fixture.repairId)
 
   try {
-    await testGuardMissingDiagnosis(fixture.repairId, fixture.shopId, fixture.staffId, original)
-    await testNullOriginalAllowed(fixture.repairId, fixture.shopId, fixture.staffId, original)
-    await testDuplicatePending(fixture.repairId, fixture.shopId, fixture.staffId, original)
-    await testSuccessfulRequest(fixture.repairId, fixture.shopId, fixture.staffId)
-    await testOwnerForbidden(fixture.repairId, fixture.shopId, fixture.ownerId)
-    await testManualStatusBlocked(fixture.repairId, fixture.shopId, fixture.staffId)
-    await testPublicTrackingPendingApproval(fixture.trackingToken)
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+
+    await testRequestApprovalGuards(
+      fixture.repairId,
+      fixture.shopId,
+      fixture.staffId,
+      fixture.ownerId,
+    )
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+    await testNoApprovalRequired(fixture.trackingToken)
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+    await testRequestApprovalAndViews({
+      repairId: fixture.repairId,
+      shopId: fixture.shopId,
+      staffId: fixture.staffId,
+      trackingToken: fixture.trackingToken,
+    })
+    await testApproveFlow(fixture.trackingToken, fixture.repairId)
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+    await requestCustomerApproval({
+      shopId: fixture.shopId,
+      userRole: 'STAFF',
+      userId: fixture.staffId,
+      id: fixture.repairId,
+      additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
+    })
+    await testRejectFlow(fixture.trackingToken, fixture.repairId)
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+    await requestCustomerApproval({
+      shopId: fixture.shopId,
+      userRole: 'STAFF',
+      userId: fixture.staffId,
+      id: fixture.repairId,
+      additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
+    })
+    await testInvalidTokenAndPayload(fixture.trackingToken)
+
     console.log('All request-approval verification tests passed.')
   } finally {
-    await cleanupApprovalArtifacts(fixture.repairId)
-    await restoreRepairSnapshot(fixture.repairId, original)
+    await restoreSnapshot(fixture.repairId, snapshot)
   }
 }
 
