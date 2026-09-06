@@ -30,6 +30,7 @@ coverage/
 *.pem
 .vercel
 .turbo
+*.tsbuildinfo
 
 # IDE — .vscode/settings.json is tracked on purpose (AI instruction settings)
 .idea/
