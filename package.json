@@ -15,6 +15,7 @@
     "seed": "bun run scripts/seed.ts",
     "verify:approval-schema": "bun run scripts/verify-approval-schema.ts",
     "verify:request-approval": "bun run scripts/verify-request-approval.ts",
+    "verify:reopen-repair": "bun run scripts/verify-reopen-repair.ts",
     "verify:technician-role-change": "bun run scripts/verify-technician-role-change.ts"
   },
   "dependencies": {

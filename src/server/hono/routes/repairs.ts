@@ -20,7 +20,12 @@ import {
 } from '@/server/services/repair.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
-import { createRepairSchema, updateEstimatedCostSchema, updateExpectedCompletionDateSchema } from '@/features/repairs/schemas'
+import {
+  createRepairSchema,
+  reopenRepairSchema,
+  updateEstimatedCostSchema,
+  updateExpectedCompletionDateSchema,
+} from '@/features/repairs/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -150,23 +155,18 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/reopen',
-    zValidator(
-      'json',
-      z.object({
-        note: z.string().optional(),
-      }),
-    ),
+    zValidator('json', reopenRepairSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
-      const { note } = c.req.valid('json')
+      const { reason } = c.req.valid('json')
 
       const updated = await reopenRepairTicket({
         shopId,
         userRole,
         userId,
         id,
-        note,
+        reason,
       })
       return c.json(updated)
     },

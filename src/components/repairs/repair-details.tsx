@@ -253,7 +253,7 @@ export function RepairDetails({ id }: { id: string }) {
           <div className="flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <div className="flex min-w-0 flex-col gap-3">
-                <h1 className="text-xl font-bold tracking-tight text-foreground break-words sm:text-2xl md:text-3xl">
+                <h1 className="text-xl font-bold tracking-tight text-foreground wrap-break-word sm:text-2xl md:text-3xl">
                   Repair Ticket
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">
@@ -290,7 +290,10 @@ export function RepairDetails({ id }: { id: string }) {
             <div className="flex w-full min-w-0 shrink-0 flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4 lg:max-w-sm">
               <StatusChangeControl
                 repairId={repair.id}
+                ticketNumber={repair.ticketNumber}
                 currentStatus={repair.status}
+                customerName={repair.customer.name}
+                deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}
                 assignedTechnicianId={repair.assignedTechnicianId}
                 onStatusUpdated={() => refetch()}
               />
@@ -804,6 +807,8 @@ export function RepairDetails({ id }: { id: string }) {
                             <strong className="text-foreground">{item.changedBy.name}</strong>
                             {item.changedBy.role ? ` (${item.changedBy.role})` : ''}
                           </>
+                        ) : item.actorType === 'OWNER' ? (
+                          <>Changed by <strong className="text-foreground">Owner</strong></>
                         ) : (
                           <>Changed by <strong className="text-foreground">Staff</strong></>
                         )}

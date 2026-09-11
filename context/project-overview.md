@@ -204,7 +204,8 @@ sign in; they use the public tracking page only.
 | Assign technician | yes | yes | no |
 | Update repair status | NO* | yes | assigned repairs only |
 | Edit diagnosis, add repair notes | yes | yes | assigned repairs only |
-| Reopen COMPLETED/CANCELLED ticket | yes | no | no |
+| Reopen COMPLETED ticket | yes | yes* | no |
+| Reopen CANCELLED ticket | yes** | no | no |
 | Record parts used | yes | yes | assigned repairs only |
 | Create/edit invoices, record payments | yes | yes | no |
 | Manage inventory | yes | yes | no |
@@ -213,7 +214,10 @@ sign in; they use the public tracking page only.
 | Connect/disconnect shop Gmail | yes | no | no |
 | Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no |
 
-* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER retains the single administrative override exception to reopen COMPLETED or CANCELLED tickets.
+* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER retains the administrative override exception to reopen eligible COMPLETED tickets and the pre-existing OWNER-only CANCELLED reopen path.
+* **STAFF completed reopen:** STAFF may reopen only `COMPLETED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING`.
+* **OWNER cancelled nuance:** `CANCELLED` remains reopenable only by the OWNER in this branch. That path is not extended to STAFF here.
+* **History note:** Reopen activity currently uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
 
 Every mutating endpoint must check this table server-side. If an
 action is not listed, ask before implementing a permission for it.

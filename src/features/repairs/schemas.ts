@@ -104,3 +104,13 @@ export const requestCustomerApprovalSchema = z.object({
 })
 
 export type RequestCustomerApprovalInput = z.infer<typeof requestCustomerApprovalSchema>
+
+export const reopenRepairSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .max(1000, { message: 'Reopen reason cannot exceed 1000 characters' })
+    .optional(),
+})
+
+export type ReopenRepairInput = z.infer<typeof reopenRepairSchema>

@@ -3,8 +3,20 @@
 import * as React from 'react'
 import { AlertCircle, ChevronDown, Lock, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
+import { useReopenRepair } from '@/features/repairs/mutations'
 import { useSession } from '@/lib/auth-client'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -35,14 +47,20 @@ const ALL_STATUSES = [
 
 interface StatusChangeControlProps {
   repairId: string
+  ticketNumber: string
   currentStatus: string
+  customerName: string
+  deviceSummary: string
   assignedTechnicianId?: string | null
   onStatusUpdated?: () => void
 }
 
 export function StatusChangeControl({
   repairId,
+  ticketNumber,
   currentStatus,
+  customerName,
+  deviceSummary,
   assignedTechnicianId,
   onStatusUpdated,
 }: StatusChangeControlProps) {
@@ -56,19 +74,24 @@ export function StatusChangeControl({
 
   const canChangeStatus =
     (isStaff || isAssignedTechnician) && !['COMPLETED', 'CANCELLED'].includes(currentStatus)
-  const isClosed = ['COMPLETED', 'CANCELLED'].includes(currentStatus)
+  const canReopenCompleted = ['OWNER', 'STAFF'].includes(userRole) && currentStatus === 'COMPLETED'
+  const canReopenCancelled = isOwner && currentStatus === 'CANCELLED'
+  const isClosed = currentStatus === 'COMPLETED' || currentStatus === 'CANCELLED'
   const isAwaitingCustomerApproval = currentStatus === 'WAITING_FOR_APPROVAL'
+  const reopenMutation = useReopenRepair(repairId)
 
   const [selectedStatus, setSelectedStatus] = React.useState(currentStatus)
   const [prevStatus, setPrevStatus] = React.useState(currentStatus)
   const [isUpdating, setIsUpdating] = React.useState(false)
   const [validationError, setValidationError] = React.useState<string | null>(null)
-  const [reopenNote, setReopenNote] = React.useState('')
-  const [showReopenInput, setShowReopenInput] = React.useState(false)
+  const [reopenReason, setReopenReason] = React.useState('')
+  const [reopenDialogOpen, setReopenDialogOpen] = React.useState(false)
 
   if (prevStatus !== currentStatus) {
     setPrevStatus(currentStatus)
     setSelectedStatus(currentStatus)
+    setReopenReason('')
+    setReopenDialogOpen(false)
   }
 
   const isManualApprovalTransition =
@@ -125,14 +148,15 @@ export function StatusChangeControl({
     }
   }
 
+  const trimmedReopenReason = reopenReason.trim()
+  const isReopenReasonEmpty = trimmedReopenReason.length === 0
+
   const handleReopen = async () => {
     setValidationError(null)
-    setIsUpdating(true)
     try {
-      await apiClient.post(`repairs/${repairId}/reopen`, { note: reopenNote || undefined })
-      toast.success('Repair ticket reopened successfully!')
-      setShowReopenInput(false)
-      setReopenNote('')
+      await reopenMutation.mutateAsync({ reason: trimmedReopenReason || undefined })
+      setReopenDialogOpen(false)
+      setReopenReason('')
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
       const errorObj = err as {
@@ -145,9 +169,6 @@ export function StatusChangeControl({
         errorObj?.message ||
         'Failed to reopen ticket'
       setValidationError(msg)
-      toast.error(msg)
-    } finally {
-      setIsUpdating(false)
     }
   }
 
@@ -168,83 +189,9 @@ export function StatusChangeControl({
     )
   }
 
-  // Owner View: Read-only status badge + Reopen button if COMPLETED/CANCELLED
-  if (isOwner) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">Status:</span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
-            {STATUS_LABELS[currentStatus] || currentStatus}
-          </span>
+  const showReadOnlyClosedMessage = isClosed && !canReopenCompleted && !canReopenCancelled
 
-          {isClosed && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowReopenInput(!showReopenInput)}
-              className="h-8 text-xs font-semibold gap-1.5 text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Reopen Ticket
-            </Button>
-          )}
-        </div>
-
-        {showReopenInput && (
-          <div className="p-3 rounded-md border border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20 space-y-2 animate-in fade-in duration-150">
-            <p className="text-xs font-medium text-amber-900 dark:text-amber-300">
-              Reopen this closed ticket? Reopening sets status back to &quot;In Repair&quot;.
-            </p>
-            <input
-              type="text"
-              placeholder="Reason for reopening (optional)..."
-              value={reopenNote}
-              onChange={(e) => setReopenNote(e.target.value)}
-              className="w-full text-xs px-2.5 py-1.5 rounded border border-amber-300 bg-background focus:outline-none focus:ring-1 focus:ring-amber-500"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowReopenInput(false)}
-                className="h-7 text-xs"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleReopen}
-                disabled={isUpdating}
-                className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                {isUpdating ? 'Reopening...' : 'Confirm Reopen'}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
-          <Lock className="h-3 w-3 shrink-0" />
-          <span>
-            Owner manages the shop by reassigning, not by editing ticket state directly.
-          </span>
-        </div>
-
-        {validationError && (
-          <div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{validationError}</span>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (isClosed) {
+  if (showReadOnlyClosedMessage) {
     return (
       <div className="space-y-1">
         <div className="flex items-center gap-2">
@@ -254,7 +201,8 @@ export function StatusChangeControl({
           </span>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Ticket is closed ({currentStatus.toLowerCase()}). Only Owner can reopen closed tickets.
+          Ticket is closed ({currentStatus.toLowerCase()}). Only Owner or Staff can reopen completed
+          tickets, and only Owner can reopen cancelled tickets.
         </p>
       </div>
     )
@@ -296,6 +244,135 @@ export function StatusChangeControl({
             <span>{validationError}</span>
           </div>
         )}
+      </div>
+    )
+  }
+
+  if (canReopenCompleted || canReopenCancelled || isOwner) {
+    const dialogTitle =
+      currentStatus === 'COMPLETED' ? 'Reopen Repair Ticket?' : 'Reopen Cancelled Repair Ticket?'
+    const dialogDescription =
+      currentStatus === 'COMPLETED'
+        ? 'This repair ticket has been completed. Reopening it will return the ticket to the active repair workflow.'
+        : 'This repair ticket is currently cancelled. Reopening it will restore it to the repair workflow.'
+    const nextStatusLabel = currentStatus === 'COMPLETED' ? 'Diagnosing' : 'In Repair'
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">Status:</span>
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
+            {STATUS_LABELS[currentStatus] || currentStatus}
+          </span>
+
+          {(canReopenCompleted || canReopenCancelled) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setValidationError(null)
+                setReopenReason('')
+                setReopenDialogOpen(true)
+              }}
+              className="h-8 text-xs font-semibold gap-1.5 text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Reopen Ticket
+            </Button>
+          )}
+        </div>
+
+        {isOwner && (
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <Lock className="h-3 w-3 shrink-0" />
+            <span>
+              Owner manages the shop by reassigning, not by editing ticket state directly.
+            </span>
+          </div>
+        )}
+
+        {validationError && (
+          <div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>{validationError}</span>
+          </div>
+        )}
+
+        <AlertDialog
+          open={reopenDialogOpen}
+          onOpenChange={setReopenDialogOpen}
+          contentClassName="max-w-xl p-6 sm:p-8"
+        >
+          <AlertDialogHeader className="mb-5">
+            <AlertDialogTitle className="text-xl">{dialogTitle}</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm sm:text-base">
+              {dialogDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-5">
+            <div className="grid gap-4 rounded-xl border border-border bg-muted/20 p-5 sm:grid-cols-2 sm:p-6">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Ticket Number
+                </Label>
+                <p className="text-sm font-semibold text-foreground">#{ticketNumber}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Current Status
+                </Label>
+                <p className="text-sm font-semibold text-foreground">
+                  {STATUS_LABELS[currentStatus] || currentStatus}
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Customer
+                </Label>
+                <p className="text-sm text-foreground">{customerName}</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Device
+                </Label>
+                <p className="text-sm text-foreground">{deviceSummary}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label
+                htmlFor={`reopen-reason-${repairId}`}
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Reason for reopening <span className="text-destructive">*</span>
+              </Label>
+              <Textarea
+                id={`reopen-reason-${repairId}`}
+                placeholder="Customer reported the same issue again..."
+                value={reopenReason}
+                onChange={(event) => setReopenReason(event.target.value)}
+                rows={4}
+                className="text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Reopening will move this repair back to <strong>{nextStatusLabel}</strong>.
+              </p>
+            </div>
+          </div>
+
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel disabled={reopenMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReopen}
+              disabled={reopenMutation.isPending || isReopenReasonEmpty}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {reopenMutation.isPending ? 'Reopening...' : 'Reopen Ticket'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialog>
       </div>
     )
   }

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import { repairKeys, type Repair } from './queries'
-import type { CreateRepairInput } from './schemas'
+import type { CreateRepairInput, ReopenRepairInput } from './schemas'
 
 export function useCreateRepair() {
   const queryClient = useQueryClient()
@@ -67,13 +67,14 @@ export function useUpdateRepairStatus(repairId: string) {
 export function useReopenRepair(repairId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation<Repair, Error, { note?: string }>({
-    mutationFn: async ({ note }) => {
-      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, { note })
+  return useMutation<Repair, Error, ReopenRepairInput>({
+    mutationFn: async ({ reason }) => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, { reason })
       return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
       toast.success('Repair ticket reopened successfully!')
     },
     onError: (error: unknown) => {

@@ -55,7 +55,7 @@ export interface RepairStatusHistoryItem {
   id: string
   fromStatus: string | null
   toStatus: string
-  actorType: 'STAFF' | 'CUSTOMER'
+  actorType: 'OWNER' | 'STAFF' | 'CUSTOMER'
   note: string | null
   createdAt: string
   changedBy: {

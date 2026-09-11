@@ -623,7 +623,7 @@ export async function updateRepairStatus({
   if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
     throw new HTTPException(400, {
       message:
-        'Completed or cancelled tickets cannot have status updated directly. Owner must reopen the ticket.',
+        'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
     })
   }
 
@@ -722,7 +722,7 @@ export async function requestCustomerApproval({
   if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
     throw new HTTPException(400, {
       message:
-        'Completed or cancelled tickets cannot have status updated directly. Owner must reopen the ticket.',
+        'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
     })
   }
 
@@ -809,18 +809,17 @@ export async function reopenRepairTicket({
   userRole,
   userId,
   id,
-  note,
+  reason,
 }: {
   shopId: string
   userRole: string
   userId: string
   id: string
-  note?: string
+  reason?: string
 }) {
-  // Only OWNER can reopen a closed ticket
-  if (userRole !== 'OWNER') {
+  if (!['OWNER', 'STAFF'].includes(userRole)) {
     throw new HTTPException(403, {
-      message: 'Only the shop owner can reopen completed or cancelled tickets.',
+      message: 'Only Owner and Staff can reopen eligible repair tickets.',
     })
   }
 
@@ -833,29 +832,62 @@ export async function reopenRepairTicket({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (!['COMPLETED', 'CANCELLED'].includes(existing.status)) {
+  const trimmedReason = reason?.trim() ?? ''
+
+  if (userRole === 'STAFF' && trimmedReason.length === 0) {
+    throw new HTTPException(400, {
+      message: 'Reason for reopening is required.',
+    })
+  }
+
+  const isCompleted = existing.status === 'COMPLETED'
+  const isCancelled = existing.status === 'CANCELLED'
+
+  if (!isCompleted && !isCancelled) {
     throw new HTTPException(400, {
       message: 'Only completed or cancelled tickets can be reopened.',
     })
   }
 
+  if (isCancelled && userRole !== 'OWNER') {
+    throw new HTTPException(403, {
+      message: 'Only the shop owner can reopen cancelled tickets.',
+    })
+  }
+
+  const nextStatus = isCompleted ? 'DIAGNOSING' : 'IN_REPAIR'
+  const actorType = userRole === 'OWNER' ? 'OWNER' : 'STAFF'
+  const historyNote = trimmedReason
+    ? `Repair ticket reopened by ${userRole}. Reason: ${trimmedReason}`
+    : 'Repair ticket reopened by OWNER.'
+
   const updated = await db.transaction(async (tx) => {
+    const now = new Date()
     const [res] = await tx
       .update(repairs)
       .set({
-        status: 'IN_REPAIR',
-        updatedAt: new Date(),
+        status: nextStatus,
+        updatedAt: now,
       })
-      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId), eq(repairs.status, existing.status)))
       .returning()
 
+    if (!res) {
+      throw new HTTPException(409, {
+        message: 'This repair ticket was already reopened or changed by another request.',
+      })
+    }
+
+    // Reopen activity currently uses repair_status_history because the generic Activity/Audit Log is deferred to Sprint 4.
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
       repairId: id,
       fromStatus: existing.status,
-      toStatus: 'IN_REPAIR',
+      toStatus: nextStatus,
       changedBy: userId,
-      note: note || 'Ticket reopened by Owner',
+      actorType,
+      note: historyNote,
+      createdAt: now,
     })
 
     return res
