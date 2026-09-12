@@ -179,6 +179,21 @@ requirement.
    existing `APPROVED` value (not `IN_REPAIR`). Staff manually advance
    the repair to subsequent statuses afterward.
 
+**Manual status-change phases (Staff / assigned Technician):**
+
+1. **Pre-approval** (`RECEIVED`, `DIAGNOSING`): only `RECEIVED` and
+   `DIAGNOSING` may be set manually. `APPROVED` is never set by staff —
+   it comes only from the customer approval decision. Request Customer
+   Approval remains DIAGNOSING-only and is the only path into
+   `WAITING_FOR_APPROVAL`.
+2. **Pending approval** (`WAITING_FOR_APPROVAL`): locked until the
+   customer responds.
+3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed
+   destinations are `APPROVED`, `WAITING_FOR_PARTS`, `IN_REPAIR`,
+   `QUALITY_CHECK`, `READY_FOR_PICKUP`, `COMPLETED`, and `CANCELLED`.
+4. **Closed** (`COMPLETED`, `CANCELLED`): use the reopen action, not
+   the status dropdown.
+
 This list is the single source of truth for the status enum. The
 diagram in `ui-context.md` §11 is a simplified visual grouping, not a
 second list — do not generate the enum from it.

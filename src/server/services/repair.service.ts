@@ -17,6 +17,7 @@ import {
   isExpectedCompletionDateInPast,
   overdueRepairCondition,
 } from '@/features/repairs/overdue'
+import { getManualStatusTransitionError } from '@/features/repairs/status-transitions'
 import { generateTicketNumber, generateTrackingToken } from '@/server/lib/tokens'
 import {
   insertActiveAssignment,
@@ -639,11 +640,16 @@ export async function updateRepairStatus({
     .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
     .limit(1)
 
-  if (pendingApproval) {
+  if (pendingApproval || existing.status === 'WAITING_FOR_APPROVAL') {
     throw new HTTPException(400, {
       message:
         'Customer approval is pending. Status cannot be changed until the customer responds.',
     })
+  }
+
+  const transitionError = getManualStatusTransitionError(existing.status, status)
+  if (transitionError) {
+    throw new HTTPException(400, { message: transitionError })
   }
 
   // Execute status update and status history logging in transaction
@@ -723,6 +729,12 @@ export async function requestCustomerApproval({
     throw new HTTPException(400, {
       message:
         'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
+    })
+  }
+
+  if (existing.status !== 'DIAGNOSING') {
+    throw new HTTPException(400, {
+      message: 'Customer approval can only be requested while the repair is in Diagnosing.',
     })
   }
 

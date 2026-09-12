@@ -299,6 +299,9 @@ export function RepairDetails({ id }: { id: string }) {
               />
               <RequestApprovalControl
                 repairId={repair.id}
+                ticketNumber={repair.ticketNumber}
+                customerName={repair.customer.name}
+                deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}
                 diagnosis={repair.diagnosis}
                 estimatedCost={repair.estimatedCost}
                 approval={repair.approval}

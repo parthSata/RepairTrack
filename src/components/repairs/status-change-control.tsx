@@ -17,6 +17,10 @@ import {
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import { useReopenRepair } from '@/features/repairs/mutations'
+import {
+  getAllowedManualStatusDestinations,
+  getManualStatusTransitionError,
+} from '@/features/repairs/status-transitions'
 import { useSession } from '@/lib/auth-client'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -31,19 +35,6 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
 }
-
-const ALL_STATUSES = [
-  'RECEIVED',
-  'DIAGNOSING',
-  'WAITING_FOR_APPROVAL',
-  'APPROVED',
-  'WAITING_FOR_PARTS',
-  'IN_REPAIR',
-  'QUALITY_CHECK',
-  'READY_FOR_PICKUP',
-  'COMPLETED',
-  'CANCELLED',
-] as const
 
 interface StatusChangeControlProps {
   repairId: string
@@ -97,17 +88,16 @@ export function StatusChangeControl({
   const isManualApprovalTransition =
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
-  const selectableStatuses = ALL_STATUSES.filter(
-    (status) => status !== 'WAITING_FOR_APPROVAL' || status === currentStatus,
-  )
+  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus)
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value
     setSelectedStatus(newStatus)
     setValidationError(null)
 
-    if (newStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL') {
-      setValidationError('Use Request Customer Approval to send an estimate for approval.')
+    const transitionError = getManualStatusTransitionError(currentStatus, newStatus)
+    if (transitionError) {
+      setValidationError(transitionError)
     }
   }
 
@@ -118,6 +108,12 @@ export function StatusChangeControl({
       setValidationError(
         'Owner cannot change repair status directly. Status changes belong to staff and technicians.',
       )
+      return
+    }
+
+    const transitionError = getManualStatusTransitionError(currentStatus, selectedStatus)
+    if (transitionError) {
+      setValidationError(transitionError)
       return
     }
 

@@ -29,11 +29,16 @@ function getDisabledReason({
   diagnosis,
   estimatedCost,
   approval,
+  currentStatus,
 }: {
   diagnosis: string | null
   estimatedCost: number | null
   approval: RepairApproval | null | undefined
+  currentStatus: string
 }): string | null {
+  if (currentStatus !== 'DIAGNOSING') {
+    return 'Customer approval can only be requested while the repair is in Diagnosing.'
+  }
   if (!diagnosis?.trim()) {
     return 'Add a diagnosis before requesting customer approval'
   }
@@ -48,6 +53,9 @@ function getDisabledReason({
 
 interface RequestApprovalControlProps {
   repairId: string
+  ticketNumber: string
+  customerName: string
+  deviceSummary: string
   diagnosis: string | null
   estimatedCost: number | null
   approval: RepairApproval | null | undefined
@@ -58,6 +66,9 @@ interface RequestApprovalControlProps {
 
 export function RequestApprovalControl({
   repairId,
+  ticketNumber,
+  customerName,
+  deviceSummary,
   diagnosis,
   estimatedCost,
   approval,
@@ -83,7 +94,12 @@ export function RequestApprovalControl({
     return null
   }
 
-  const disabledReason = getDisabledReason({ diagnosis, estimatedCost, approval })
+  const disabledReason = getDisabledReason({
+    diagnosis,
+    estimatedCost,
+    approval,
+    currentStatus,
+  })
   const isReady = !disabledReason
   const isDisabled = Boolean(disabledReason) || requestMutation.isPending
 
@@ -168,6 +184,33 @@ export function RequestApprovalControl({
             on their tracking page.
           </AlertDialogDescription>
         </AlertDialogHeader>
+
+        <div className="mb-5 grid gap-4 rounded-xl border border-border bg-muted/20 p-5 sm:grid-cols-2 sm:p-6">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Ticket Number
+            </Label>
+            <p className="text-sm font-semibold text-foreground">#{ticketNumber}</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Current Status
+            </Label>
+            <p className="text-sm font-semibold text-foreground">Diagnosing</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Customer
+            </Label>
+            <p className="text-sm text-foreground">{customerName}</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Device
+            </Label>
+            <p className="text-sm text-foreground">{deviceSummary}</p>
+          </div>
+        </div>
 
         {diagnosis?.trim() && estimatedCost !== null ? (
           <div className="space-y-5">
