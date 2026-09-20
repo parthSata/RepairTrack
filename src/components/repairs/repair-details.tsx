@@ -4,11 +4,9 @@ import * as React from 'react'
 import Link from 'next/link'
 import {
   ArrowLeft,
-  CheckCircle2,
   HardDrive,
   FileText,
   MessageSquare,
-  History,
   User,
   Wrench,
   UserCheck,
@@ -56,11 +54,14 @@ import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/compon
 import { ModelConfirmationCard } from './model-confirmation-card'
 import { CustomerTrackingSection } from './customer-tracking-section'
 import { StatusChangeControl } from './status-change-control'
+import { StatusHistoryTimeline } from './status-history-timeline'
 import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
 import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBanner } from './approval-status-badge'
 import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
+import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
+import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
@@ -224,22 +225,18 @@ export function RepairDetails({ id }: { id: string }) {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-6">
+    <div className="page-enter flex w-full min-w-0 flex-col gap-6">
       {/* Top Header Navigation */}
       <header className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Link href="/repairs" className="w-fit">
           <Button
             variant="ghost"
-            className="h-9 px-3 text-xs gap-2 text-muted-foreground hover:text-foreground -ml-3"
+            className="h-9 -ml-3 gap-2 px-3 text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
             Back to Repair Tickets
           </Button>
         </Link>
-
-        <span className="w-fit max-w-full truncate font-mono text-xs font-semibold text-muted-foreground bg-muted px-2.5 py-1 rounded-md border border-border">
-          Ticket #{repair.ticketNumber}
-        </span>
       </header>
 
       {/* Model Confirmation Card (if unverified device in DIAGNOSING state) */}
@@ -248,46 +245,56 @@ export function RepairDetails({ id }: { id: string }) {
       )}
 
       {/* Main Ticket Overview Header Card */}
-      <Card className="w-full min-w-0">
+      <Card className="w-full min-w-0 overflow-hidden border-border/80 shadow-sm">
         <CardContent className="flex w-full min-w-0 flex-col gap-6 pt-6">
           <div className="flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex min-w-0 flex-1 flex-col gap-4">
               <div className="flex min-w-0 flex-col gap-3">
-                <h1 className="text-xl font-bold tracking-tight text-foreground wrap-break-word sm:text-2xl md:text-3xl">
-                  Repair Ticket
+                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  Repair ticket
+                </p>
+                <h1 className="font-mono text-2xl font-bold tracking-tight text-foreground wrap-break-word sm:text-3xl">
+                  #{repair.ticketNumber}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="font-semibold text-xs uppercase px-2.5 py-0.5">
-                    {repair.status.replace(/_/g, ' ')}
+                  <Badge variant="secondary" className="px-2.5 py-0.5 text-xs font-medium">
+                    {repair.priority} priority
                   </Badge>
-                  <Badge variant="secondary" className="font-medium text-xs">
-                    {repair.priority} Priority
-                  </Badge>
+                  {!repair.approval ? (
+                    <span
+                      className={cn(
+                        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
+                        getRepairStatusTone(repair.status).chip,
+                      )}
+                    >
+                      {getRepairStatusLabel(repair.status)}
+                    </span>
+                  ) : null}
                 </div>
               </div>
 
               {repair.approval ? <ApprovalStatusBanner approval={repair.approval} /> : null}
 
-              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <User className="h-3.5 w-3.5 shrink-0 opacity-70" />
                 <span>
                   Created by{' '}
-                  <strong className="text-foreground font-semibold">
+                  <span className="font-medium text-foreground/80">
                     {repair.creator?.name ?? 'Shop User'}
-                  </strong>
+                  </span>
                   {repair.creator?.role && (
-                    <span className="ml-1.5 text-[10px] font-medium bg-muted px-1.5 py-0.5 rounded border border-border">
+                    <span className="ml-1.5 rounded border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
                       {repair.creator.role}
                     </span>
                   )}
-                  {' · '}
+                  <span className="mx-1.5 text-border">·</span>
                   {formatDateTime(repair.createdAt)}
                 </span>
               </div>
             </div>
 
             {/* Status Control Box */}
-            <div className="flex w-full min-w-0 shrink-0 flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4 lg:max-w-sm">
+            <div className="flex w-full min-w-0 shrink-0 flex-col gap-4 rounded-xl border border-border/80 bg-gradient-to-b from-muted/40 to-muted/10 p-4 shadow-sm transition-shadow duration-200 hover:shadow-md lg:max-w-sm">
               <StatusChangeControl
                 repairId={repair.id}
                 ticketNumber={repair.ticketNumber}
@@ -297,6 +304,7 @@ export function RepairDetails({ id }: { id: string }) {
                 assignedTechnicianId={repair.assignedTechnicianId}
                 onStatusUpdated={() => refetch()}
               />
+              <div className="h-px w-full bg-border/70" />
               <RequestApprovalControl
                 repairId={repair.id}
                 ticketNumber={repair.ticketNumber}
@@ -313,36 +321,36 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
 
           {/* Info cards grid */}
-          <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
             {/* Linked Device */}
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-background/60 p-4 transition-colors duration-200 hover:bg-muted/20">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <HardDrive className="h-3.5 w-3.5" />
                 Linked device
               </span>
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background border border-border shrink-0">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/40">
                   <DeviceTypeIcon type={repair.device.deviceType} />
                 </div>
-                <div className="min-w-0 flex flex-col">
-                  <span className="font-semibold text-sm text-foreground flex items-center gap-1.5 flex-wrap">
+                <div className="flex min-w-0 flex-col">
+                  <span className="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-foreground">
                     <span>{repair.device.brand}</span>
                     {repair.device.model ? (
                       <span>{repair.device.model}</span>
                     ) : (
-                      <span className="text-xs text-muted-foreground italic font-normal">Unconfirmed</span>
+                      <span className="text-xs font-normal italic text-muted-foreground">Unconfirmed</span>
                     )}
                     <ModelVerificationBadge
                       modelVerified={repair.device.modelVerified}
                       modelVerificationOverridden={repair.device.modelVerificationOverridden}
                     />
                   </span>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span className="capitalize">{repair.device.deviceType.toLowerCase()}</span>
                     <ConditionBadge condition={repair.device.condition} />
                   </div>
                   {repair.device.serialNumber && (
-                    <span className="text-[11px] text-muted-foreground font-mono mt-0.5 break-all">
+                    <span className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
                       S/N: {repair.device.serialNumber}
                     </span>
                   )}
@@ -351,23 +359,23 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Linked Customer */}
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-background/60 p-4 transition-colors duration-200 hover:bg-muted/20">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <User className="h-3.5 w-3.5" />
                 Customer
               </span>
               <div className="flex flex-col">
-                <span className="font-semibold text-sm text-foreground">{repair.customer.name}</span>
-                <span className="text-xs text-muted-foreground mt-0.5">{repair.customer.phone}</span>
+                <span className="text-sm font-semibold text-foreground">{repair.customer.name}</span>
+                <span className="mt-0.5 text-xs text-muted-foreground">{repair.customer.phone}</span>
                 {repair.customer.email && (
-                  <span className="text-xs text-muted-foreground break-all">{repair.customer.email}</span>
+                  <span className="break-all text-xs text-muted-foreground">{repair.customer.email}</span>
                 )}
               </div>
             </div>
 
             {/* Technician Assignment */}
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-background/60 p-4 transition-colors duration-200 hover:bg-muted/20">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <UserCheck className="h-3.5 w-3.5" />
                 Assigned technician
               </span>
@@ -409,7 +417,7 @@ export function RepairDetails({ id }: { id: string }) {
                       reassignMutation.isPending ||
                       (selectedTechId || null) === (repair.assignedTechnicianId || null)
                     }
-                    className="h-9 w-full text-xs px-3 sm:w-auto"
+                    className="h-9 w-full px-3 text-xs sm:w-auto"
                   >
                     {reassignMutation.isPending ? 'Saving...' : 'Save'}
                   </Button>
@@ -429,8 +437,8 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Expected Completion Date */}
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-background/60 p-4 transition-colors duration-200 hover:bg-muted/20">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
                 Expected completion
               </span>
@@ -443,7 +451,7 @@ export function RepairDetails({ id }: { id: string }) {
                       value={expectedDateValue}
                       min={todayDateMin}
                       onChange={(e) => setExpectedDateValue(e.target.value)}
-                      className="h-9 text-xs flex-1 px-2"
+                      className="h-9 flex-1 px-2 text-xs"
                     />
                     <div className="flex gap-2">
                       <Button
@@ -451,7 +459,7 @@ export function RepairDetails({ id }: { id: string }) {
                         size="sm"
                         variant="ghost"
                         onClick={() => setIsEditingExpectedDate(false)}
-                        className="h-9 flex-1 text-xs px-2 sm:flex-none"
+                        className="h-9 flex-1 px-2 text-xs sm:flex-none"
                       >
                         Cancel
                       </Button>
@@ -460,7 +468,7 @@ export function RepairDetails({ id }: { id: string }) {
                         size="sm"
                         onClick={handleSaveExpectedDate}
                         disabled={updateExpectedDateMutation.isPending}
-                        className="h-9 flex-1 text-xs px-2.5 sm:flex-none"
+                        className="h-9 flex-1 px-2.5 text-xs sm:flex-none"
                       >
                         {updateExpectedDateMutation.isPending ? 'Saving...' : 'Save'}
                       </Button>
@@ -468,7 +476,7 @@ export function RepairDetails({ id }: { id: string }) {
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-semibold text-foreground">
                         {formatDate(repair.expectedCompletionDate)}
                       </span>
@@ -484,7 +492,7 @@ export function RepairDetails({ id }: { id: string }) {
                       variant="outline"
                       size="sm"
                       onClick={() => setIsEditingExpectedDate(true)}
-                      className="h-8 w-full text-xs px-2 gap-1 text-muted-foreground hover:text-foreground sm:w-auto"
+                      className="h-8 w-full gap-1 px-2 text-xs text-muted-foreground hover:text-foreground sm:w-auto"
                     >
                       <Pencil className="h-3 w-3" />
                       Edit
@@ -492,7 +500,7 @@ export function RepairDetails({ id }: { id: string }) {
                   </div>
                 )
               ) : (
-                <div className="text-sm font-semibold text-foreground flex items-center gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
                   <span>{formatDate(repair.expectedCompletionDate)}</span>
                   {repair.isOverdue ? (
                     <Badge variant="warning" className="gap-1">
@@ -506,23 +514,23 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
 
           {/* Issue & Initial Physical Condition */}
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Wrench className="h-3.5 w-3.5" />
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 p-4 md:col-span-1">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <Wrench className="h-3.5 w-3.5 text-accent" />
                 Problem description
               </span>
-              <p className="text-sm text-foreground leading-relaxed">
+              <p className="text-sm leading-relaxed text-foreground">
                 {repair.problemDescription || repair.issueDescription || 'No description provided.'}
               </p>
             </div>
 
-            <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-              <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5" />
+            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 p-4">
+              <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <FileText className="h-3.5 w-3.5 text-steel" />
                 Initial condition & accessories
               </span>
-              <p className="text-sm text-foreground leading-relaxed">
+              <p className="text-sm leading-relaxed text-foreground">
                 {repair.initialCondition || 'No condition notes recorded.'}
               </p>
             </div>
@@ -539,13 +547,17 @@ export function RepairDetails({ id }: { id: string }) {
       ) : null}
 
       {/* Diagnosis Section */}
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4 text-primary" />
-              Technical Diagnosis
-            </h3>
+      <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                <FileText className="h-4 w-4 text-steel" aria-hidden />
+              </div>
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                Technical diagnosis
+              </h3>
+            </div>
 
             {canEditDiagnosisAndNotes && !isDiagnosisEditing && (
               <Button
@@ -554,7 +566,7 @@ export function RepairDetails({ id }: { id: string }) {
                 onClick={() => setIsDiagnosisEditing(true)}
                 className="h-8 text-xs"
               >
-                Edit Diagnosis
+                Edit
               </Button>
             )}
           </div>
@@ -566,7 +578,7 @@ export function RepairDetails({ id }: { id: string }) {
                 value={diagnosisText}
                 onChange={(e) => setDiagnosisText(e.target.value)}
                 rows={4}
-                className="text-sm"
+                className="rounded-xl text-sm"
               />
               <div className="flex justify-end gap-2">
                 <Button
@@ -591,22 +603,22 @@ export function RepairDetails({ id }: { id: string }) {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-foreground bg-muted/20 p-4 rounded-md border border-border">
+            <p className="rounded-xl border border-border/70 bg-muted/15 p-4 text-sm leading-relaxed text-foreground">
               {repair.diagnosis ? (
                 repair.diagnosis
               ) : (
-                <span className="text-muted-foreground italic">
+                <span className="italic text-muted-foreground">
                   No technician diagnosis recorded yet.
                 </span>
               )}
             </p>
           )}
 
-          <div className="pt-4 border-t border-border space-y-3">
+          <div className="space-y-3 border-t border-border/70 pt-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h4 className="text-sm font-semibold text-foreground">
-                {pendingApprovalBreakdown ? 'Repair estimate' : 'Original Estimate'}
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹ Rupees)</span>
+              <h4 className="text-sm font-semibold tracking-tight text-foreground">
+                {pendingApprovalBreakdown ? 'Repair estimate' : 'Original estimate'}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹)</span>
               </h4>
               {canEditDiagnosisAndNotes && !isEstimatedCostEditing && (
                 <Button
@@ -620,7 +632,7 @@ export function RepairDetails({ id }: { id: string }) {
                     )
                     setIsEstimatedCostEditing(true)
                   }}
-                  className="h-8 w-full text-xs gap-1.5 sm:w-auto"
+                  className="h-8 w-full gap-1.5 text-xs sm:w-auto"
                 >
                   <Pencil className="h-3.5 w-3.5" />
                   {pendingApprovalBreakdown ? 'Edit revised total' : 'Edit'}
@@ -648,7 +660,7 @@ export function RepairDetails({ id }: { id: string }) {
                   placeholder={pendingApprovalBreakdown ? 'Revised total e.g. 10000' : 'e.g. 1500'}
                   value={estimatedCostValue}
                   onChange={(e) => setEstimatedCostValue(e.target.value)}
-                  className="text-sm w-full max-w-sm"
+                  className="w-full max-w-sm text-sm"
                 />
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <Button
@@ -688,16 +700,16 @@ export function RepairDetails({ id }: { id: string }) {
               <div
                 className={
                   repair.estimatedCost !== null
-                    ? 'rounded-lg border border-amber-300/80 bg-amber-50 px-4 py-4 dark:border-amber-800 dark:bg-amber-950/30'
+                    ? 'rounded-xl border border-accent/25 bg-accent/10 px-5 py-5'
                     : undefined
                 }
               >
                 {repair.estimatedCost !== null ? (
-                  <p className="text-2xl font-bold text-amber-950 dark:text-amber-50">
+                  <p className="text-3xl font-bold tracking-tight text-foreground">
                     {formatINRFromPaise(repair.estimatedCost)}
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-sm italic text-muted-foreground">
                     Not set — enter amount in rupees before requesting approval
                   </p>
                 )}
@@ -708,14 +720,15 @@ export function RepairDetails({ id }: { id: string }) {
       </Card>
 
       {/* Repair Notes Section (Append-only) */}
-      <Card>
-        <CardContent className="pt-6 space-y-6">
-          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-primary" />
-            Repair Notes
-          </h3>
+      <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        <CardContent className="space-y-5 pt-6">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+              <MessageSquare className="h-4 w-4 text-steel" aria-hidden />
+            </div>
+            <h3 className="text-base font-semibold tracking-tight text-foreground">Repair notes</h3>
+          </div>
 
-          {/* Add Note Form */}
           {canEditDiagnosisAndNotes && (
             <form onSubmit={handleAddNote} className="space-y-3">
               <Textarea
@@ -723,14 +736,14 @@ export function RepairDetails({ id }: { id: string }) {
                 value={newNoteText}
                 onChange={(e) => setNewNoteText(e.target.value)}
                 rows={2}
-                className="text-sm"
+                className="rounded-xl text-sm"
               />
               <div className="flex justify-end">
                 <Button
                   type="submit"
                   size="sm"
                   disabled={addNoteMutation.isPending || !newNoteText.trim()}
-                  className="h-8 text-xs gap-1.5"
+                  className="h-8 gap-1.5 text-xs"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {addNoteMutation.isPending ? 'Adding...' : 'Add Note'}
@@ -739,31 +752,32 @@ export function RepairDetails({ id }: { id: string }) {
             </form>
           )}
 
-          {/* Notes List */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {repair.notes && repair.notes.length > 0 ? (
               repair.notes.map((note) => (
                 <div
                   key={note.id}
-                  className="p-3.5 rounded-lg border border-border bg-card hover:bg-muted/20 transition-colors space-y-1"
+                  className="space-y-1.5 rounded-xl border border-border/70 bg-card px-3.5 py-3 transition-colors duration-200 hover:bg-muted/20"
                 >
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 font-semibold text-foreground">
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
                       {note.author.name}
                       {note.author.role && (
-                        <span className="text-[10px] bg-muted px-1.5 py-0.2 rounded border border-border">
+                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           {note.author.role}
                         </span>
                       )}
                     </span>
-                    <span>{formatDateTime(note.createdAt)}</span>
+                    <span className="shrink-0 tabular-nums">{formatDateTime(note.createdAt)}</span>
                   </div>
-                  <p className="text-sm text-foreground whitespace-pre-wrap pl-5">{note.note}</p>
+                  <p className="pl-5 text-sm leading-relaxed whitespace-pre-wrap text-foreground">
+                    {note.note}
+                  </p>
                 </div>
               ))
             ) : (
-              <p className="text-xs text-muted-foreground italic text-center py-4">
+              <p className="rounded-xl border border-dashed border-border bg-muted/15 py-6 text-center text-xs italic text-muted-foreground">
                 No repair notes recorded.
               </p>
             )}
@@ -771,73 +785,7 @@ export function RepairDetails({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      {/* Status Timeline History */}
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-            <History className="h-4 w-4 text-primary" />
-            Status History Timeline
-          </h3>
-
-          <div className="relative pl-6 border-l-2 border-border space-y-6 my-2">
-            {repair.statusHistory && repair.statusHistory.length > 0 ? (
-              repair.statusHistory.map((item) => (
-                <div key={item.id} className="relative group">
-                  {/* Timeline point icon */}
-                  <div className="absolute -left-7.75 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-background border-2 border-primary text-primary">
-                    <CheckCircle2 className="h-3 w-3" />
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-xs flex-wrap">
-                      <span className="font-bold text-foreground">
-                        {item.fromStatus
-                          ? `${item.fromStatus.replace(/_/g, ' ')} → ${item.toStatus.replace(
-                              /_/g,
-                              ' ',
-                            )}`
-                          : `Status set to ${item.toStatus.replace(/_/g, ' ')}`}
-                      </span>
-
-                      <span className="text-muted-foreground">•</span>
-
-                      <span className="text-muted-foreground">
-                        {item.actorType === 'CUSTOMER' ? (
-                          <>Changed by <strong className="text-foreground">Customer</strong></>
-                        ) : item.changedBy?.name ? (
-                          <>
-                            Changed by{' '}
-                            <strong className="text-foreground">{item.changedBy.name}</strong>
-                            {item.changedBy.role ? ` (${item.changedBy.role})` : ''}
-                          </>
-                        ) : item.actorType === 'OWNER' ? (
-                          <>Changed by <strong className="text-foreground">Owner</strong></>
-                        ) : (
-                          <>Changed by <strong className="text-foreground">Staff</strong></>
-                        )}
-                      </span>
-
-                      <span className="text-muted-foreground">•</span>
-
-                      <span className="text-muted-foreground">
-                        {formatDateTime(item.createdAt)}
-                      </span>
-                    </div>
-
-                    {item.note && (
-                      <p className="text-xs text-muted-foreground italic bg-muted/30 px-2.5 py-1 rounded border border-border w-fit">
-                        Note: {item.note}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-xs text-muted-foreground italic">No history logged.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <StatusHistoryTimeline items={repair.statusHistory} />
     </div>
   )
 }

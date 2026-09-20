@@ -1,10 +1,17 @@
 'use client'
 
 import * as React from 'react'
-import { AlertCircle, ChevronDown, Lock, RefreshCw } from 'lucide-react'
+import { AlertCircle, Lock, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,20 +28,9 @@ import {
   getAllowedManualStatusDestinations,
   getManualStatusTransitionError,
 } from '@/features/repairs/status-transitions'
+import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
-
-const STATUS_LABELS: Record<string, string> = {
-  RECEIVED: 'Received',
-  DIAGNOSING: 'Diagnosing',
-  WAITING_FOR_APPROVAL: 'Waiting for Approval',
-  APPROVED: 'Approved',
-  WAITING_FOR_PARTS: 'Waiting for Parts',
-  IN_REPAIR: 'In Repair',
-  QUALITY_CHECK: 'Quality Check',
-  READY_FOR_PICKUP: 'Ready for Pickup',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
-}
+import { cn } from '@/lib/utils'
 
 interface StatusChangeControlProps {
   repairId: string
@@ -44,6 +40,20 @@ interface StatusChangeControlProps {
   deviceSummary: string
   assignedTechnicianId?: string | null
   onStatusUpdated?: () => void
+}
+
+function StatusChip({ status }: { status: string }) {
+  const tone = getRepairStatusTone(status)
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold tracking-tight',
+        tone.chip,
+      )}
+    >
+      {getRepairStatusLabel(status)}
+    </span>
+  )
 }
 
 export function StatusChangeControl({
@@ -90,8 +100,7 @@ export function StatusChangeControl({
 
   const selectableStatuses = getAllowedManualStatusDestinations(currentStatus)
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value
+  const handleStatusSelect = (newStatus: string) => {
     setSelectedStatus(newStatus)
     setValidationError(null)
 
@@ -125,7 +134,7 @@ export function StatusChangeControl({
     setIsUpdating(true)
     try {
       await apiClient.patch(`repairs/${repairId}/status`, { status: selectedStatus })
-      toast.success(`Repair status updated to ${STATUS_LABELS[selectedStatus]}`)
+      toast.success(`Repair status updated to ${getRepairStatusLabel(selectedStatus)}`)
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
       const errorObj = err as {
@@ -170,16 +179,16 @@ export function StatusChangeControl({
 
   if (isAwaitingCustomerApproval) {
     return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">Status:</span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-            Waiting for Approval
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Status
           </span>
+          <StatusChip status={currentStatus} />
         </div>
-        <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
-          <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          <span>Status is locked until the customer responds on their tracking page.</span>
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>Locked until the customer responds on their tracking page.</span>
         </p>
       </div>
     )
@@ -189,16 +198,16 @@ export function StatusChangeControl({
 
   if (showReadOnlyClosedMessage) {
     return (
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Status:</span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
-            {STATUS_LABELS[currentStatus] || currentStatus}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Status
           </span>
+          <StatusChip status={currentStatus} />
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Ticket is closed ({currentStatus.toLowerCase()}). Only Owner or Staff can reopen completed
-          tickets, and only Owner can reopen cancelled tickets.
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Ticket is closed. Only Owner or Staff can reopen completed tickets, and only Owner can
+          reopen cancelled tickets.
         </p>
       </div>
     )
@@ -206,36 +215,46 @@ export function StatusChangeControl({
 
   if (canChangeStatus) {
     return (
-      <div className="space-y-2">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <div className="relative flex-1">
-            <select
-              value={selectedStatus}
-              onChange={handleStatusChange}
-              disabled={isUpdating}
-              className="w-full h-9 rounded-md border border-input bg-background pl-3 pr-8 text-xs font-medium ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 appearance-none"
-            >
-              {selectableStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          </div>
-
-          <Button
-            type="button"
-            onClick={handleUpdate}
-            disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
-            className="h-9 px-4 text-xs font-semibold"
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor={`status-select-${repairId}`}
+            className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
           >
-            {isUpdating ? 'Updating...' : 'Update Status'}
-          </Button>
+            Update status
+          </Label>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+            <Select
+              value={selectedStatus}
+              onValueChange={handleStatusSelect}
+              disabled={isUpdating}
+            >
+              <SelectTrigger id={`status-select-${repairId}`} className="flex-1 text-sm">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectableStatuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {getRepairStatusLabel(status)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              variant="accent"
+              onClick={handleUpdate}
+              disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
+              className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-[8.5rem]"
+            >
+              {isUpdating ? 'Updating…' : 'Update'}
+            </Button>
+          </div>
         </div>
 
         {validationError && (
-          <div className="flex items-center gap-1.5 text-xs text-destructive font-medium animate-in fade-in duration-200">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{validationError}</span>
           </div>
@@ -255,11 +274,11 @@ export function StatusChangeControl({
 
     return (
       <div className="space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-xs text-muted-foreground font-medium">Status:</span>
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-muted border border-border text-foreground">
-            {STATUS_LABELS[currentStatus] || currentStatus}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            Status
           </span>
+          <StatusChip status={currentStatus} />
 
           {(canReopenCompleted || canReopenCancelled) && (
             <Button
@@ -271,25 +290,23 @@ export function StatusChangeControl({
                 setReopenReason('')
                 setReopenDialogOpen(true)
               }}
-              className="h-8 text-xs font-semibold gap-1.5 text-amber-600 border-amber-300 hover:bg-amber-50 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/30"
+              className="h-8 gap-1.5 border-amber-300 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Reopen Ticket
+              Reopen
             </Button>
           )}
         </div>
 
         {isOwner && (
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Lock className="h-3 w-3 shrink-0" />
-            <span>
-              Owner manages the shop by reassigning, not by editing ticket state directly.
-            </span>
+            <span>Owner manages the shop by reassigning, not by editing ticket state.</span>
           </div>
         )}
 
         {validationError && (
-          <div className="flex items-center gap-1.5 text-xs text-destructive font-medium">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-destructive">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             <span>{validationError}</span>
           </div>
@@ -320,7 +337,7 @@ export function StatusChangeControl({
                   Current Status
                 </Label>
                 <p className="text-sm font-semibold text-foreground">
-                  {STATUS_LABELS[currentStatus] || currentStatus}
+                  {getRepairStatusLabel(currentStatus)}
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -374,8 +391,8 @@ export function StatusChangeControl({
   }
 
   return (
-    <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center gap-2">
-      <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+      <Lock className="h-3.5 w-3.5 shrink-0" />
       <span>Only assigned technician or staff can change repair status.</span>
     </div>
   )

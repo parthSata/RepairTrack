@@ -143,7 +143,7 @@ export function RequestApprovalControl({
     <div className="space-y-2">
       <Button
         type="button"
-        variant={isReady ? 'default' : 'outline'}
+        variant={isReady ? 'accent' : 'outline'}
         size="sm"
         disabled={isDisabled}
         onClick={() => {
@@ -153,8 +153,8 @@ export function RequestApprovalControl({
         }}
         className={
           isReady
-            ? 'h-9 w-full sm:w-auto text-xs font-semibold gap-1.5 bg-amber-600 hover:bg-amber-700 text-white border-amber-600'
-            : 'h-9 w-full sm:w-auto text-xs font-semibold gap-1.5'
+            ? 'h-10 w-full gap-1.5 text-xs font-semibold'
+            : 'h-10 w-full gap-1.5 text-xs font-semibold'
         }
       >
         <Send className="h-3.5 w-3.5" />
@@ -162,12 +162,12 @@ export function RequestApprovalControl({
       </Button>
 
       {disabledReason ? (
-        <p className="text-[11px] text-muted-foreground flex items-start gap-1.5">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>{disabledReason}</span>
         </p>
       ) : (
-        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
           Sends diagnosis and revised estimate to the customer tracking page.
         </p>
       )}
