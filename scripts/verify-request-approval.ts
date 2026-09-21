@@ -1,5 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { config } from 'dotenv'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -279,6 +281,223 @@ async function testRequestApprovalGuards(
   console.log('Guard checks passed: diagnosis/original estimate required, OWNER blocked, direct WAITING_FOR_APPROVAL blocked')
 }
 
+async function testApprovalOnlyFromDiagnosing(
+  repairId: string,
+  shopId: string,
+  staffId: string,
+) {
+  const blockedStatuses: Array<typeof repairs.$inferSelect.status> = [
+    'APPROVED',
+    'WAITING_FOR_PARTS',
+    'IN_REPAIR',
+    'QUALITY_CHECK',
+    'READY_FOR_PICKUP',
+    'RECEIVED',
+  ]
+
+  for (const status of blockedStatuses) {
+    await db
+      .update(repairs)
+      .set({
+        diagnosis: 'Board-level repair',
+        estimatedCost: TEST_INITIAL_PAISE,
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(repairs.id, repairId))
+
+    await expectServiceError(
+      () =>
+        requestCustomerApproval({
+          shopId,
+          userRole: 'STAFF',
+          userId: staffId,
+          id: repairId,
+          additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
+        }),
+      400,
+      'Customer approval can only be requested while the repair is in Diagnosing',
+      `Guard non-diagnosing source (${status})`,
+    )
+  }
+
+  console.log('Edge case passed: approval request is blocked unless status is DIAGNOSING')
+}
+
+async function testPreApprovalStatusPhaseGuards(
+  repairId: string,
+  shopId: string,
+  staffId: string,
+) {
+  await db
+    .update(repairs)
+    .set({
+      diagnosis: 'Board-level repair',
+      estimatedCost: TEST_INITIAL_PAISE,
+      status: 'DIAGNOSING',
+      updatedAt: new Date(),
+    })
+    .where(eq(repairs.id, repairId))
+
+  const blockedLateStatuses: Array<typeof repairs.$inferSelect.status> = [
+    'WAITING_FOR_PARTS',
+    'IN_REPAIR',
+    'READY_FOR_PICKUP',
+    'APPROVED',
+    'COMPLETED',
+    'CANCELLED',
+  ]
+
+  for (const status of blockedLateStatuses) {
+    await expectServiceError(
+      () =>
+        updateRepairStatus({
+          shopId,
+          userRole: 'STAFF',
+          userId: staffId,
+          id: repairId,
+          status,
+        }),
+      400,
+      'This status change is not allowed until the repair is approved.',
+      `Guard pre-approval block (${status})`,
+    )
+  }
+
+  const reverted = await updateRepairStatus({
+    shopId,
+    userRole: 'STAFF',
+    userId: staffId,
+    id: repairId,
+    status: 'RECEIVED',
+  })
+  assert(
+    reverted.status === 'RECEIVED',
+    'Edge case failed: STAFF should be able to move DIAGNOSING -> RECEIVED before approval',
+  )
+
+  const diagnosingAgain = await updateRepairStatus({
+    shopId,
+    userRole: 'STAFF',
+    userId: staffId,
+    id: repairId,
+    status: 'DIAGNOSING',
+  })
+  assert(
+    diagnosingAgain.status === 'DIAGNOSING',
+    'Edge case failed: STAFF should be able to move RECEIVED -> DIAGNOSING before approval',
+  )
+
+  console.log(
+    'Edge case passed: pre-approval manual status changes are limited to RECEIVED and DIAGNOSING',
+  )
+}
+
+async function testPendingBlocksManualStatusChange(
+  repairId: string,
+  shopId: string,
+  staffId: string,
+) {
+  await expectServiceError(
+    () =>
+      updateRepairStatus({
+        shopId,
+        userRole: 'STAFF',
+        userId: staffId,
+        id: repairId,
+        status: 'WAITING_FOR_PARTS',
+      }),
+    400,
+    'Customer approval is pending',
+    'Guard pending blocks WAITING_FOR_PARTS',
+  )
+
+  await expectServiceError(
+    () =>
+      updateRepairStatus({
+        shopId,
+        userRole: 'STAFF',
+        userId: staffId,
+        id: repairId,
+        status: 'IN_REPAIR',
+      }),
+    400,
+    'Customer approval is pending',
+    'Guard pending blocks IN_REPAIR',
+  )
+
+  console.log('Edge case passed: pending WAITING_FOR_APPROVAL still blocks manual status changes')
+}
+
+async function testStaffCanAdvanceAfterApproved(
+  repairId: string,
+  shopId: string,
+  staffId: string,
+) {
+  const updated = await updateRepairStatus({
+    shopId,
+    userRole: 'STAFF',
+    userId: staffId,
+    id: repairId,
+    status: 'WAITING_FOR_PARTS',
+  })
+
+  assert(
+    updated.status === 'WAITING_FOR_PARTS',
+    'Edge case failed: STAFF should be able to advance status after APPROVED',
+  )
+
+  const advancedAgain = await updateRepairStatus({
+    shopId,
+    userRole: 'STAFF',
+    userId: staffId,
+    id: repairId,
+    status: 'IN_REPAIR',
+  })
+
+  assert(
+    advancedAgain.status === 'IN_REPAIR',
+    'Edge case failed: STAFF should continue normal status changes after APPROVED',
+  )
+
+  console.log('Edge case passed: after APPROVED, STAFF can continue normal status changes')
+}
+
+function testApprovalDialogShowsTicketContext() {
+  const controlSource = readFileSync(
+    join(process.cwd(), 'src/components/repairs/request-approval-control.tsx'),
+    'utf8',
+  )
+  const detailsSource = readFileSync(
+    join(process.cwd(), 'src/components/repairs/repair-details.tsx'),
+    'utf8',
+  )
+
+  assert(controlSource.includes('ticketNumber: string'), 'Dialog context failed: ticketNumber prop missing')
+  assert(controlSource.includes('customerName: string'), 'Dialog context failed: customerName prop missing')
+  assert(controlSource.includes('deviceSummary: string'), 'Dialog context failed: deviceSummary prop missing')
+  assert(controlSource.includes('Ticket Number'), 'Dialog context failed: Ticket Number label missing')
+  assert(controlSource.includes('#{ticketNumber}'), 'Dialog context failed: ticket number render missing')
+  assert(
+    controlSource.includes("currentStatus !== 'DIAGNOSING'"),
+    'Dialog context failed: DIAGNOSING-only UI guard missing',
+  )
+  assert(
+    detailsSource.includes('ticketNumber={repair.ticketNumber}'),
+    'Dialog context failed: repair details does not pass ticketNumber',
+  )
+  assert(
+    detailsSource.includes('customerName={repair.customer.name}'),
+    'Dialog context failed: repair details does not pass customerName',
+  )
+  assert(
+    detailsSource.includes("deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}"),
+    'Dialog context failed: repair details does not pass deviceSummary',
+  )
+
+  console.log('Edge case passed: approval dialog renders ticket-identification context')
+}
+
 async function testNoApprovalRequired(trackingToken: string) {
   const payload = publicTrackingResponseSchema.parse(await getPublicRepairByTrackingToken(trackingToken))
   assert(!payload.approval, 'Test 1 failed: approval data should be absent when no approval is required')
@@ -492,6 +711,20 @@ async function main() {
       repairId: fixture.repairId,
       trackingToken: fixture.trackingToken,
     })
+    await testApprovalOnlyFromDiagnosing(fixture.repairId, fixture.shopId, fixture.staffId)
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
+    await testPreApprovalStatusPhaseGuards(fixture.repairId, fixture.shopId, fixture.staffId)
+
+    testApprovalDialogShowsTicketContext()
+
+    await resetForApprovalFlow({
+      repairId: fixture.repairId,
+      trackingToken: fixture.trackingToken,
+    })
     await testNoApprovalRequired(fixture.trackingToken)
 
     await resetForApprovalFlow({
@@ -504,7 +737,9 @@ async function main() {
       staffId: fixture.staffId,
       trackingToken: fixture.trackingToken,
     })
+    await testPendingBlocksManualStatusChange(fixture.repairId, fixture.shopId, fixture.staffId)
     await testApproveFlow(fixture.trackingToken, fixture.repairId)
+    await testStaffCanAdvanceAfterApproved(fixture.repairId, fixture.shopId, fixture.staffId)
 
     await resetForApprovalFlow({
       repairId: fixture.repairId,

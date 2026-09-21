@@ -17,6 +17,7 @@ import {
   isExpectedCompletionDateInPast,
   overdueRepairCondition,
 } from '@/features/repairs/overdue'
+import { getManualStatusTransitionError } from '@/features/repairs/status-transitions'
 import { generateTicketNumber, generateTrackingToken } from '@/server/lib/tokens'
 import {
   insertActiveAssignment,
@@ -623,7 +624,7 @@ export async function updateRepairStatus({
   if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
     throw new HTTPException(400, {
       message:
-        'Completed or cancelled tickets cannot have status updated directly. Owner must reopen the ticket.',
+        'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
     })
   }
 
@@ -639,11 +640,16 @@ export async function updateRepairStatus({
     .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
     .limit(1)
 
-  if (pendingApproval) {
+  if (pendingApproval || existing.status === 'WAITING_FOR_APPROVAL') {
     throw new HTTPException(400, {
       message:
         'Customer approval is pending. Status cannot be changed until the customer responds.',
     })
+  }
+
+  const transitionError = getManualStatusTransitionError(existing.status, status)
+  if (transitionError) {
+    throw new HTTPException(400, { message: transitionError })
   }
 
   // Execute status update and status history logging in transaction
@@ -722,7 +728,13 @@ export async function requestCustomerApproval({
   if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
     throw new HTTPException(400, {
       message:
-        'Completed or cancelled tickets cannot have status updated directly. Owner must reopen the ticket.',
+        'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
+    })
+  }
+
+  if (existing.status !== 'DIAGNOSING') {
+    throw new HTTPException(400, {
+      message: 'Customer approval can only be requested while the repair is in Diagnosing.',
     })
   }
 
@@ -804,23 +816,25 @@ export async function requestCustomerApproval({
   return getRepairById({ shopId, userRole, userId, id })
 }
 
-export async function reopenRepairTicket({
+async function recoverRepair({
   shopId,
   userRole,
   userId,
   id,
-  note,
+  reason,
+  action,
 }: {
   shopId: string
   userRole: string
   userId: string
   id: string
-  note?: string
+  reason?: string
+  action?: 'reopen' | 'restore'
 }) {
-  // Only OWNER can reopen a closed ticket
-  if (userRole !== 'OWNER') {
+  const actionLabel = action === 'restore' ? 'Restore Repair' : 'Reopen Repair'
+  if (!['OWNER', 'STAFF'].includes(userRole)) {
     throw new HTTPException(403, {
-      message: 'Only the shop owner can reopen completed or cancelled tickets.',
+      message: 'Only Owner and Staff can reopen or restore eligible repair tickets.',
     })
   }
 
@@ -833,35 +847,83 @@ export async function reopenRepairTicket({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (!['COMPLETED', 'CANCELLED'].includes(existing.status)) {
+  const trimmedReason = reason?.trim() ?? ''
+  if (trimmedReason.length === 0) {
     throw new HTTPException(400, {
-      message: 'Only completed or cancelled tickets can be reopened.',
+      message: `${action === 'restore' ? 'Restore' : 'Reopen'} reason is required.`,
     })
   }
 
+  const expectedStatus = action === 'restore' ? 'CANCELLED' : 'COMPLETED'
+  const nextStatus = 'DIAGNOSING'
+
+  if (existing.status !== expectedStatus) {
+    throw new HTTPException(400, {
+      message: `Only ${expectedStatus.toLowerCase()} tickets can be ${action === 'restore' ? 'restored' : 'reopened'}.`,
+    })
+  }
+
+  const actorType = userRole === 'OWNER' ? 'OWNER' : 'STAFF'
+  const actionVerb = action === 'restore' ? 'restored' : 'reopened'
+  const historyNote = `Repair ${actionVerb}. Previous status: ${existing.status}. New status: ${nextStatus}. Reason: ${trimmedReason}. Actor: ${userRole}.`
+
   const updated = await db.transaction(async (tx) => {
+    const now = new Date()
     const [res] = await tx
       .update(repairs)
       .set({
-        status: 'IN_REPAIR',
-        updatedAt: new Date(),
+        status: nextStatus,
+        updatedAt: now,
       })
-      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId), eq(repairs.status, existing.status)))
       .returning()
+
+    if (!res) {
+      throw new HTTPException(409, {
+        message: `This repair ticket was already ${actionVerb} or changed by another request.`,
+      })
+    }
 
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
       repairId: id,
       fromStatus: existing.status,
-      toStatus: 'IN_REPAIR',
+      toStatus: nextStatus,
       changedBy: userId,
-      note: note || 'Ticket reopened by Owner',
+      actorType,
+      note: historyNote,
+      createdAt: now,
     })
 
     return res
   })
 
   return updated
+}
+
+export async function reopenRepairTicket({
+  shopId,
+  userRole,
+  userId,
+  id,
+  reason,
+  action,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  reason?: string
+  action?: 'reopen' | 'restore'
+}) {
+  return recoverRepair({
+    shopId,
+    userRole,
+    userId,
+    id,
+    reason,
+    action,
+  })
 }
 
 export async function reassignTechnician({

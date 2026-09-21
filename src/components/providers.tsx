@@ -16,4 +16,4 @@ export function Providers({ children }: { children: ReactNode }) {
       <ToastContainer position="top-right" autoClose={3000} />
     </QueryClientProvider>
   )
-}
+}

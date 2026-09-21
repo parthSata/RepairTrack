@@ -40,6 +40,7 @@ export const deviceConditionEnum = pgEnum('device_condition', [
 ])
 
 export const repairStatusHistoryActorTypeEnum = pgEnum('repair_status_history_actor_type', [
+  'OWNER',
   'STAFF',
   'CUSTOMER',
 ])

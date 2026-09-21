@@ -179,6 +179,21 @@ requirement.
    existing `APPROVED` value (not `IN_REPAIR`). Staff manually advance
    the repair to subsequent statuses afterward.
 
+**Manual status-change phases (Staff / assigned Technician):**
+
+1. **Pre-approval** (`RECEIVED`, `DIAGNOSING`): only `RECEIVED` and
+   `DIAGNOSING` may be set manually. `APPROVED` is never set by staff —
+   it comes only from the customer approval decision. Request Customer
+   Approval remains DIAGNOSING-only and is the only path into
+   `WAITING_FOR_APPROVAL`.
+2. **Pending approval** (`WAITING_FOR_APPROVAL`): locked until the
+   customer responds.
+3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed
+   destinations are `APPROVED`, `WAITING_FOR_PARTS`, `IN_REPAIR`,
+   `QUALITY_CHECK`, `READY_FOR_PICKUP`, `COMPLETED`, and `CANCELLED`.
+4. **Closed** (`COMPLETED`, `CANCELLED`): use the reopen action, not
+   the status dropdown.
+
 This list is the single source of truth for the status enum. The
 diagram in `ui-context.md` §11 is a simplified visual grouping, not a
 second list — do not generate the enum from it.
@@ -204,7 +219,8 @@ sign in; they use the public tracking page only.
 | Assign technician | yes | yes | no |
 | Update repair status | NO* | yes | assigned repairs only |
 | Edit diagnosis, add repair notes | yes | yes | assigned repairs only |
-| Reopen COMPLETED/CANCELLED ticket | yes | no | no |
+| Reopen COMPLETED ticket | yes | yes | no |
+| Restore CANCELLED ticket | yes | yes | no |
 | Record parts used | yes | yes | assigned repairs only |
 | Create/edit invoices, record payments | yes | yes | no |
 | Manage inventory | yes | yes | no |
@@ -213,7 +229,10 @@ sign in; they use the public tracking page only.
 | Connect/disconnect shop Gmail | yes | no | no |
 | Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no |
 
-* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER retains the single administrative override exception to reopen COMPLETED or CANCELLED tickets.
+* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
+* **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.
+* **Action semantics:** Reopen/Restore are actions, not repair statuses. The existing repair status enum remains the source of truth.
+* **History note:** Recovery activity uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
 
 Every mutating endpoint must check this table server-side. If an
 action is not listed, ask before implementing a permission for it.

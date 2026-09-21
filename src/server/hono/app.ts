@@ -6,8 +6,8 @@ import { customersRouter } from '@/server/hono/routes/customers'
 import { devicesRouter } from '@/server/hono/routes/devices'
 import { repairsRouter } from '@/server/hono/routes/repairs'
 import { dashboardRouter } from '@/server/hono/routes/dashboard'
-import { staffRouter } from '@/api/routes/staff'
-import { invitationsRouter } from '@/api/routes/invitations'
+import { staffRouter } from '@/server/hono/routes/staff'
+import { invitationsRouter } from '@/server/hono/routes/invitations'
 import { trackRouter } from '@/server/hono/routes/track'
 
 export const app = new Hono()

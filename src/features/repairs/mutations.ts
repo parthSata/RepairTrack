@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import { repairKeys, type Repair } from './queries'
-import type { CreateRepairInput } from './schemas'
+import type { CreateRepairInput, ReopenRepairInput } from './schemas'
 
 export function useCreateRepair() {
   const queryClient = useQueryClient()
@@ -67,17 +67,22 @@ export function useUpdateRepairStatus(repairId: string) {
 export function useReopenRepair(repairId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation<Repair, Error, { note?: string }>({
-    mutationFn: async ({ note }) => {
-      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, { note })
+  return useMutation<Repair, Error, ReopenRepairInput & { action?: 'reopen' | 'restore' }>({
+    mutationFn: async ({ reason, action }) => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, {
+        reason,
+        action,
+      })
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: repairKeys.all })
-      toast.success('Repair ticket reopened successfully!')
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      const actionLabel = variables.action === 'restore' ? 'restored' : 'reopened'
+      toast.success(`Repair ticket ${actionLabel} successfully!`)
     },
     onError: (error: unknown) => {
-      let message = 'Failed to reopen ticket'
+      let message = 'Failed to update repair ticket'
       if (error && typeof error === 'object' && 'response' in error) {
         const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
         if (resData?.message) {

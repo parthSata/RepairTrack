@@ -111,7 +111,7 @@ export function ApprovalStatusBanner({
   return (
     <div
       className={cn(
-        'flex gap-3 rounded-lg border-l-4 px-4 py-3',
+        'flex gap-3 rounded-xl border-l-4 px-4 py-3 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
         toneClasses,
         className,
       )}

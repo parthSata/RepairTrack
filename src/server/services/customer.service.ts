@@ -127,7 +127,7 @@ export async function checkCustomerEmail({
   const conditions = [eq(customers.shopId, shopId), ilike(customers.email, email.trim())]
   if (excludeCustomerId) {
     conditions.push(sql`${customers.id} != ${excludeCustomerId}`)
-  }
+  } 
 
   const [existing] = await db
     .select({
@@ -292,7 +292,7 @@ export async function deleteCustomer({ shopId, id }: { shopId: string; id: strin
 
   if ((repairCount?.total ?? 0) > 0) {
     throw new HTTPException(400, {
-      message: 'Cannot delete customer with existing repair history. Archive or delete repairs first.',
+      message: 'Cannot delete customer with existing repair history. delete repairs first.',
     })
   }
 
