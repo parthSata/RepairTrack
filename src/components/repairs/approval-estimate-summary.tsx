@@ -83,7 +83,7 @@ export function ApprovalEstimateBreakdown({
       className={cn(
         'rounded-xl border space-y-4',
         isProminent
-          ? 'border-amber-400/60 bg-gradient-to-br from-amber-50 via-amber-50/80 to-orange-50/40 p-4 sm:p-5 shadow-[0_8px_24px_rgba(245,158,11,0.12)] dark:border-amber-700/50 dark:from-amber-950/40 dark:via-amber-950/20 dark:to-orange-950/10'
+          ? 'border-border bg-muted/30 p-4 shadow-sm sm:p-5 dark:border-border dark:bg-muted/20'
           : 'border-amber-200/70 bg-amber-50/50 p-3 sm:p-4 dark:border-amber-900/40 dark:bg-amber-950/20',
         className,
       )}
@@ -124,19 +124,21 @@ export function ApprovalEstimateBreakdown({
           <div
             className={cn(
               'rounded-lg border border-amber-300/50 bg-white/70 dark:border-amber-800/50 dark:bg-background/40',
-              isProminent ? 'p-3 sm:p-4' : 'p-3',
+              isProminent
+                ? 'border-border bg-background p-3 sm:p-4 dark:border-border dark:bg-background'
+                : 'p-3',
             )}
           >
             <div className="space-y-2.5 text-sm">
               <CostRow label="Original Estimate" amount={formatINR(initial)} />
               <CostRow label="Additional Repair Cost" amount={`+ ${formatINR(additional)}`} />
-              <div className="border-t border-amber-200/80 pt-2.5 dark:border-amber-800/50 space-y-1">
+              <div className="space-y-1 border-t border-border pt-2.5">
                 <CostRow
                   label="Revised Estimated Total"
                   amount={formatINR(revised)}
                   isTotal
                   amountClassName={cn(
-                    'font-bold text-amber-950 dark:text-amber-100 text-lg sm:text-xl',
+                    'font-bold text-foreground text-lg sm:text-xl',
                     isProminent && 'text-xl sm:text-2xl tracking-tight',
                   )}
                 />

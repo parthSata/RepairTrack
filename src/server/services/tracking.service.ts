@@ -19,6 +19,7 @@ type RepairRow = {
   status: typeof repairs.$inferSelect.status
   problemDescription: string | null
   estimatedCost: number | null
+  expectedCompletionDate: Date | null
   createdAt: Date
 }
 
@@ -76,6 +77,7 @@ export function buildPublicTrackingPayload(
       model: device.model,
     },
     problemDescription: repair.problemDescription,
+    expectedCompletionDate: repair.expectedCompletionDate?.toISOString() ?? null,
     createdAt: repair.createdAt.toISOString(),
     updates: history.map((entry) => ({
       label: mapRepairStatusToPublicLabel(entry.toStatus),
@@ -107,6 +109,7 @@ async function loadPublicRepairData(repairId: string) {
       status: repairs.status,
       problemDescription: repairs.problemDescription,
       estimatedCost: repairs.estimatedCost,
+      expectedCompletionDate: repairs.expectedCompletionDate,
       createdAt: repairs.createdAt,
       brand: devices.brand,
       model: devices.model,
@@ -150,6 +153,7 @@ async function loadPublicRepairData(repairId: string) {
       status: row.status,
       problemDescription: row.problemDescription,
       estimatedCost: row.estimatedCost,
+      expectedCompletionDate: row.expectedCompletionDate,
       createdAt: row.createdAt,
     },
     {
