@@ -816,22 +816,25 @@ export async function requestCustomerApproval({
   return getRepairById({ shopId, userRole, userId, id })
 }
 
-export async function reopenRepairTicket({
+async function recoverRepair({
   shopId,
   userRole,
   userId,
   id,
   reason,
+  action,
 }: {
   shopId: string
   userRole: string
   userId: string
   id: string
   reason?: string
+  action?: 'reopen' | 'restore'
 }) {
+  const actionLabel = action === 'restore' ? 'Restore Repair' : 'Reopen Repair'
   if (!['OWNER', 'STAFF'].includes(userRole)) {
     throw new HTTPException(403, {
-      message: 'Only Owner and Staff can reopen eligible repair tickets.',
+      message: 'Only Owner and Staff can reopen or restore eligible repair tickets.',
     })
   }
 
@@ -845,33 +848,24 @@ export async function reopenRepairTicket({
   }
 
   const trimmedReason = reason?.trim() ?? ''
-
-  if (userRole === 'STAFF' && trimmedReason.length === 0) {
+  if (trimmedReason.length === 0) {
     throw new HTTPException(400, {
-      message: 'Reason for reopening is required.',
+      message: `${action === 'restore' ? 'Restore' : 'Reopen'} reason is required.`,
     })
   }
 
-  const isCompleted = existing.status === 'COMPLETED'
-  const isCancelled = existing.status === 'CANCELLED'
+  const expectedStatus = action === 'restore' ? 'CANCELLED' : 'COMPLETED'
+  const nextStatus = 'DIAGNOSING'
 
-  if (!isCompleted && !isCancelled) {
+  if (existing.status !== expectedStatus) {
     throw new HTTPException(400, {
-      message: 'Only completed or cancelled tickets can be reopened.',
+      message: `Only ${expectedStatus.toLowerCase()} tickets can be ${action === 'restore' ? 'restored' : 'reopened'}.`,
     })
   }
 
-  if (isCancelled && userRole !== 'OWNER') {
-    throw new HTTPException(403, {
-      message: 'Only the shop owner can reopen cancelled tickets.',
-    })
-  }
-
-  const nextStatus = isCompleted ? 'DIAGNOSING' : 'IN_REPAIR'
   const actorType = userRole === 'OWNER' ? 'OWNER' : 'STAFF'
-  const historyNote = trimmedReason
-    ? `Repair ticket reopened by ${userRole}. Reason: ${trimmedReason}`
-    : 'Repair ticket reopened by OWNER.'
+  const actionVerb = action === 'restore' ? 'restored' : 'reopened'
+  const historyNote = `Repair ${actionVerb}. Previous status: ${existing.status}. New status: ${nextStatus}. Reason: ${trimmedReason}. Actor: ${userRole}.`
 
   const updated = await db.transaction(async (tx) => {
     const now = new Date()
@@ -886,11 +880,10 @@ export async function reopenRepairTicket({
 
     if (!res) {
       throw new HTTPException(409, {
-        message: 'This repair ticket was already reopened or changed by another request.',
+        message: `This repair ticket was already ${actionVerb} or changed by another request.`,
       })
     }
 
-    // Reopen activity currently uses repair_status_history because the generic Activity/Audit Log is deferred to Sprint 4.
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
       repairId: id,
@@ -906,6 +899,31 @@ export async function reopenRepairTicket({
   })
 
   return updated
+}
+
+export async function reopenRepairTicket({
+  shopId,
+  userRole,
+  userId,
+  id,
+  reason,
+  action,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  reason?: string
+  action?: 'reopen' | 'restore'
+}) {
+  return recoverRepair({
+    shopId,
+    userRole,
+    userId,
+    id,
+    reason,
+    action,
+  })
 }
 
 export async function reassignTechnician({

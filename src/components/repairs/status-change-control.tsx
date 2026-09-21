@@ -76,7 +76,7 @@ export function StatusChangeControl({
   const canChangeStatus =
     (isStaff || isAssignedTechnician) && !['COMPLETED', 'CANCELLED'].includes(currentStatus)
   const canReopenCompleted = ['OWNER', 'STAFF'].includes(userRole) && currentStatus === 'COMPLETED'
-  const canReopenCancelled = isOwner && currentStatus === 'CANCELLED'
+  const canRestoreCancelled = ['OWNER', 'STAFF'].includes(userRole) && currentStatus === 'CANCELLED'
   const isClosed = currentStatus === 'COMPLETED' || currentStatus === 'CANCELLED'
   const isAwaitingCustomerApproval = currentStatus === 'WAITING_FOR_APPROVAL'
   const reopenMutation = useReopenRepair(repairId)
@@ -156,10 +156,38 @@ export function StatusChangeControl({
   const trimmedReopenReason = reopenReason.trim()
   const isReopenReasonEmpty = trimmedReopenReason.length === 0
 
+  const actionConfig =
+    currentStatus === 'COMPLETED'
+      ? {
+          action: 'reopen' as const,
+          title: 'Reopen Repair',
+          description:
+            'This repair is currently completed. Reopening it will move the repair back to Diagnosing.',
+          confirmLabel: 'Reopen Repair',
+          buttonLabel: 'Reopen',
+          nextStatusLabel: 'Diagnosing',
+          reasonPlaceholder: 'Customer reported the same issue again...',
+          actionLabel: 'Reopen Repair' as const,
+        }
+      : {
+          action: 'restore' as const,
+          title: 'Restore Repair',
+          description:
+            'This repair was cancelled previously. Restoring it will move the repair back to Diagnosing.',
+          confirmLabel: 'Restore Repair',
+          buttonLabel: 'Restore',
+          nextStatusLabel: 'Diagnosing',
+          reasonPlaceholder: 'Customer requested the repair to resume...',
+          actionLabel: 'Restore Repair' as const,
+        }
+
   const handleReopen = async () => {
     setValidationError(null)
     try {
-      await reopenMutation.mutateAsync({ reason: trimmedReopenReason || undefined })
+      await reopenMutation.mutateAsync({
+        reason: trimmedReopenReason,
+        action: actionConfig.action,
+      })
       setReopenDialogOpen(false)
       setReopenReason('')
       if (onStatusUpdated) onStatusUpdated()
@@ -172,7 +200,7 @@ export function StatusChangeControl({
         errorObj?.response?.data?.message ||
         errorObj?.response?.data?.error?.message ||
         errorObj?.message ||
-        'Failed to reopen ticket'
+        'Failed to update repair ticket'
       setValidationError(msg)
     }
   }
@@ -194,7 +222,7 @@ export function StatusChangeControl({
     )
   }
 
-  const showReadOnlyClosedMessage = isClosed && !canReopenCompleted && !canReopenCancelled
+  const showReadOnlyClosedMessage = isClosed && !canReopenCompleted && !canRestoreCancelled
 
   if (showReadOnlyClosedMessage) {
     return (
@@ -206,8 +234,7 @@ export function StatusChangeControl({
           <StatusChip status={currentStatus} />
         </div>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          Ticket is closed. Only Owner or Staff can reopen completed tickets, and only Owner can
-          reopen cancelled tickets.
+          Ticket is closed. Only Owner and Staff can reopen completed tickets or restore cancelled tickets.
         </p>
       </div>
     )
@@ -246,7 +273,7 @@ export function StatusChangeControl({
               variant="accent"
               onClick={handleUpdate}
               disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
-              className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-[8.5rem]"
+              className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-34"
             >
               {isUpdating ? 'Updating…' : 'Update'}
             </Button>
@@ -263,15 +290,7 @@ export function StatusChangeControl({
     )
   }
 
-  if (canReopenCompleted || canReopenCancelled || isOwner) {
-    const dialogTitle =
-      currentStatus === 'COMPLETED' ? 'Reopen Repair Ticket?' : 'Reopen Cancelled Repair Ticket?'
-    const dialogDescription =
-      currentStatus === 'COMPLETED'
-        ? 'This repair ticket has been completed. Reopening it will return the ticket to the active repair workflow.'
-        : 'This repair ticket is currently cancelled. Reopening it will restore it to the repair workflow.'
-    const nextStatusLabel = currentStatus === 'COMPLETED' ? 'Diagnosing' : 'In Repair'
-
+  if (canReopenCompleted || canRestoreCancelled) {
     return (
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -280,7 +299,7 @@ export function StatusChangeControl({
           </span>
           <StatusChip status={currentStatus} />
 
-          {(canReopenCompleted || canReopenCancelled) && (
+          {(canReopenCompleted || canRestoreCancelled) && (
             <Button
               type="button"
               variant="outline"
@@ -293,7 +312,7 @@ export function StatusChangeControl({
               className="h-8 gap-1.5 border-amber-300 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950/30"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              Reopen
+              {currentStatus === 'COMPLETED' ? 'Reopen' : 'Restore'}
             </Button>
           )}
         </div>
@@ -318,9 +337,9 @@ export function StatusChangeControl({
           contentClassName="max-w-xl p-6 sm:p-8"
         >
           <AlertDialogHeader className="mb-5">
-            <AlertDialogTitle className="text-xl">{dialogTitle}</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl">{actionConfig.title}</AlertDialogTitle>
             <AlertDialogDescription className="text-sm sm:text-base">
-              {dialogDescription}
+              {actionConfig.description}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -359,19 +378,17 @@ export function StatusChangeControl({
                 htmlFor={`reopen-reason-${repairId}`}
                 className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
               >
-                Reason for reopening <span className="text-destructive">*</span>
+                Reason for {currentStatus === 'COMPLETED' ? 'reopening' : 'restoring'}{' '}
+                <span className="text-destructive">*</span>
               </Label>
               <Textarea
                 id={`reopen-reason-${repairId}`}
-                placeholder="Customer reported the same issue again..."
+                placeholder={actionConfig.reasonPlaceholder}
                 value={reopenReason}
                 onChange={(event) => setReopenReason(event.target.value)}
                 rows={4}
                 className="text-sm"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Reopening will move this repair back to <strong>{nextStatusLabel}</strong>.
-              </p>
             </div>
           </div>
 
@@ -382,7 +399,11 @@ export function StatusChangeControl({
               disabled={reopenMutation.isPending || isReopenReasonEmpty}
               className="bg-amber-600 hover:bg-amber-700"
             >
-              {reopenMutation.isPending ? 'Reopening...' : 'Reopen Ticket'}
+              {reopenMutation.isPending
+                ? currentStatus === 'COMPLETED'
+                  ? 'Reopening...'
+                  : 'Restoring...'
+                : actionConfig.confirmLabel}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialog>

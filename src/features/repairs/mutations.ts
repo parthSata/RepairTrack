@@ -67,18 +67,22 @@ export function useUpdateRepairStatus(repairId: string) {
 export function useReopenRepair(repairId: string) {
   const queryClient = useQueryClient()
 
-  return useMutation<Repair, Error, ReopenRepairInput>({
-    mutationFn: async ({ reason }) => {
-      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, { reason })
+  return useMutation<Repair, Error, ReopenRepairInput & { action?: 'reopen' | 'restore' }>({
+    mutationFn: async ({ reason, action }) => {
+      const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, {
+        reason,
+        action,
+      })
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: repairKeys.all })
       queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
-      toast.success('Repair ticket reopened successfully!')
+      const actionLabel = variables.action === 'restore' ? 'restored' : 'reopened'
+      toast.success(`Repair ticket ${actionLabel} successfully!`)
     },
     onError: (error: unknown) => {
-      let message = 'Failed to reopen ticket'
+      let message = 'Failed to update repair ticket'
       if (error && typeof error === 'object' && 'response' in error) {
         const resData = (error as { response?: { data?: { message?: string; error?: { message?: string } } } }).response?.data
         if (resData?.message) {

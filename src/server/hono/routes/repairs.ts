@@ -159,7 +159,7 @@ export const repairsRouter = new Hono()
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
-      const { reason } = c.req.valid('json')
+      const { reason, action } = c.req.valid('json')
 
       const updated = await reopenRepairTicket({
         shopId,
@@ -167,6 +167,7 @@ export const repairsRouter = new Hono()
         userId,
         id,
         reason,
+        action,
       })
       return c.json(updated)
     },

@@ -270,8 +270,12 @@ async function testOwnerCanReopenCompleted(fixture: Fixture, repairId: string) {
   assert(latestHistory?.actorType === 'OWNER', 'Test 1 failed: history actorType should be OWNER')
   assert(latestHistory?.changedBy === fixture.ownerId, 'Test 1 failed: changedBy should be the owner')
   assert(
-    latestHistory?.note === 'Repair ticket reopened by OWNER. Reason: Customer reported the same issue again.',
-    'Test 1 failed: history note should include the OWNER reopen reason',
+      typeof latestHistory?.note === 'string' &&
+      latestHistory.note.includes('Previous status: COMPLETED') &&
+      latestHistory.note.includes('New status: DIAGNOSING') &&
+      latestHistory.note.includes('Reason: Customer reported the same issue again.') &&
+      latestHistory.note.includes('Actor: OWNER'),
+    'Test 1 failed: history note should include the OWNER reopen reason and required status details',
   )
   assert(
     JSON.stringify(after.statusHistory.slice(0, before.statusHistory.length)) ===
@@ -312,8 +316,12 @@ async function testStaffCanReopenCompleted(fixture: Fixture, repairId: string) {
   assert(result.status === 'DIAGNOSING', 'Test 2 failed: STAFF reopen should return DIAGNOSING')
   assert(latestHistory?.actorType === 'STAFF', 'Test 2 failed: STAFF reopen should record STAFF actorType')
   assert(
-    latestHistory?.note === 'Repair ticket reopened by STAFF. Reason: Customer reported the same issue again.',
-    'Test 2 failed: STAFF reopen note should include the required reason',
+    typeof latestHistory?.note === 'string' &&
+      latestHistory.note.includes('Previous status: COMPLETED') &&
+      latestHistory.note.includes('New status: DIAGNOSING') &&
+      latestHistory.note.includes('Reason: Customer reported the same issue again.') &&
+      latestHistory.note.includes('Actor: STAFF'),
+    'Test 2 failed: STAFF reopen note should include the required reason and status details',
   )
 
   console.log('Test 2 passed: STAFF can reopen a COMPLETED ticket')
@@ -336,35 +344,47 @@ async function testStaffReasonRequired(fixture: Fixture, repairId: string) {
         reason: '   ',
       }),
     400,
-    'Reason for reopening is required',
+    'Reopen reason is required',
     'Test 3',
   )
 
   console.log('Test 3 passed: STAFF must provide a reason')
 }
 
-async function testStaffCannotReopenCancelled(fixture: Fixture, repairId: string) {
+async function testStaffCanRestoreCancelled(fixture: Fixture, repairId: string) {
   await seedRepair({
     repairId,
     assignedTechnicianId: fixture.technicianId,
     status: 'CANCELLED',
   })
 
-  await expectServiceError(
-    () =>
-      reopenRepairTicket({
-        shopId: fixture.shopId,
-        userRole: 'STAFF',
-        userId: fixture.staffId,
-        id: repairId,
-        reason: 'Customer changed their mind again.',
-      }),
-    403,
-    'Only the shop owner can reopen cancelled tickets',
-    'Test 4',
+  const result = await reopenRepairTicket({
+    shopId: fixture.shopId,
+    userRole: 'STAFF',
+    userId: fixture.staffId,
+    id: repairId,
+    reason: 'Customer changed their mind again.',
+    action: 'restore',
+  })
+  const after = await getCurrentState(repairId)
+  const latestHistory = after.statusHistory.at(-1)
+
+  assert(result.status === 'DIAGNOSING', 'Test 4 failed: STAFF restore should return DIAGNOSING')
+  assert(after.repair?.status === 'DIAGNOSING', 'Test 4 failed: cancelled repair should be restored to DIAGNOSING')
+  assert(latestHistory?.fromStatus === 'CANCELLED', 'Test 4 failed: history should record fromStatus CANCELLED')
+  assert(latestHistory?.toStatus === 'DIAGNOSING', 'Test 4 failed: history should record toStatus DIAGNOSING')
+  assert(latestHistory?.actorType === 'STAFF', 'Test 4 failed: restore should record STAFF actorType')
+  assert(
+    typeof latestHistory?.note === 'string' &&
+      latestHistory.note.includes('Previous status: CANCELLED') &&
+      latestHistory.note.includes('New status: DIAGNOSING') &&
+      latestHistory.note.includes('Reason: Customer changed their mind again.') &&
+      latestHistory.note.includes('Actor: STAFF'),
+    'Test 4 failed: STAFF restore note should include the required reason and status details',
   )
 
-  console.log('Test 4 passed: STAFF cannot reopen a CANCELLED ticket')
+  console.log('Test 4 passed: STAFF can restore a CANCELLED ticket')
+  console.log('Test 4b passed: cancelled restore transitions CANCELLED -> DIAGNOSING')
 }
 
 async function testStaffCannotReopenActiveTickets(fixture: Fixture, repairId: string) {
@@ -396,7 +416,7 @@ async function testStaffCannotReopenActiveTickets(fixture: Fixture, repairId: st
           reason: 'Customer reported the same issue again.',
         }),
       400,
-      'Only completed or cancelled tickets can be reopened',
+      status === 'CANCELLED' ? 'Only cancelled tickets can be restored' : 'Only completed tickets can be reopened',
       `Test 5 (${status})`,
     )
   }
@@ -421,7 +441,7 @@ async function testTechnicianCannotReopen(fixture: Fixture, repairId: string) {
         reason: 'Customer reported the same issue again.',
       }),
     403,
-    'Only Owner and Staff can reopen eligible repair tickets',
+    'Only Owner and Staff can reopen or restore eligible repair tickets',
     'Test 6',
   )
 
@@ -439,7 +459,7 @@ async function testCustomerCannotReopen() {
         reason: 'Customer reported the same issue again.',
       }),
     403,
-    'Only Owner and Staff can reopen eligible repair tickets',
+    'Only Owner and Staff can reopen or restore eligible repair tickets',
     'Test 7',
   )
 
@@ -481,11 +501,44 @@ async function testUnauthenticatedCannotReopen(fixture: Fixture, repairId: strin
         reason: 'Customer reported the same issue again.',
       }),
     403,
-    'Only Owner and Staff can reopen eligible repair tickets',
+    'Only Owner and Staff can reopen or restore eligible repair tickets',
     'Test 9',
   )
 
   console.log('Test 9 passed: unauthenticated/invalid caller cannot reopen')
+}
+
+async function testOwnerCanRestoreCancelled(fixture: Fixture, repairId: string) {
+  await seedRepair({
+    repairId,
+    assignedTechnicianId: fixture.technicianId,
+    status: 'CANCELLED',
+  })
+
+  const result = await reopenRepairTicket({
+    shopId: fixture.shopId,
+    userRole: 'OWNER',
+    userId: fixture.ownerId,
+    id: repairId,
+    reason: 'Customer requested the repair to resume.',
+    action: 'restore',
+  })
+
+  assert(result.status === 'DIAGNOSING', 'Test 4-owner failed: OWNER restore should return DIAGNOSING')
+  const after = await getCurrentState(repairId)
+  assert(after.repair?.status === 'DIAGNOSING', 'Test 4-owner failed: cancelled repair should restore to DIAGNOSING')
+  const latestHistory = after.statusHistory.at(-1)
+  assert(latestHistory?.actorType === 'OWNER', 'Test 4-owner failed: restore should record OWNER actorType')
+  assert(
+    typeof latestHistory?.note === 'string' &&
+      latestHistory.note.includes('Previous status: CANCELLED') &&
+      latestHistory.note.includes('New status: DIAGNOSING') &&
+      latestHistory.note.includes('Reason: Customer requested the repair to resume.') &&
+      latestHistory.note.includes('Actor: OWNER'),
+    'Test 4-owner failed: restore history note should include the OWNER reason and status details',
+  )
+
+  console.log('Test 4-owner passed: OWNER can restore a CANCELLED ticket')
 }
 
 async function testConcurrentDuplicateReopen(fixture: Fixture, repairId: string) {
@@ -539,10 +592,11 @@ async function testOwnerCancelledPathUnchanged(fixture: Fixture, repairId: strin
     userId: fixture.ownerId,
     id: repairId,
     reason: 'Owner override after cancellation review.',
+    action: 'restore',
   })
 
-  assert(result.status === 'IN_REPAIR', 'Cancelled nuance failed: OWNER CANCELLED reopen should remain IN_REPAIR')
-  console.log('Cancelled nuance check passed: OWNER-only CANCELLED reopen path remains unchanged')
+  assert(result.status === 'DIAGNOSING', 'Cancelled restore failed: OWNER RESTORE should move CANCELLED -> DIAGNOSING')
+  console.log('Cancelled restore check passed: OWNER and STAFF can restore CANCELLED tickets back to DIAGNOSING')
 }
 
 async function main() {
@@ -553,13 +607,14 @@ async function main() {
     await testOwnerCanReopenCompleted(fixture, repairId)
     await testStaffCanReopenCompleted(fixture, repairId)
     await testStaffReasonRequired(fixture, repairId)
-    await testStaffCannotReopenCancelled(fixture, repairId)
+    await testStaffCanRestoreCancelled(fixture, repairId)
     await testStaffCannotReopenActiveTickets(fixture, repairId)
     await testTechnicianCannotReopen(fixture, repairId)
     await testCustomerCannotReopen()
     await testWrongShopCannotReopen(fixture, repairId)
     await testUnauthenticatedCannotReopen(fixture, repairId)
     await testConcurrentDuplicateReopen(fixture, repairId)
+    await testOwnerCanRestoreCancelled(fixture, repairId)
     await testOwnerCancelledPathUnchanged(fixture, repairId)
 
     console.log('All reopen verification tests passed.')

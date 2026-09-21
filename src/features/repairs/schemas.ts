@@ -106,11 +106,12 @@ export const requestCustomerApprovalSchema = z.object({
 export type RequestCustomerApprovalInput = z.infer<typeof requestCustomerApprovalSchema>
 
 export const reopenRepairSchema = z.object({
+  action: z.enum(['reopen', 'restore']).optional().default('reopen'),
   reason: z
     .string()
     .trim()
-    .max(1000, { message: 'Reopen reason cannot exceed 1000 characters' })
-    .optional(),
+    .min(1, { message: 'Reason is required' })
+    .max(1000, { message: 'Recovery reason cannot exceed 1000 characters' }),
 })
 
 export type ReopenRepairInput = z.infer<typeof reopenRepairSchema>
