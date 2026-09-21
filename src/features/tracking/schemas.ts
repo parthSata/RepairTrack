@@ -60,6 +60,7 @@ export const publicTrackingResponseSchema = z.object({
   }),
   problemDescription: z.string().nullable(),
   estimatedCost: z.number().optional(),
+  expectedCompletionDate: z.string().nullable(),
   approval: z
     .object({
       status: z.enum(['PENDING', 'APPROVED', 'REJECTED']),

@@ -20,7 +20,7 @@ export function TrackPageShell({
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
         Repair tracking
       </p>
-      <h1 className="text-xl font-semibold tracking-tight text-foreground break-words sm:text-2xl md:text-3xl">
+      <h1 className="text-xl font-semibold tracking-tight text-foreground wrap-break-word sm:text-2xl md:text-3xl">
         {title}
       </h1>
       <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>

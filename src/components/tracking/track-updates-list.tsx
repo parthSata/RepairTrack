@@ -29,7 +29,7 @@ export function TrackUpdatesList({ updates }: { updates: PublicTrackingResponse[
           className="flex min-w-0 flex-col gap-1.5 rounded-lg border border-border bg-muted/20 px-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-4 track-update-enter motion-safe:animate-[track-update-enter_220ms_ease-out_both]"
           style={{ animationDelay: `${index * 60}ms` }}
         >
-          <span className="min-w-0 text-sm font-medium text-foreground break-words">
+          <span className="min-w-0 text-sm font-medium text-foreground wrap-break-word">
             {update.label}
           </span>
           <time className="shrink-0 text-xs text-muted-foreground tabular-nums sm:text-right">
