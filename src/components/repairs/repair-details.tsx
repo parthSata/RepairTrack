@@ -53,6 +53,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ConditionBadge, DeviceTypeIcon, ModelVerificationBadge } from '@/components/devices/device-table'
 import { ModelConfirmationCard } from './model-confirmation-card'
 import { CustomerTrackingSection } from './customer-tracking-section'
+import { RepairPhotosSection } from './repair-photos-section'
 import { StatusChangeControl } from './status-change-control'
 import { StatusHistoryTimeline } from './status-history-timeline'
 import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
@@ -537,6 +538,10 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {repair.photos ? (
+        <RepairPhotosSection repairId={repair.id} photos={repair.photos} />
+      ) : null}
 
       {canShowCustomerTracking ? (
         <CustomerTrackingSection
