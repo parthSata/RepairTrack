@@ -10,6 +10,7 @@ export const shops = pgTable('shops', {
   email: text('email'),
   address: text('address'),
   businessInfo: text('business_info'),
+  businessHours: text('business_hours'),
   logoKey: text('logo_key'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -7,6 +7,7 @@ import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { devices, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
+import { shops } from '@/server/db/schema/users'
 import { phonesMatch } from '@/server/lib/tokens'
 import { mapRepairStatusToPublicLabel } from '@/features/tracking/status-labels'
 
@@ -26,6 +27,13 @@ type RepairRow = {
 type DeviceRow = {
   brand: string
   model: string | null
+}
+
+type ShopRow = {
+  name: string | null
+  address: string | null
+  phone: string | null
+  businessHours: string | null
 }
 
 type HistoryRow = {
@@ -66,12 +74,17 @@ function toPublicApproval(approval: ApprovalRow) {
 export function buildPublicTrackingPayload(
   repair: RepairRow,
   device: DeviceRow,
+  shop: ShopRow,
   history: HistoryRow[],
   approval?: ApprovalRow | null,
 ): PublicTrackingResponse {
   const payload: PublicTrackingResponse = {
     ticketNumber: repair.ticketNumber,
     status: mapRepairStatusToPublicLabel(repair.status),
+    shopName: shop.name ?? '',
+    shopAddress: shop.address ?? '',
+    shopPhone: shop.phone ?? '',
+    shopBusinessHours: shop.businessHours,
     device: {
       brand: device.brand,
       model: device.model,
@@ -113,9 +126,14 @@ async function loadPublicRepairData(repairId: string) {
       createdAt: repairs.createdAt,
       brand: devices.brand,
       model: devices.model,
+      shopName: shops.name,
+      shopAddress: shops.address,
+      shopPhone: shops.phone,
+      shopBusinessHours: shops.businessHours,
     })
     .from(repairs)
     .innerJoin(devices, eq(devices.id, repairs.deviceId))
+    .innerJoin(shops, eq(shops.id, repairs.shopId))
     .where(eq(repairs.id, repairId))
 
   if (!row) {
@@ -159,6 +177,12 @@ async function loadPublicRepairData(repairId: string) {
     {
       brand: row.brand,
       model: row.model,
+    },
+    {
+      name: row.shopName,
+      address: row.shopAddress,
+      phone: row.shopPhone,
+      businessHours: row.shopBusinessHours,
     },
     history,
     latestApprovalRows[0] ?? null,

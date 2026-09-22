@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { businessHoursSchema } from './business-hours'
 
 const phoneSchema = z
   .string({ error: 'Phone is required' })
@@ -31,6 +32,7 @@ export const shopProfileSchema = z.object({
   email: emailSchema,
   address: addressSchema,
   businessInfo: z.string().trim().max(1000).optional(),
+  businessHours: businessHoursSchema,
   logoUrl: z.string().trim().max(500).optional(),
 })
 
