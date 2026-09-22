@@ -54,6 +54,10 @@ export type TrackDecisionInput = z.infer<typeof trackDecisionSchema>
 export const publicTrackingResponseSchema = z.object({
   ticketNumber: z.string(),
   status: z.string(),
+  shopName: z.string(),
+  shopAddress: z.string(),
+  shopPhone: z.string(),
+  shopBusinessHours: z.string().nullable(),
   device: z.object({
     brand: z.string(),
     model: z.string().nullable(),

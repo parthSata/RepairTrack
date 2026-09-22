@@ -22,6 +22,7 @@ export default async function ShopProfilePage() {
         email: session.user.email,
         address: shop.address ?? '',
         businessInfo: shop.businessInfo ?? '',
+        businessHours: shop.businessHours,
         logoUrl: shop.logoUrl ?? '',
         logoPreviewUrl: shop.logoUrl ? logoPublicUrl(shop.logoUrl) : null,
       }

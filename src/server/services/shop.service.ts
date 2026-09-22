@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { shops } from '@/server/db/schema'
 import type { ShopProfile } from '@/features/shop/schemas'
+import { parseBusinessHours, serializeBusinessHours } from '@/features/shop/business-hours'
 
 export async function getShopById(shopId: string) {
   const [shop] = await db
@@ -12,13 +13,14 @@ export async function getShopById(shopId: string) {
       email: shops.email,
       address: shops.address,
       businessInfo: shops.businessInfo,
+      businessHours: shops.businessHours,
       logoUrl: shops.logoKey,
     })
     .from(shops)
     .where(eq(shops.id, shopId))
     .limit(1)
 
-  return shop ?? null
+  return shop ? { ...shop, businessHours: parseBusinessHours(shop.businessHours) } : null
 }
 
 export async function updateShopProfile(shopId: string, profile: ShopProfile) {
@@ -37,6 +39,7 @@ export async function updateShopProfile(shopId: string, profile: ShopProfile) {
       email: profile.email,
       address: profile.address,
       businessInfo: profile.businessInfo || null,
+      businessHours: serializeBusinessHours(profile.businessHours),
       logoKey: profile.logoUrl || null,
       updatedAt: new Date(),
     })

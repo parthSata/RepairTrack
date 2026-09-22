@@ -17,6 +17,7 @@ import {
   TrackStatusIcon,
 } from '@/components/tracking/track-progress-indicator'
 import { TrackApprovalSummaryCard } from '@/components/tracking/track-approval-summary-card'
+import { TrackPickupInfo } from '@/components/tracking/track-pickup-info'
 import { TrackRepairSummary } from '@/components/tracking/track-repair-summary'
 import { TrackSectionHeader } from '@/components/tracking/track-section-header'
 import { TrackUpdatesList } from '@/components/tracking/track-updates-list'
@@ -107,6 +108,14 @@ export function TrackStatusView({
           </div>
         </div>
       </section>
+
+      <TrackPickupInfo
+        status={data.status}
+        shopName={data.shopName}
+        shopAddress={data.shopAddress}
+        shopPhone={data.shopPhone}
+        shopBusinessHours={data.shopBusinessHours}
+      />
 
       {approval ? (
         <TrackApprovalSummaryCard
