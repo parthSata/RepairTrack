@@ -10,6 +10,7 @@ import { devices, repairStatusHistory, repairs } from '@/server/db/schema/repair
 import { shops } from '@/server/db/schema/users'
 import { phonesMatch } from '@/server/lib/tokens'
 import { mapRepairStatusToPublicLabel } from '@/features/tracking/status-labels'
+import { getPublicRepairPhotos } from '@/server/services/repair-photo.service'
 
 const PUBLIC_TRACKING_NOT_FOUND = "We couldn't find this repair."
 const PUBLIC_APPROVAL_ALREADY_DECIDED = 'This repair estimate has already been decided.'
@@ -77,6 +78,7 @@ export function buildPublicTrackingPayload(
   shop: ShopRow,
   history: HistoryRow[],
   approval?: ApprovalRow | null,
+  photos?: { beforeUrl: string; afterUrl: string } | null,
 ): PublicTrackingResponse {
   const payload: PublicTrackingResponse = {
     ticketNumber: repair.ticketNumber,
@@ -111,6 +113,10 @@ export function buildPublicTrackingPayload(
     }
   }
 
+  if (photos) {
+    payload.photos = photos
+  }
+
   return payload
 }
 
@@ -118,6 +124,7 @@ async function loadPublicRepairData(repairId: string) {
   const [row] = await db
     .select({
       repairId: repairs.id,
+      shopId: repairs.shopId,
       ticketNumber: repairs.ticketNumber,
       status: repairs.status,
       problemDescription: repairs.problemDescription,
@@ -140,7 +147,7 @@ async function loadPublicRepairData(repairId: string) {
     return null
   }
 
-  const [history, latestApprovalRows] = await Promise.all([
+  const [history, latestApprovalRows, photos] = await Promise.all([
     db
       .select({
         toStatus: repairStatusHistory.toStatus,
@@ -163,6 +170,7 @@ async function loadPublicRepairData(repairId: string) {
       .where(eq(repairApprovals.repairId, repairId))
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
+    getPublicRepairPhotos(row.shopId, repairId, row.status),
   ])
 
   return buildPublicTrackingPayload(
@@ -186,6 +194,7 @@ async function loadPublicRepairData(repairId: string) {
     },
     history,
     latestApprovalRows[0] ?? null,
+    photos,
   )
 }
 
