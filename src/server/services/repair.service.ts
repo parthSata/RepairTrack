@@ -24,6 +24,7 @@ import {
   markActiveOrHeldAssignmentCompleted,
   syncAssignmentOnReassign,
 } from '@/server/services/repair-assignment.helpers'
+import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -354,6 +355,7 @@ export async function getRepairById({
       finalCost: repairs.finalCost,
       expectedCompletionDate: repairs.expectedCompletionDate,
       assignedTechnicianId: repairs.assignedTechnicianId,
+      customerPhotosHidden: repairs.customerPhotosHidden,
       createdBy: repairs.createdBy,
       createdAt: repairs.createdAt,
       updatedAt: repairs.updatedAt,
@@ -383,8 +385,8 @@ export async function getRepairById({
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
-  // Fetch creator info, assignment context, notes, status history, and approval concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult] =
+  // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -495,6 +497,7 @@ export async function getRepairById({
         ),
       )
       .limit(1),
+    getRepairPhotosForDetail({ shopId, userRole, userId, repairId: id }),
   ])
 
   const creator = creatorResult[0] || null
@@ -548,6 +551,12 @@ export async function getRepairById({
     resolvedStatusHistory = refreshedHistory
   }
 
+  // Recompute photo visibility against healed status
+  const photosPayload =
+    resolvedStatus === repair.status
+      ? photos
+      : await getRepairPhotosForDetail({ shopId, userRole, userId, repairId: id })
+
   return {
     ...repair,
     status: resolvedStatus,
@@ -560,6 +569,7 @@ export async function getRepairById({
     notes,
     statusHistory: resolvedStatusHistory,
     approval,
+    photos: photosPayload,
     currentAssignment: currentAssignment
       ? {
           id: currentAssignment.id,
