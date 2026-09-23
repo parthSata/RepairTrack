@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Eye, Package } from 'lucide-react'
+import { AlertTriangle, Eye, Package, Plus } from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -16,6 +16,8 @@ import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-col
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PartForm } from '@/components/inventory/part-form'
 import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cn } from '@/lib/utils'
@@ -54,6 +56,8 @@ export function PartTable() {
     sortBy: 'createdAt',
     sortOrder: 'desc',
   })
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [createPending, setCreatePending] = React.useState(false)
 
   const { data, isLoading, isError, error, refetch } = useParts(filters)
 
@@ -192,6 +196,14 @@ export function PartTable() {
             </span>
           ) : null}
         </div>
+        <Button
+          variant="accent"
+          className="shrink-0 gap-2"
+          onClick={() => setCreateOpen(true)}
+        >
+          <Plus className="h-4 w-4" />
+          Add Part
+        </Button>
       </div>
 
       {alertBanner ? (
@@ -234,11 +246,44 @@ export function PartTable() {
               <TableEmptyState
                 icon={Package}
                 title="No parts yet — add your first part to start tracking inventory."
-              />
+              >
+                <Button
+                  variant="accent"
+                  className="mt-4 gap-2"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add First Part
+                </Button>
+              </TableEmptyState>
             )
           }
         />
       )}
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          if (createPending && !open) return
+          setCreateOpen(open)
+        }}
+        preventDismiss={createPending}
+      >
+        <DialogHeader>
+          <DialogTitle>Add Part</DialogTitle>
+        </DialogHeader>
+        <PartForm
+          mode="create"
+          onPendingChange={setCreatePending}
+          onSuccess={() => {
+            setCreatePending(false)
+            setCreateOpen(false)
+          }}
+          onCancel={() => {
+            if (!createPending) setCreateOpen(false)
+          }}
+        />
+      </Dialog>
     </div>
   )
 }

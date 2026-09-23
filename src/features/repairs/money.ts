@@ -1,15 +1,16 @@
 /**
- * Money is stored in the database as integer paise (100 paise = ₹1).
- * User-facing inputs and labels always use rupees.
+ * Repair-domain money helpers (legacy stored-cost handling + formatting).
+ * Pure ₹ ↔ paise converters live in `@/lib/money` and are re-exported here
+ * so existing repair imports keep working.
  */
 
-export function rupeesToPaise(rupees: number): number {
-  return Math.round(rupees * 100)
-}
+export {
+  rupeesToPaise,
+  paiseToRupees,
+  parseRupeesInput,
+} from '@/lib/money'
 
-export function paiseToRupees(paise: number): number {
-  return paise / 100
-}
+import { paiseToRupees, rupeesToPaise } from '@/lib/money'
 
 /**
  * Converts a DB integer to rupees for display.
@@ -65,14 +66,6 @@ export function formatRupeesInputValue(stored: number | null): string {
   const rupees = storedCostToRupees(stored)
   if (rupees == null) return ''
   return Number.isInteger(rupees) ? String(rupees) : rupees.toFixed(2)
-}
-
-export function parseRupeesInput(value: string): number | null {
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  const parsed = Number.parseFloat(trimmed)
-  if (Number.isNaN(parsed) || parsed < 0) return null
-  return parsed
 }
 
 /** Normalize user-entered rupees to paise for DB writes. */

@@ -1,8 +1,47 @@
 import { and, count, desc, eq, gt, ilike, lte, or } from 'drizzle-orm'
+import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { inventory } from '@/server/db/schema/inventory'
-import type { PartFilterInput } from '@/features/inventory/schemas'
+import type { PartFilterInput, PartFormInput } from '@/features/inventory/schemas'
 import { REORDER_THRESHOLD } from '@/features/inventory/stock-status'
+
+export async function createPart({
+  shopId,
+  data,
+}: {
+  shopId: string
+  data: PartFormInput
+}) {
+  const existingSku = await db
+    .select({ id: inventory.id })
+    .from(inventory)
+    .where(and(eq(inventory.shopId, shopId), eq(inventory.sku, data.sku)))
+    .limit(1)
+
+  if (existingSku.length > 0) {
+    throw new HTTPException(400, {
+      message: 'A part with this SKU already exists in your shop',
+    })
+  }
+
+  const id = crypto.randomUUID()
+  const [created] = await db
+    .insert(inventory)
+    .values({
+      id,
+      shopId,
+      name: data.name,
+      sku: data.sku,
+      quantity: data.quantity,
+      minimumStock: data.minimumStock,
+      purchasePrice: data.purchasePrice,
+      sellingPrice: data.sellingPrice,
+      supplier: data.supplier?.trim() ? data.supplier.trim() : null,
+    })
+    .returning()
+
+  return created
+}
 
 export async function listParts({
   shopId,

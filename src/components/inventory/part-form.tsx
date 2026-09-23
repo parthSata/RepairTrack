@@ -1,0 +1,305 @@
+'use client'
+
+import * as React from 'react'
+import {
+  Controller,
+  useForm,
+  type Control,
+  type FieldPath,
+  type FieldErrors,
+  type Resolver,
+} from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertCircle, Package, Tag, Hash, Warehouse, IndianRupee, Truck } from 'lucide-react'
+import { partSchema, type PartFormInput } from '@/features/inventory/schemas'
+import { useCreatePart } from '@/features/inventory/mutations'
+import type { Part } from '@/features/inventory/queries'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from '@/components/ui/sonner'
+import { getApiErrorMessage } from '@/lib/api-error'
+import {
+  formatPaiseAsRupeesInput,
+  parseRupeesInput,
+  rupeesToPaise,
+} from '@/lib/money'
+import { cn } from '@/lib/utils'
+
+interface PartFormProps {
+  mode: 'create' | 'edit'
+  partId?: string
+  initialData?: Partial<PartFormInput>
+  onSuccess: (part?: Part) => void
+  onCancel?: () => void
+  onPendingChange?: (pending: boolean) => void
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return (
+    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive">
+      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+      {message}
+    </p>
+  )
+}
+
+function PaisePriceField({
+  name,
+  label,
+  control,
+  errors,
+  disabled,
+}: {
+  name: Extract<FieldPath<PartFormInput>, 'purchasePrice' | 'sellingPrice'>
+  label: string
+  control: Control<PartFormInput>
+  errors: FieldErrors<PartFormInput>
+  disabled?: boolean
+}) {
+  const error = errors[name]
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={name} className="flex items-center gap-2 text-sm font-medium">
+        <IndianRupee className="h-4 w-4 text-muted-foreground" />
+        {label} <span className="font-bold text-destructive">*</span>
+      </Label>
+      <div className="relative">
+        <span
+          className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground"
+          aria-hidden
+        >
+          ₹
+        </span>
+        <Controller
+          name={name}
+          control={control}
+          render={({ field }) => (
+            <Input
+              id={name}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              placeholder="0"
+              disabled={disabled}
+              className={cn(
+                'pl-7',
+                error ? 'border-destructive focus-visible:ring-destructive' : '',
+              )}
+              value={formatPaiseAsRupeesInput(field.value)}
+              onChange={(e) => {
+                const rupees = parseRupeesInput(e.target.value)
+                if (rupees == null) {
+                  field.onChange(e.target.value === '' ? 0 : Number.NaN)
+                  return
+                }
+                field.onChange(rupeesToPaise(rupees))
+              }}
+              onBlur={field.onBlur}
+              name={field.name}
+              ref={field.ref}
+            />
+          )}
+        />
+      </div>
+      <FieldError message={error?.message} />
+    </div>
+  )
+}
+
+export function PartForm({
+  mode,
+  initialData,
+  onSuccess,
+  onCancel,
+  onPendingChange,
+}: PartFormProps) {
+  const createMutation = useCreatePart()
+  const isPending = createMutation.isPending
+
+  React.useEffect(() => {
+    onPendingChange?.(isPending)
+  }, [isPending, onPendingChange])
+
+  const {
+    register,
+    handleSubmit, 
+    control,
+    setError,
+    formState: { errors },
+  } = useForm<PartFormInput>({
+    // partSchema uses z.coerce; cast keeps RHF aligned with PartFormInput (output type)
+    resolver: zodResolver(partSchema) as Resolver<PartFormInput>,
+    mode: 'onChange',
+    reValidateMode: 'onChange',
+    defaultValues: {
+      name: initialData?.name ?? '',
+      sku: initialData?.sku ?? '',
+      quantity: initialData?.quantity ?? 0,
+      minimumStock: initialData?.minimumStock ?? 0,
+      purchasePrice: initialData?.purchasePrice ?? 0,
+      sellingPrice: initialData?.sellingPrice ?? 0,
+      supplier: initialData?.supplier ?? '',
+    },
+  })
+
+  const onSubmit = async (values: PartFormInput) => {
+    try {
+      if (mode !== 'create') {
+        toast.error('Editing parts is not available yet')
+        return
+      }
+
+      const payload: PartFormInput = {
+        ...values,
+        supplier: values.supplier?.trim() ? values.supplier.trim() : null,
+      }
+
+      const saved = await createMutation.mutateAsync(payload)
+      toast.success('Part added')
+      onSuccess(saved)
+    } catch (err: unknown) {
+      const message = getApiErrorMessage(err, 'Failed to add part. Please try again.')
+
+      if (/sku/i.test(message)) {
+        setError('sku', { type: 'manual', message })
+      }
+
+      toast.error(message, { duration: 5000 })
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2" noValidate>
+      <div className="space-y-1.5">
+        <Label htmlFor="name" className="flex items-center gap-2 text-sm font-medium">
+          <Package className="h-4 w-4 text-muted-foreground" />
+          Part name <span className="font-bold text-destructive">*</span>
+        </Label>
+        <Input
+          id="name"
+          placeholder="e.g. iPhone 13 LCD"
+          disabled={isPending}
+          className={errors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+          {...register('name')}
+        />
+        <FieldError message={errors.name?.message} />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="sku" className="flex items-center gap-2 text-sm font-medium">
+          <Tag className="h-4 w-4 text-muted-foreground" />
+          SKU <span className="font-bold text-destructive">*</span>
+        </Label>
+        <Input
+          id="sku"
+          placeholder="e.g. LCD-IP13"
+          disabled={isPending}
+          className={errors.sku ? 'border-destructive focus-visible:ring-destructive' : ''}
+          {...register('sku')}
+        />
+        <FieldError message={errors.sku?.message} />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label htmlFor="quantity" className="flex items-center gap-2 text-sm font-medium">
+            <Hash className="h-4 w-4 text-muted-foreground" />
+            Quantity
+          </Label>
+          <Input
+            id="quantity"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            disabled={isPending}
+            className={errors.quantity ? 'border-destructive focus-visible:ring-destructive' : ''}
+            {...register('quantity')}
+          />
+          <FieldError message={errors.quantity?.message} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="minimumStock" className="flex items-center gap-2 text-sm font-medium">
+            <Warehouse className="h-4 w-4 text-muted-foreground" />
+            Minimum stock
+          </Label>
+          <Input
+            id="minimumStock"
+            type="number"
+            inputMode="numeric"
+            min={0}
+            step={1}
+            disabled={isPending}
+            className={
+              errors.minimumStock ? 'border-destructive focus-visible:ring-destructive' : ''
+            }
+            {...register('minimumStock')}
+          />
+          <FieldError message={errors.minimumStock?.message} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <PaisePriceField
+          name="purchasePrice"
+          label="Purchase price"
+          control={control}
+          errors={errors}
+          disabled={isPending}
+        />
+        <PaisePriceField
+          name="sellingPrice"
+          label="Selling price"
+          control={control}
+          errors={errors}
+          disabled={isPending}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="supplier" className="flex items-center gap-2 text-sm font-medium">
+            <Truck className="h-4 w-4 text-muted-foreground" />
+            Supplier
+          </Label>
+          <span className="text-[11px] text-muted-foreground">Optional</span>
+        </div>
+        <Input
+          id="supplier"
+          placeholder="e.g. PartsHub India"
+          disabled={isPending}
+          className={errors.supplier ? 'border-destructive focus-visible:ring-destructive' : ''}
+          {...register('supplier', {
+            setValueAs: (v: string) => {
+              const trimmed = typeof v === 'string' ? v.trim() : ''
+              return trimmed.length > 0 ? trimmed : null
+            },
+          })}
+        />
+        <FieldError message={errors.supplier?.message} />
+      </div>
+
+      <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+        {onCancel ? (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
+            Cancel
+          </Button>
+        ) : null}
+        <Button type="submit" variant="accent" disabled={isPending}>
+          {isPending
+            ? mode === 'create'
+              ? 'Adding…'
+              : 'Saving…'
+            : mode === 'create'
+              ? 'Add Part'
+              : 'Save Changes'}
+        </Button>
+      </div>
+    </form>
+  )
+}
