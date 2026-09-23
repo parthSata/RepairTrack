@@ -120,6 +120,26 @@ export interface Repair {
     heldAt: string | null
     heldReason: string | null
   } | null
+  photos?: RepairPhotosPayload
+}
+
+export interface RepairPhotoItem {
+  id: string
+  type: 'BEFORE' | 'AFTER'
+  publicId: string
+  url: string
+  uploadedBy: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RepairPhotosPayload {
+  customerPhotosHidden: boolean
+  customerVisible: boolean
+  canMutate: boolean
+  canHide: boolean
+  before: RepairPhotoItem | null
+  after: RepairPhotoItem | null
 }
 
 export interface RepairListResponse {

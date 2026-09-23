@@ -19,6 +19,7 @@ import {
 import { TrackApprovalSummaryCard } from '@/components/tracking/track-approval-summary-card'
 import { TrackPickupInfo } from '@/components/tracking/track-pickup-info'
 import { TrackRepairSummary } from '@/components/tracking/track-repair-summary'
+import { TrackRepairPhotos } from '@/components/tracking/track-repair-photos'
 import { TrackSectionHeader } from '@/components/tracking/track-section-header'
 import { TrackUpdatesList } from '@/components/tracking/track-updates-list'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
@@ -144,6 +145,10 @@ export function TrackStatusView({
         expectedCompletionDate={data.expectedCompletionDate}
         hasPendingApproval={hasPendingApproval}
       />
+
+      {data.photos ? (
+        <TrackRepairPhotos beforeUrl={data.photos.beforeUrl} afterUrl={data.photos.afterUrl} />
+      ) : null}
 
       <Card className="w-full min-w-0 border-border">
         <CardContent className="flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6">

@@ -261,6 +261,19 @@ Rules:
 
 # 13. Commits
 
+## Permission (binding)
+
+- **Never auto-commit.** Do not run `git commit` unless the user explicitly asks
+  to commit in that message (e.g. "commit this", "create a commit").
+- **Never push to GitHub** (`git push`, `gh pr create` that pushes, force-push)
+  unless the user explicitly asks to push or open a PR.
+- **Ask first, every time.** Before any commit, confirm with the user (even if a
+  plan said "feature-wise commits"). Plan text does not count as permission.
+- Finishing a feature does not imply permission to commit or push. Leave changes
+  unstaged/uncommitted and tell the user how to review them.
+
+## Message style
+
 Conventional commits, one logical change each:
 
 ```text

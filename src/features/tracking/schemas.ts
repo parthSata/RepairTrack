@@ -86,6 +86,12 @@ export const publicTrackingResponseSchema = z.object({
       timestamp: z.string(),
     }),
   ),
+  photos: z
+    .object({
+      beforeUrl: z.string(),
+      afterUrl: z.string(),
+    })
+    .optional(),
 })
 
 export type PublicTrackingResponse = z.infer<typeof publicTrackingResponseSchema>

@@ -228,6 +228,11 @@ sign in; they use the public tracking page only.
 | Manage staff, shop settings | yes | no | no |
 | Connect/disconnect shop Gmail | yes | no | no |
 | Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no |
+| Upload / replace / delete repair photos (before & after) while **internal** | yes | yes | assigned repairs only |
+| Upload / replace / delete repair photos while **customer-visible** | yes | yes | no |
+| Hide / unhide repair photos from customer tracking | yes | yes | no |
+
+Repair photos become customer-visible only when both before and after exist, repair status is `READY_FOR_PICKUP` or `COMPLETED`, and `customer_photos_hidden` is false. There is no per-ticket Share action.
 
 * **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
 * **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.

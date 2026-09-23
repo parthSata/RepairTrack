@@ -120,6 +120,13 @@
       "when": 1790042832409,
       "tag": "0016_talented_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790086500019,
+      "tag": "0017_acoustic_victor_mancha",
+      "breakpoints": true
     }
   ]
 }

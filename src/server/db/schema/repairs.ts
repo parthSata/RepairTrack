@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core'
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { shops, users } from './users'
 import { customers } from './customers'
@@ -44,6 +44,8 @@ export const repairStatusHistoryActorTypeEnum = pgEnum('repair_status_history_ac
   'STAFF',
   'CUSTOMER',
 ])
+
+export const repairPhotoTypeEnum = pgEnum('repair_photo_type', ['BEFORE', 'AFTER'])
 
 export const devices = pgTable(
   'devices',
@@ -100,6 +102,7 @@ export const repairs = pgTable(
     assignedTechnicianId: text('assigned_technician_id').references(() => users.id, {
       onDelete: 'set null',
     }),
+    customerPhotosHidden: boolean('customer_photos_hidden').default(false).notNull(),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -111,6 +114,31 @@ export const repairs = pgTable(
     index('repairs_status_idx').on(table.status),
     index('repairs_assigned_technician_id_idx').on(table.assignedTechnicianId),
     index('repairs_tracking_token_idx').on(table.trackingToken),
+  ],
+)
+
+export const repairPhotos = pgTable(
+  'repair_photos',
+  {
+    id: text('id').primaryKey(),
+    shopId: text('shop_id')
+      .notNull()
+      .references(() => shops.id, { onDelete: 'cascade' }),
+    repairId: text('repair_id')
+      .notNull()
+      .references(() => repairs.id, { onDelete: 'cascade' }),
+    type: repairPhotoTypeEnum('type').notNull(),
+    cloudinaryPublicId: text('cloudinary_public_id').notNull(),
+    uploadedBy: text('uploaded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('repair_photos_shop_id_idx').on(table.shopId),
+    index('repair_photos_repair_id_idx').on(table.repairId),
+    uniqueIndex('repair_photos_repair_id_type_uidx').on(table.repairId, table.type),
   ],
 )
 
@@ -163,6 +191,7 @@ export const repairsRelations = relations(repairs, ({ one, many }) => ({
   statusHistory: many(repairStatusHistory),
   approvals: many(repairApprovals),
   assignments: many(repairAssignments),
+  photos: many(repairPhotos),
 }))
 
 export const repairNotesRelations = relations(repairNotes, ({ one }) => ({
@@ -173,6 +202,12 @@ export const repairNotesRelations = relations(repairNotes, ({ one }) => ({
 export const repairStatusHistoryRelations = relations(repairStatusHistory, ({ one }) => ({
   repair: one(repairs, { fields: [repairStatusHistory.repairId], references: [repairs.id] }),
   changedByUser: one(users, { fields: [repairStatusHistory.changedBy], references: [users.id] }),
+}))
+
+export const repairPhotosRelations = relations(repairPhotos, ({ one }) => ({
+  shop: one(shops, { fields: [repairPhotos.shopId], references: [shops.id] }),
+  repair: one(repairs, { fields: [repairPhotos.repairId], references: [repairs.id] }),
+  uploader: one(users, { fields: [repairPhotos.uploadedBy], references: [users.id] }),
 }))
 
 

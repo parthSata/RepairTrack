@@ -18,6 +18,12 @@ import {
   updateExpectedCompletionDate,
   updateRepairStatus,
 } from '@/server/services/repair.service'
+import {
+  confirmRepairPhoto,
+  deleteRepairPhoto,
+  requestRepairPhotoUploadUrl,
+  setRepairPhotosVisibility,
+} from '@/server/services/repair-photo.service'
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
 import {
@@ -26,6 +32,12 @@ import {
   updateEstimatedCostSchema,
   updateExpectedCompletionDateSchema,
 } from '@/features/repairs/schemas'
+import {
+  repairPhotoConfirmSchema,
+  repairPhotoTypeValues,
+  repairPhotoUploadUrlSchema,
+  repairPhotoVisibilitySchema,
+} from '@/features/repairs/photos/schemas'
 
 async function requireRepairUserSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
@@ -288,4 +300,70 @@ export const repairsRouter = new Hono()
     })
     return c.json(updated)
   })
-
+  .post(
+    '/:id/photos/upload-url',
+    zValidator('json', repairPhotoUploadUrlSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { type, size } = c.req.valid('json')
+      const upload = await requestRepairPhotoUploadUrl(
+        { shopId, userRole, userId, repairId: id },
+        { type, size },
+      )
+      return c.json(upload)
+    },
+  )
+  .put(
+    '/:id/photos',
+    zValidator('json', repairPhotoConfirmSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { type, publicId } = c.req.valid('json')
+      const payload = await confirmRepairPhoto(
+        { shopId, userRole, userId, repairId: id },
+        { type, publicId },
+      )
+      return c.json(payload)
+    },
+  )
+  .delete('/:id/photos/:type', async (c) => {
+    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+    const id = c.req.param('id')
+    const typeParam = c.req.param('type').toUpperCase()
+    if (!repairPhotoTypeValues.includes(typeParam as (typeof repairPhotoTypeValues)[number])) {
+      throw new HTTPException(400, { message: 'Photo type must be BEFORE or AFTER' })
+    }
+    const payload = await deleteRepairPhoto(
+      { shopId, userRole, userId, repairId: id },
+      typeParam as (typeof repairPhotoTypeValues)[number],
+    )
+    return c.json(payload)
+  })
+  .patch(
+    '/:id/photos/visibility',
+    zValidator('json', repairPhotoVisibilitySchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { hidden } = c.req.valid('json')
+      const payload = await setRepairPhotosVisibility(
+        { shopId, userRole, userId, repairId: id },
+        hidden,
+      )
+      return c.json(payload)
+    },
+  )
