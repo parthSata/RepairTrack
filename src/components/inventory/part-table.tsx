@@ -3,7 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Package } from 'lucide-react'
+import { AlertTriangle, Eye, Package } from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -15,23 +15,34 @@ import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { cn } from '@/lib/utils'
 
 function StockStatusBadge({ quantity, minimumStock }: { quantity: number; minimumStock: number }) {
   const status = getPartStockStatus(quantity, minimumStock)
   if (status === 'OK') return null
 
   return (
-    <Badge
-      variant={status === 'OUT' ? 'destructive' : 'warning'}
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap border shadow-2xs',
+        status === 'OUT'
+          ? 'border-red-200/90 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300'
+          : 'border-amber-300/90 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200',
+      )}
       title={STOCK_STATUS_COPY[status]}
-      className="whitespace-nowrap"
     >
+      <span
+        className={cn(
+          'h-1.5 w-1.5 rounded-full shrink-0',
+          status === 'OUT' ? 'bg-red-500' : 'bg-amber-500',
+        )}
+        aria-hidden="true"
+      />
       {status === 'OUT' ? 'Out of stock' : 'Low stock'}
-    </Badge>
+    </span>
   )
 }
 
@@ -117,10 +128,12 @@ export function PartTable() {
             <Link href={`/inventory/${part.id}`}>
               <Button
                 variant="ghost"
-                className="h-8 px-2 text-xs"
+                size="sm"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
                 aria-label={`View ${part.name}`}
+                title={`View ${part.name}`}
               >
-                View
+                <Eye className="h-4 w-4" aria-hidden="true" />
               </Button>
             </Link>
           </div>
@@ -184,10 +197,10 @@ export function PartTable() {
       {alertBanner ? (
         <div
           role="status"
-          className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-200"
+          className="flex items-start gap-3 rounded-xl border border-amber-300/90 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-950 shadow-xs dark:border-amber-800/80 dark:bg-amber-950/40 dark:text-amber-200"
         >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          <p>{alertBanner}</p>
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+          <p className="leading-relaxed text-amber-900 dark:text-amber-200">{alertBanner}</p>
         </div>
       ) : null}
 
