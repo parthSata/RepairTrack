@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Eye, Package, Plus } from 'lucide-react'
+import { AlertTriangle, Package, Pencil, Plus } from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -22,8 +21,8 @@ import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cn } from '@/lib/utils'
 
-function StockStatusBadge({ quantity, minimumStock }: { quantity: number; minimumStock: number }) {
-  const status = getPartStockStatus(quantity, minimumStock)
+function StockStatusBadge({ quantity, stockAlert }: { quantity: number; stockAlert: number }) {
+  const status = getPartStockStatus(quantity, stockAlert)
   if (status === 'OK') return null
 
   return (
@@ -58,6 +57,8 @@ export function PartTable() {
   })
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createPending, setCreatePending] = React.useState(false)
+  const [editPart, setEditPart] = React.useState<Part | null>(null)
+  const [editPending, setEditPending] = React.useState(false)
 
   const { data, isLoading, isError, error, refetch } = useParts(filters)
 
@@ -70,7 +71,7 @@ export function PartTable() {
           <span className="font-medium text-foreground">{row.original.name}</span>
           <StockStatusBadge
             quantity={row.original.quantity}
-            minimumStock={row.original.minimumStock}
+            stockAlert={row.original.stockAlert}
           />
         </div>
       ),
@@ -90,10 +91,10 @@ export function PartTable() {
       ),
     },
     {
-      accessorKey: 'minimumStock',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Minimum Stock" />,
+      accessorKey: 'stockAlert',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock Alert" />,
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.original.minimumStock}</span>
+        <span className="text-sm text-muted-foreground">{row.original.stockAlert}</span>
       ),
     },
     {
@@ -129,17 +130,16 @@ export function PartTable() {
         const part = row.original
         return (
           <div className="flex items-center justify-end">
-            <Link href={`/inventory/${part.id}`}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label={`View ${part.name}`}
-                title={`View ${part.name}`}
-              >
-                <Eye className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+              aria-label={`Edit ${part.name}`}
+              title={`Edit ${part.name}`}
+              onClick={() => setEditPart(part)}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
         )
       },
@@ -283,6 +283,42 @@ export function PartTable() {
             if (!createPending) setCreateOpen(false)
           }}
         />
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editPart)}
+        onOpenChange={(open) => {
+          if (editPending && !open) return
+          if (!open) setEditPart(null)
+        }}
+        preventDismiss={editPending}
+      >
+        <DialogHeader>
+          <DialogTitle>Edit Part</DialogTitle>
+        </DialogHeader>
+        {editPart ? (
+          <PartForm
+            mode="edit"
+            partId={editPart.id}
+            initialData={{
+              name: editPart.name,
+              sku: editPart.sku,
+              quantity: editPart.quantity,
+              stockAlert: editPart.stockAlert,
+              purchasePrice: editPart.purchasePrice,
+              sellingPrice: editPart.sellingPrice,
+              supplier: editPart.supplier,
+            }}
+            onPendingChange={setEditPending}
+            onSuccess={() => {
+              setEditPending(false)
+              setEditPart(null)
+            }}
+            onCancel={() => {
+              if (!editPending) setEditPart(null)
+            }}
+          />
+        ) : null}
       </Dialog>
     </div>
   )

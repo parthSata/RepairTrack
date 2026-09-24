@@ -11,7 +11,7 @@ export const inventory = pgTable(
     name: text('name').notNull(),
     sku: text('sku').notNull(),
     quantity: integer('quantity').notNull().default(0),
-    minimumStock: integer('minimum_stock').notNull().default(0),
+    stockAlert: integer('stock_alert').notNull().default(0),
     purchasePrice: integer('purchase_price').notNull(),
     sellingPrice: integer('selling_price').notNull(),
     supplier: text('supplier'),

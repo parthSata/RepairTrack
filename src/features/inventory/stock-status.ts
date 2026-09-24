@@ -8,9 +8,9 @@ export const STOCK_STATUS_COPY = {
   LOW: 'Low stock — order new stock soon.',
 } as const
 
-export function getPartStockStatus(quantity: number, minimumStock: number): PartStockStatus {
+export function getPartStockStatus(quantity: number, stockAlert: number): PartStockStatus {
   if (quantity === 0) return 'OUT'
-  if (quantity <= REORDER_THRESHOLD || quantity <= minimumStock) return 'LOW'
+  if (quantity <= REORDER_THRESHOLD || quantity <= stockAlert) return 'LOW'
   return 'OK'
 }
 

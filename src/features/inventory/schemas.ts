@@ -12,7 +12,7 @@ export const partSchema = z.object({
     .min(1, { message: 'SKU is required' })
     .max(100, { message: 'SKU cannot exceed 100 characters' }),
   quantity: z.coerce.number().int().min(0).default(0),
-  minimumStock: z.coerce.number().int().min(0).default(0),
+  stockAlert: z.coerce.number().int().min(0).default(0),
   purchasePrice: z.coerce.number().int().min(0, { message: 'Purchase price must be 0 or greater (paise)' }),
   sellingPrice: z.coerce.number().int().min(0, { message: 'Selling price must be 0 or greater (paise)' }),
   supplier: z

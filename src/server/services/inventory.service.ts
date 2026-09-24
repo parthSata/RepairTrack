@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, ilike, lte, or } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, ne, or, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { inventory } from '@/server/db/schema/inventory'
@@ -33,7 +33,7 @@ export async function createPart({
       name: data.name,
       sku: data.sku,
       quantity: data.quantity,
-      minimumStock: data.minimumStock,
+      stockAlert: data.stockAlert,
       purchasePrice: data.purchasePrice,
       sellingPrice: data.sellingPrice,
       supplier: data.supplier?.trim() ? data.supplier.trim() : null,
@@ -41,6 +41,57 @@ export async function createPart({
     .returning()
 
   return created
+}
+
+export async function updatePart({
+  shopId,
+  id,
+  data,
+}: {
+  shopId: string
+  id: string
+  data: PartFormInput
+}) {
+  const [existing] = await db
+    .select({ id: inventory.id })
+    .from(inventory)
+    .where(and(eq(inventory.id, id), eq(inventory.shopId, shopId)))
+    .limit(1)
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Part not found' })
+  }
+
+  const existingSku = await db
+    .select({ id: inventory.id })
+    .from(inventory)
+    .where(
+      and(eq(inventory.shopId, shopId), eq(inventory.sku, data.sku), ne(inventory.id, id)),
+    )
+    .limit(1)
+
+  if (existingSku.length > 0) {
+    throw new HTTPException(400, {
+      message: 'A part with this SKU already exists in your shop',
+    })
+  }
+
+  const [updated] = await db
+    .update(inventory)
+    .set({
+      name: data.name,
+      sku: data.sku,
+      quantity: data.quantity,
+      stockAlert: data.stockAlert,
+      purchasePrice: data.purchasePrice,
+      sellingPrice: data.sellingPrice,
+      supplier: data.supplier?.trim() ? data.supplier.trim() : null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(inventory.id, id), eq(inventory.shopId, shopId)))
+    .returning()
+
+  return updated
 }
 
 export async function listParts({
@@ -72,18 +123,7 @@ export async function listParts({
             ? inventory.updatedAt
             : inventory.createdAt
 
-  const outOfStockWhere = and(whereClause, eq(inventory.quantity, 0))
-  const lowStockWhere = and(
-    whereClause,
-    gt(inventory.quantity, 0),
-    or(
-      lte(inventory.quantity, REORDER_THRESHOLD),
-      lte(inventory.quantity, inventory.minimumStock),
-    ),
-  )
-
-  const [countResult, items, outOfStockResult, lowStockResult] = await Promise.all([
-    db.select({ total: count() }).from(inventory).where(whereClause),
+  const [items, statsResult] = await Promise.all([
     db
       .select({
         id: inventory.id,
@@ -91,7 +131,7 @@ export async function listParts({
         name: inventory.name,
         sku: inventory.sku,
         quantity: inventory.quantity,
-        minimumStock: inventory.minimumStock,
+        stockAlert: inventory.stockAlert,
         purchasePrice: inventory.purchasePrice,
         sellingPrice: inventory.sellingPrice,
         supplier: inventory.supplier,
@@ -103,11 +143,18 @@ export async function listParts({
       .orderBy(sortOrder === 'asc' ? sortColumn : desc(sortColumn))
       .limit(limit)
       .offset(offset),
-    db.select({ total: count() }).from(inventory).where(outOfStockWhere),
-    db.select({ total: count() }).from(inventory).where(lowStockWhere),
+    db
+      .select({
+        total: count(),
+        outOfStockCount: sql<number>`count(*) filter (where ${inventory.quantity} = 0)::int`,
+        lowStockCount: sql<number>`count(*) filter (where ${inventory.quantity} > 0 and (${inventory.quantity} <= ${REORDER_THRESHOLD} or ${inventory.quantity} <= ${inventory.stockAlert}))::int`,
+      })
+      .from(inventory)
+      .where(whereClause),
   ])
 
-  const total = countResult[0]?.total ?? 0
+  const stats = statsResult[0] ?? { total: 0, outOfStockCount: 0, lowStockCount: 0 }
+  const total = Number(stats.total) || 0
   const totalPages = Math.ceil(total / limit) || 1
 
   return {
@@ -116,7 +163,7 @@ export async function listParts({
     page,
     limit,
     totalPages,
-    outOfStockCount: outOfStockResult[0]?.total ?? 0,
-    lowStockCount: lowStockResult[0]?.total ?? 0,
+    outOfStockCount: Number(stats.outOfStockCount) || 0,
+    lowStockCount: Number(stats.lowStockCount) || 0,
   }
 }

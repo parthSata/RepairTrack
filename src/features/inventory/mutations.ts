@@ -16,3 +16,18 @@ export function useCreatePart() {
     },
   })
 }
+
+export function useUpdatePart() {
+  const queryClient = useQueryClient()
+
+  return useMutation<Part, Error, { id: string; data: PartFormInput }>({
+    mutationFn: async ({ id, data }) => {
+      const response = await apiClient.patch<Part>(`/inventory/${id}`, data)
+      return response.data
+    },
+    onSuccess: (_part, { id }) => {
+      queryClient.invalidateQueries({ queryKey: partKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: partKeys.detail(id) })
+    },
+  })
+}

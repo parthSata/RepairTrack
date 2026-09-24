@@ -12,7 +12,7 @@ import {
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Package, Tag, Hash, Warehouse, IndianRupee, Truck } from 'lucide-react'
 import { partSchema, type PartFormInput } from '@/features/inventory/schemas'
-import { useCreatePart } from '@/features/inventory/mutations'
+import { useCreatePart, useUpdatePart } from '@/features/inventory/mutations'
 import type { Part } from '@/features/inventory/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,13 +112,15 @@ function PaisePriceField({
 
 export function PartForm({
   mode,
+  partId,
   initialData,
   onSuccess,
   onCancel,
   onPendingChange,
 }: PartFormProps) {
   const createMutation = useCreatePart()
-  const isPending = createMutation.isPending
+  const updateMutation = useUpdatePart()
+  const isPending = createMutation.isPending || updateMutation.isPending
 
   React.useEffect(() => {
     onPendingChange?.(isPending)
@@ -139,7 +141,7 @@ export function PartForm({
       name: initialData?.name ?? '',
       sku: initialData?.sku ?? '',
       quantity: initialData?.quantity ?? 0,
-      minimumStock: initialData?.minimumStock ?? 0,
+      stockAlert: initialData?.stockAlert ?? 0,
       purchasePrice: initialData?.purchasePrice ?? 0,
       sellingPrice: initialData?.sellingPrice ?? 0,
       supplier: initialData?.supplier ?? '',
@@ -147,22 +149,33 @@ export function PartForm({
   })
 
   const onSubmit = async (values: PartFormInput) => {
+    const payload: PartFormInput = {
+      ...values,
+      supplier: values.supplier?.trim() ? values.supplier.trim() : null,
+    }
+
     try {
-      if (mode !== 'create') {
-        toast.error('Editing parts is not available yet')
+      if (mode === 'create') {
+        const saved = await createMutation.mutateAsync(payload)
+        toast.success('Part added')
+        onSuccess(saved)
         return
       }
 
-      const payload: PartFormInput = {
-        ...values,
-        supplier: values.supplier?.trim() ? values.supplier.trim() : null,
+      if (!partId) {
+        toast.error('Missing part id. Please try again.')
+        return
       }
 
-      const saved = await createMutation.mutateAsync(payload)
-      toast.success('Part added')
+      const saved = await updateMutation.mutateAsync({ id: partId, data: payload })
+      toast.success('Part updated')
       onSuccess(saved)
     } catch (err: unknown) {
-      const message = getApiErrorMessage(err, 'Failed to add part. Please try again.')
+      const fallback =
+        mode === 'create'
+          ? 'Failed to add part. Please try again.'
+          : 'Failed to update part. Please try again.'
+      const message = getApiErrorMessage(err, fallback)
 
       if (/sku/i.test(message)) {
         setError('sku', { type: 'manual', message })
@@ -224,23 +237,23 @@ export function PartForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="minimumStock" className="flex items-center gap-2 text-sm font-medium">
+          <Label htmlFor="stockAlert" className="flex items-center gap-2 text-sm font-medium">
             <Warehouse className="h-4 w-4 text-muted-foreground" />
-            Minimum stock
+            Stock alert
           </Label>
           <Input
-            id="minimumStock"
+            id="stockAlert"
             type="number"
             inputMode="numeric"
             min={0}
             step={1}
             disabled={isPending}
             className={
-              errors.minimumStock ? 'border-destructive focus-visible:ring-destructive' : ''
+              errors.stockAlert ? 'border-destructive focus-visible:ring-destructive' : ''
             }
-            {...register('minimumStock')}
+            {...register('stockAlert')}
           />
-          <FieldError message={errors.minimumStock?.message} />
+          <FieldError message={errors.stockAlert?.message} />
         </div>
       </div>
 

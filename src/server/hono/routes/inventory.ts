@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { partFilterSchema, partSchema } from '@/features/inventory/schemas'
 import { auth } from '@/server/auth'
-import { createPart, listParts } from '@/server/services/inventory.service'
+import { createPart, listParts, updatePart } from '@/server/services/inventory.service'
 
 const inventoryRouter = new Hono()
 
@@ -50,6 +50,22 @@ inventoryRouter.post(
     const data = c.req.valid('json')
     const part = await createPart({ shopId, data })
     return c.json(part, 201)
+  },
+)
+
+inventoryRouter.patch(
+  '/:id',
+  zValidator('json', partSchema, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+    }
+  }),
+  async (c) => {
+    const { shopId } = await requireInventoryAccess(c.req.raw)
+    const id = c.req.param('id')
+    const data = c.req.valid('json')
+    const updated = await updatePart({ shopId, id, data })
+    return c.json(updated)
   },
 )
 

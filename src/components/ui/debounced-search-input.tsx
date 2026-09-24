@@ -20,16 +20,19 @@ export function DebouncedSearchInput({
   className,
 }: DebouncedSearchInputProps) {
   const [searchTerm, setSearchTerm] = React.useState(value)
-  const [prevValue, setPrevValue] = React.useState(value)
+  const isTypingRef = React.useRef(false)
 
-  if (prevValue !== value) {
-    setPrevValue(value)
-    setSearchTerm(value)
-  }
+  React.useEffect(() => {
+    if (!isTypingRef.current) {
+      setSearchTerm(value)
+    }
+    isTypingRef.current = false
+  }, [value])
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
       if (searchTerm !== value) {
+        isTypingRef.current = true
         onChange(searchTerm)
       }
     }, debounceMs)
@@ -43,7 +46,10 @@ export function DebouncedSearchInput({
       <Input
         type="text"
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e) => {
+          isTypingRef.current = true
+          setSearchTerm(e.target.value)
+        }}
         placeholder={placeholder}
         className="pl-9 pr-8"
       />
@@ -51,6 +57,7 @@ export function DebouncedSearchInput({
         <button
           type="button"
           onClick={() => {
+            isTypingRef.current = false
             setSearchTerm('')
             onChange('')
           }}

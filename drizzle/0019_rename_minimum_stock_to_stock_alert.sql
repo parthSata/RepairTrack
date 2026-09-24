@@ -1,0 +1,1 @@
+ALTER TABLE "inventory" RENAME COLUMN "minimum_stock" TO "stock_alert";
