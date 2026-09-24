@@ -3,7 +3,7 @@ import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { partFilterSchema, partSchema } from '@/features/inventory/schemas'
 import { auth } from '@/server/auth'
-import { createPart, listParts, updatePart } from '@/server/services/inventory.service'
+import { createPart, deletePart, listParts, updatePart } from '@/server/services/inventory.service'
 
 const inventoryRouter = new Hono()
 
@@ -68,5 +68,12 @@ inventoryRouter.patch(
     return c.json(updated)
   },
 )
+
+inventoryRouter.delete('/:id', async (c) => {
+  const { shopId } = await requireInventoryAccess(c.req.raw)
+  const id = c.req.param('id')
+  const result = await deletePart({ shopId, id })
+  return c.json(result)
+})
 
 export { inventoryRouter }

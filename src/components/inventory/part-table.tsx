@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Package, Pencil, Plus } from 'lucide-react'
+import { AlertTriangle, Package, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -16,6 +16,7 @@ import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { PartDeleteDialog } from '@/components/inventory/part-delete-dialog'
 import { PartForm } from '@/components/inventory/part-form'
 import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -59,6 +60,7 @@ export function PartTable() {
   const [createPending, setCreatePending] = React.useState(false)
   const [editPart, setEditPart] = React.useState<Part | null>(null)
   const [editPending, setEditPending] = React.useState(false)
+  const [deletePart, setDeletePart] = React.useState<Part | null>(null)
 
   const { data, isLoading, isError, error, refetch } = useParts(filters)
 
@@ -129,7 +131,7 @@ export function PartTable() {
       cell: ({ row }) => {
         const part = row.original
         return (
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-0.5">
             <Button
               variant="ghost"
               size="sm"
@@ -139,6 +141,16 @@ export function PartTable() {
               onClick={() => setEditPart(part)}
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              aria-label={`Delete ${part.name}`}
+              title={`Delete ${part.name}`}
+              onClick={() => setDeletePart(part)}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         )
@@ -320,6 +332,14 @@ export function PartTable() {
           />
         ) : null}
       </Dialog>
+
+      <PartDeleteDialog
+        open={Boolean(deletePart)}
+        onOpenChange={(open) => {
+          if (!open) setDeletePart(null)
+        }}
+        part={deletePart}
+      />
     </div>
   )
 }
