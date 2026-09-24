@@ -21,8 +21,8 @@ import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cn } from '@/lib/utils'
 
-function StockStatusBadge({ quantity, minimumStock }: { quantity: number; minimumStock: number }) {
-  const status = getPartStockStatus(quantity, minimumStock)
+function StockStatusBadge({ quantity, stockAlert }: { quantity: number; stockAlert: number }) {
+  const status = getPartStockStatus(quantity, stockAlert)
   if (status === 'OK') return null
 
   return (
@@ -71,7 +71,7 @@ export function PartTable() {
           <span className="font-medium text-foreground">{row.original.name}</span>
           <StockStatusBadge
             quantity={row.original.quantity}
-            minimumStock={row.original.minimumStock}
+            stockAlert={row.original.stockAlert}
           />
         </div>
       ),
@@ -91,10 +91,10 @@ export function PartTable() {
       ),
     },
     {
-      accessorKey: 'minimumStock',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Minimum Stock" />,
+      accessorKey: 'stockAlert',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock Alert" />,
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.original.minimumStock}</span>
+        <span className="text-sm text-muted-foreground">{row.original.stockAlert}</span>
       ),
     },
     {
@@ -304,7 +304,7 @@ export function PartTable() {
               name: editPart.name,
               sku: editPart.sku,
               quantity: editPart.quantity,
-              minimumStock: editPart.minimumStock,
+              stockAlert: editPart.stockAlert,
               purchasePrice: editPart.purchasePrice,
               sellingPrice: editPart.sellingPrice,
               supplier: editPart.supplier,

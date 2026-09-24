@@ -33,7 +33,7 @@ export async function createPart({
       name: data.name,
       sku: data.sku,
       quantity: data.quantity,
-      minimumStock: data.minimumStock,
+      stockAlert: data.stockAlert,
       purchasePrice: data.purchasePrice,
       sellingPrice: data.sellingPrice,
       supplier: data.supplier?.trim() ? data.supplier.trim() : null,
@@ -82,7 +82,7 @@ export async function updatePart({
       name: data.name,
       sku: data.sku,
       quantity: data.quantity,
-      minimumStock: data.minimumStock,
+      stockAlert: data.stockAlert,
       purchasePrice: data.purchasePrice,
       sellingPrice: data.sellingPrice,
       supplier: data.supplier?.trim() ? data.supplier.trim() : null,
@@ -131,7 +131,7 @@ export async function listParts({
         name: inventory.name,
         sku: inventory.sku,
         quantity: inventory.quantity,
-        minimumStock: inventory.minimumStock,
+        stockAlert: inventory.stockAlert,
         purchasePrice: inventory.purchasePrice,
         sellingPrice: inventory.sellingPrice,
         supplier: inventory.supplier,
@@ -147,7 +147,7 @@ export async function listParts({
       .select({
         total: count(),
         outOfStockCount: sql<number>`count(*) filter (where ${inventory.quantity} = 0)::int`,
-        lowStockCount: sql<number>`count(*) filter (where ${inventory.quantity} > 0 and (${inventory.quantity} <= ${REORDER_THRESHOLD} or ${inventory.quantity} <= ${inventory.minimumStock}))::int`,
+        lowStockCount: sql<number>`count(*) filter (where ${inventory.quantity} > 0 and (${inventory.quantity} <= ${REORDER_THRESHOLD} or ${inventory.quantity} <= ${inventory.stockAlert}))::int`,
       })
       .from(inventory)
       .where(whereClause),

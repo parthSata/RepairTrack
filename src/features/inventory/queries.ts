@@ -8,7 +8,7 @@ export interface Part {
   name: string
   sku: string
   quantity: number
-  minimumStock: number
+  stockAlert: number
   purchasePrice: number
   sellingPrice: number
   supplier: string | null

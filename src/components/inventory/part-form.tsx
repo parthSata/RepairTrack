@@ -141,7 +141,7 @@ export function PartForm({
       name: initialData?.name ?? '',
       sku: initialData?.sku ?? '',
       quantity: initialData?.quantity ?? 0,
-      minimumStock: initialData?.minimumStock ?? 0,
+      stockAlert: initialData?.stockAlert ?? 0,
       purchasePrice: initialData?.purchasePrice ?? 0,
       sellingPrice: initialData?.sellingPrice ?? 0,
       supplier: initialData?.supplier ?? '',
@@ -237,23 +237,23 @@ export function PartForm({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="minimumStock" className="flex items-center gap-2 text-sm font-medium">
+          <Label htmlFor="stockAlert" className="flex items-center gap-2 text-sm font-medium">
             <Warehouse className="h-4 w-4 text-muted-foreground" />
-            Minimum stock
+            Stock alert
           </Label>
           <Input
-            id="minimumStock"
+            id="stockAlert"
             type="number"
             inputMode="numeric"
             min={0}
             step={1}
             disabled={isPending}
             className={
-              errors.minimumStock ? 'border-destructive focus-visible:ring-destructive' : ''
+              errors.stockAlert ? 'border-destructive focus-visible:ring-destructive' : ''
             }
-            {...register('minimumStock')}
+            {...register('stockAlert')}
           />
-          <FieldError message={errors.minimumStock?.message} />
+          <FieldError message={errors.stockAlert?.message} />
         </div>
       </div>
 
