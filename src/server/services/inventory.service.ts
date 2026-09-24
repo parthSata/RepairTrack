@@ -94,6 +94,23 @@ export async function updatePart({
   return updated
 }
 
+export async function deletePart({ shopId, id }: { shopId: string; id: string }) {
+  const [existing] = await db
+    .select({ id: inventory.id })
+    .from(inventory)
+    .where(and(eq(inventory.id, id), eq(inventory.shopId, shopId)))
+    .limit(1)
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Part not found' })
+  }
+
+  // Usage guard (block if referenced by repair_parts) lands with "Parts used in repair."
+  await db.delete(inventory).where(and(eq(inventory.id, id), eq(inventory.shopId, shopId)))
+
+  return { success: true as const }
+}
+
 export async function listParts({
   shopId,
   search,

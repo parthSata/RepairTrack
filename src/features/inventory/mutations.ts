@@ -31,3 +31,17 @@ export function useUpdatePart() {
     },
   })
 }
+
+export function useDeletePart() {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ success: true }, Error, string>({
+    mutationFn: async (id) => {
+      const response = await apiClient.delete<{ success: true }>(`/inventory/${id}`)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: partKeys.lists() })
+    },
+  })
+}
