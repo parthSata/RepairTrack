@@ -1,9 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Eye, Package, Plus } from 'lucide-react'
+import { AlertTriangle, Package, Pencil, Plus } from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -58,6 +57,8 @@ export function PartTable() {
   })
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createPending, setCreatePending] = React.useState(false)
+  const [editPart, setEditPart] = React.useState<Part | null>(null)
+  const [editPending, setEditPending] = React.useState(false)
 
   const { data, isLoading, isError, error, refetch } = useParts(filters)
 
@@ -129,17 +130,16 @@ export function PartTable() {
         const part = row.original
         return (
           <div className="flex items-center justify-end">
-            <Link href={`/inventory/${part.id}`}>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-                aria-label={`View ${part.name}`}
-                title={`View ${part.name}`}
-              >
-                <Eye className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+              aria-label={`Edit ${part.name}`}
+              title={`Edit ${part.name}`}
+              onClick={() => setEditPart(part)}
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </Button>
           </div>
         )
       },
@@ -283,6 +283,42 @@ export function PartTable() {
             if (!createPending) setCreateOpen(false)
           }}
         />
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editPart)}
+        onOpenChange={(open) => {
+          if (editPending && !open) return
+          if (!open) setEditPart(null)
+        }}
+        preventDismiss={editPending}
+      >
+        <DialogHeader>
+          <DialogTitle>Edit Part</DialogTitle>
+        </DialogHeader>
+        {editPart ? (
+          <PartForm
+            mode="edit"
+            partId={editPart.id}
+            initialData={{
+              name: editPart.name,
+              sku: editPart.sku,
+              quantity: editPart.quantity,
+              minimumStock: editPart.minimumStock,
+              purchasePrice: editPart.purchasePrice,
+              sellingPrice: editPart.sellingPrice,
+              supplier: editPart.supplier,
+            }}
+            onPendingChange={setEditPending}
+            onSuccess={() => {
+              setEditPending(false)
+              setEditPart(null)
+            }}
+            onCancel={() => {
+              if (!editPending) setEditPart(null)
+            }}
+          />
+        ) : null}
       </Dialog>
     </div>
   )
