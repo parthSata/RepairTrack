@@ -1,30 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import {
-  Controller,
-  useForm,
-  type Control,
-  type FieldPath,
-  type FieldErrors,
-  type Resolver,
-} from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, Package, Tag, Hash, Warehouse, IndianRupee, Truck } from 'lucide-react'
+import { Package, Tag, Hash, Warehouse, Truck } from 'lucide-react'
 import { partSchema, type PartFormInput } from '@/features/inventory/schemas'
 import { useCreatePart, useUpdatePart } from '@/features/inventory/mutations'
 import type { Part } from '@/features/inventory/queries'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { FieldError } from '@/components/ui/field-error'
+import { PaisePriceField } from '@/components/ui/paise-price-field'
 import { toast } from '@/components/ui/sonner'
 import { getApiErrorMessage } from '@/lib/api-error'
-import {
-  formatPaiseAsRupeesInput,
-  parseRupeesInput,
-  rupeesToPaise,
-} from '@/lib/money'
-import { cn } from '@/lib/utils'
 
 interface PartFormProps {
   mode: 'create' | 'edit'
@@ -33,81 +22,6 @@ interface PartFormProps {
   onSuccess: (part?: Part) => void
   onCancel?: () => void
   onPendingChange?: (pending: boolean) => void
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null
-  return (
-    <p className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive">
-      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-      {message}
-    </p>
-  )
-}
-
-function PaisePriceField({
-  name,
-  label,
-  control,
-  errors,
-  disabled,
-}: {
-  name: Extract<FieldPath<PartFormInput>, 'purchasePrice' | 'sellingPrice'>
-  label: string
-  control: Control<PartFormInput>
-  errors: FieldErrors<PartFormInput>
-  disabled?: boolean
-}) {
-  const error = errors[name]
-
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={name} className="flex items-center gap-2 text-sm font-medium">
-        <IndianRupee className="h-4 w-4 text-muted-foreground" />
-        {label} <span className="font-bold text-destructive">*</span>
-      </Label>
-      <div className="relative">
-        <span
-          className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-muted-foreground"
-          aria-hidden
-        >
-          ₹
-        </span>
-        <Controller
-          name={name}
-          control={control}
-          render={({ field }) => (
-            <Input
-              id={name}
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="0"
-              disabled={disabled}
-              className={cn(
-                'pl-7',
-                error ? 'border-destructive focus-visible:ring-destructive' : '',
-              )}
-              value={formatPaiseAsRupeesInput(field.value)}
-              onChange={(e) => {
-                const rupees = parseRupeesInput(e.target.value)
-                if (rupees == null) {
-                  field.onChange(e.target.value === '' ? 0 : Number.NaN)
-                  return
-                }
-                field.onChange(rupeesToPaise(rupees))
-              }}
-              onBlur={field.onBlur}
-              name={field.name}
-              ref={field.ref}
-            />
-          )}
-        />
-      </div>
-      <FieldError message={error?.message} />
-    </div>
-  )
 }
 
 export function PartForm({
