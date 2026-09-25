@@ -738,7 +738,6 @@ export function RepairDetails({ id }: { id: string }) {
         parts={repair.parts ?? []}
         laborCharges={repair.laborCharges ?? 0}
         additionalCharges={repair.additionalCharges ?? 0}
-        discount={repair.discount ?? 0}
         taxPercent={repair.taxPercent ?? 0}
         estimatedTotal={repair.estimatedTotal ?? null}
         canEdit={canEditDiagnosisAndNotes}

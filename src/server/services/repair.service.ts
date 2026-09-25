@@ -360,7 +360,6 @@ export async function getRepairById({
       finalCost: repairs.finalCost,
       laborCharges: repairs.laborCharges,
       additionalCharges: repairs.additionalCharges,
-      discount: repairs.discount,
       taxPercent: repairs.taxPercent,
       estimatedTotal: repairs.estimatedTotal,
       finalTotal: repairs.finalTotal,
@@ -1163,7 +1162,6 @@ export async function updateRepairEstimatePricing({
   id,
   laborCharges,
   additionalCharges,
-  discount,
   taxPercent,
 }: {
   shopId: string
@@ -1172,7 +1170,6 @@ export async function updateRepairEstimatePricing({
   id: string
   laborCharges: number
   additionalCharges: number
-  discount: number
   taxPercent: number
 }) {
   const [existing] = await db
@@ -1209,7 +1206,6 @@ export async function updateRepairEstimatePricing({
     laborCharges,
     partsCharges,
     additionalCharges,
-    discount,
     taxPercent,
   })
 
@@ -1219,7 +1215,6 @@ export async function updateRepairEstimatePricing({
       .set({
         laborCharges,
         additionalCharges,
-        discount,
         taxPercent,
         estimatedTotal: total,
         estimatedCost: total,

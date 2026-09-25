@@ -98,7 +98,6 @@ export interface Repair {
   finalCost: number | null
   laborCharges: number
   additionalCharges: number
-  discount: number
   taxPercent: number
   estimatedTotal: number | null
   finalTotal: number | null

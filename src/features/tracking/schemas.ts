@@ -69,7 +69,6 @@ export const publicTrackingResponseSchema = z.object({
       laborCharges: z.number(),
       partsCharges: z.number(),
       additionalCharges: z.number(),
-      discount: z.number(),
       taxPercent: z.number(),
       taxAmount: z.number(),
       taxableValue: z.number(),

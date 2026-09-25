@@ -29,7 +29,6 @@ type RepairRow = {
   estimatedCost: number | null
   laborCharges: number
   additionalCharges: number
-  discount: number
   taxPercent: number
   estimatedTotal: number | null
   finalTotal: number | null
@@ -102,7 +101,6 @@ function buildPublicPricing(repair: RepairRow, partLines: PartChargeRow[]) {
       laborCharges: repair.laborCharges,
       partsCharges,
       additionalCharges: repair.additionalCharges,
-      discount: repair.discount,
       taxPercent: repair.taxPercent,
     })
 
@@ -110,7 +108,6 @@ function buildPublicPricing(repair: RepairRow, partLines: PartChargeRow[]) {
       laborCharges: paiseToPublicRupees(repair.laborCharges),
       partsCharges: paiseToPublicRupees(result.partsCharges),
       additionalCharges: paiseToPublicRupees(repair.additionalCharges),
-      discount: paiseToPublicRupees(repair.discount),
       taxPercent: repair.taxPercent,
       taxAmount: paiseToPublicRupees(result.taxAmount),
       taxableValue: paiseToPublicRupees(result.taxableValue),
@@ -187,7 +184,6 @@ async function loadPublicRepairData(repairId: string) {
       estimatedCost: repairs.estimatedCost,
       laborCharges: repairs.laborCharges,
       additionalCharges: repairs.additionalCharges,
-      discount: repairs.discount,
       taxPercent: repairs.taxPercent,
       estimatedTotal: repairs.estimatedTotal,
       finalTotal: repairs.finalTotal,
@@ -250,7 +246,6 @@ async function loadPublicRepairData(repairId: string) {
       estimatedCost: row.estimatedCost,
       laborCharges: row.laborCharges,
       additionalCharges: row.additionalCharges,
-      discount: row.discount,
       taxPercent: row.taxPercent,
       estimatedTotal: row.estimatedTotal,
       finalTotal: row.finalTotal,

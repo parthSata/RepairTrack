@@ -46,7 +46,6 @@ export function TrackPricingSummary({ pricing }: TrackPricingSummaryProps) {
           <Row label="Labor" amount={pricing.laborCharges} />
           <Row label="Parts" amount={pricing.partsCharges} />
           <Row label="Additional charges" amount={pricing.additionalCharges} />
-          {pricing.discount > 0 ? <Row label="Discount" amount={pricing.discount} /> : null}
           <Row label="Taxable value" amount={pricing.taxableValue} />
           <Row label={`Tax (${pricing.taxPercent}%)`} amount={pricing.taxAmount} />
           <div className="border-t border-border/80 pt-2">

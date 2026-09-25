@@ -100,7 +100,6 @@ export const repairs = pgTable(
     finalCost: integer('final_cost'),
     laborCharges: integer('labor_charges').default(0).notNull(),
     additionalCharges: integer('additional_charges').default(0).notNull(),
-    discount: integer('discount').default(0).notNull(),
     taxPercent: integer('tax_percent').default(0).notNull(),
     estimatedTotal: integer('estimated_total'),
     finalTotal: integer('final_total'),
