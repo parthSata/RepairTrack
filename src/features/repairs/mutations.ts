@@ -3,8 +3,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { repairKeys, type Repair } from './queries'
 import type { CreateRepairInput, ReopenRepairInput } from './schemas'
+import type { RepairPricingFieldsInput } from './pricing-schemas'
 
 export function useCreateRepair() {
   const queryClient = useQueryClient()
@@ -308,18 +310,6 @@ export function useRegenerateTrackingLink(repairId: string) {
   })
 }
 
-function repairPartErrorMessage(error: unknown, fallback: string) {
-  if (error && typeof error === 'object' && 'response' in error) {
-    const resData = (
-      error as { response?: { data?: { message?: string; error?: { message?: string } } } }
-    ).response?.data
-    if (resData?.message) return resData.message
-    if (resData?.error?.message) return resData.error.message
-  }
-  if (error instanceof Error) return error.message
-  return fallback
-}
-
 export function useAddRepairPart(repairId: string) {
   const queryClient = useQueryClient()
 
@@ -334,7 +324,7 @@ export function useAddRepairPart(repairId: string) {
       toast.success('Part added to repair')
     },
     onError: (error: unknown) => {
-      toast.error(repairPartErrorMessage(error, 'Failed to add part'))
+      toast.error(getApiErrorMessage(error, 'Failed to add part'))
     },
   })
 }
@@ -355,7 +345,25 @@ export function useRemoveRepairPart(repairId: string) {
       toast.success('Part removed from repair')
     },
     onError: (error: unknown) => {
-      toast.error(repairPartErrorMessage(error, 'Failed to remove part'))
+      toast.error(getApiErrorMessage(error, 'Failed to remove part'))
+    },
+  })
+}
+
+export function useUpdateEstimatePricing(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, RepairPricingFieldsInput>({
+    mutationFn: async (data) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/estimate-pricing`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      toast.success('Estimate pricing saved')
+    },
+    onError: (error: unknown) => {
+      toast.error(getApiErrorMessage(error, 'Failed to save estimate pricing'))
     },
   })
 }

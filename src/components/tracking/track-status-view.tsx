@@ -19,6 +19,7 @@ import {
 import { TrackApprovalSummaryCard } from '@/components/tracking/track-approval-summary-card'
 import { TrackPickupInfo } from '@/components/tracking/track-pickup-info'
 import { TrackRepairSummary } from '@/components/tracking/track-repair-summary'
+import { TrackPricingSummary } from '@/components/tracking/track-pricing-summary'
 import { TrackRepairPhotos } from '@/components/tracking/track-repair-photos'
 import { TrackSectionHeader } from '@/components/tracking/track-section-header'
 import { TrackUpdatesList } from '@/components/tracking/track-updates-list'
@@ -141,10 +142,12 @@ export function TrackStatusView({
       <TrackRepairSummary
         device={data.device}
         problemDescription={data.problemDescription}
-        estimatedCost={data.estimatedCost}
+        estimatedCost={data.pricing ? undefined : data.estimatedCost}
         expectedCompletionDate={data.expectedCompletionDate}
         hasPendingApproval={hasPendingApproval}
       />
+
+      {data.pricing ? <TrackPricingSummary pricing={data.pricing} /> : null}
 
       {data.photos ? (
         <TrackRepairPhotos beforeUrl={data.photos.beforeUrl} afterUrl={data.photos.afterUrl} />

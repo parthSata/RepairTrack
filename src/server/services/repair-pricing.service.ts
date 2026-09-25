@@ -1,45 +1,27 @@
 import { HTTPException } from 'hono/http-exception'
-import { paiseToRupees, rupeesToPaise } from '@/lib/money'
+import {
+  calculateRepairTotal as calculateRepairTotalCore,
+  DISCOUNT_EXCEEDS_CHARGES_MESSAGE,
+  sumPartsCharges,
+  type CalculateRepairTotalInput,
+  type CalculateRepairTotalResult,
+  type RepairPartChargeLine,
+} from '@/features/repairs/pricing-calc'
 
-export type RepairPartChargeLine = {
-  unitSellingPrice: number
-  quantity: number
-}
+export type { CalculateRepairTotalInput, CalculateRepairTotalResult, RepairPartChargeLine }
+export { sumPartsCharges }
 
-export type CalculateRepairTotalInput = {
-  laborCharges: number
-  partsCharges: number
-  additionalCharges: number
-  discount: number
-  taxPercent: number
-}
-
-export type CalculateRepairTotalResult = {
-  partsCharges: number
-  taxableValue: number
-  taxAmount: number
-  total: number
-}
-
-/** Live parts subtotal from repair_parts lines (snapshotted unit selling price × qty). */
-export function sumPartsCharges(lines: RepairPartChargeLine[]): number {
-  return lines.reduce((sum, line) => sum + line.unitSellingPrice * line.quantity, 0)
-}
-
-
+/**
+ * Server wrapper around the shared pricing formula.
+ * Converts discount overage into HTTP 400 for API callers.
+ */
 export function calculateRepairTotal(input: CalculateRepairTotalInput): CalculateRepairTotalResult {
-  const { laborCharges, partsCharges, additionalCharges, discount, taxPercent } = input
-
-  const taxableValue = laborCharges + partsCharges + additionalCharges - discount
-  if (taxableValue < 0) {
-    throw new HTTPException(400, {
-      message: 'Discount cannot exceed labor, parts, and additional charges combined.',
-    })
+  try {
+    return calculateRepairTotalCore(input)
+  } catch (err) {
+    if (err instanceof Error && err.message === DISCOUNT_EXCEEDS_CHARGES_MESSAGE) {
+      throw new HTTPException(400, { message: DISCOUNT_EXCEEDS_CHARGES_MESSAGE })
+    }
+    throw err
   }
-
-  const rawTaxPaise = Math.round((taxableValue * taxPercent) / 100)
-  const taxAmount = rupeesToPaise(Math.round(paiseToRupees(rawTaxPaise)))
-  const total = taxableValue + taxAmount
-
-  return { partsCharges, taxableValue, taxAmount, total }
 }

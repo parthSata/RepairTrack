@@ -64,6 +64,19 @@ export const publicTrackingResponseSchema = z.object({
   }),
   problemDescription: z.string().nullable(),
   estimatedCost: z.number().optional(),
+  pricing: z
+    .object({
+      laborCharges: z.number(),
+      partsCharges: z.number(),
+      additionalCharges: z.number(),
+      discount: z.number(),
+      taxPercent: z.number(),
+      taxAmount: z.number(),
+      taxableValue: z.number(),
+      estimatedTotal: z.number(),
+      finalTotal: z.number().nullable(),
+    })
+    .optional(),
   expectedCompletionDate: z.string().nullable(),
   approval: z
     .object({

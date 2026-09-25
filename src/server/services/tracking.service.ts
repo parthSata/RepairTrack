@@ -3,9 +3,15 @@ import { HTTPException } from 'hono/http-exception'
 import type { TrackDecisionInput } from '@/features/tracking/schemas'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
 import { storedCostToRupees } from '@/features/repairs/money'
+import { paiseToRupees } from '@/lib/money'
+import {
+  calculateRepairTotal,
+  sumPartsCharges,
+} from '@/features/repairs/pricing-calc'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
+import { repairParts } from '@/server/db/schema/repair-parts'
 import { devices, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { shops } from '@/server/db/schema/users'
 import { phonesMatch } from '@/server/lib/tokens'
@@ -21,6 +27,12 @@ type RepairRow = {
   status: typeof repairs.$inferSelect.status
   problemDescription: string | null
   estimatedCost: number | null
+  laborCharges: number
+  additionalCharges: number
+  discount: number
+  taxPercent: number
+  estimatedTotal: number | null
+  finalTotal: number | null
   expectedCompletionDate: Date | null
   createdAt: Date
 }
@@ -52,8 +64,17 @@ type ApprovalRow = {
   rejectionReason: string | null
 }
 
+type PartChargeRow = {
+  unitSellingPrice: number
+  quantity: number
+}
+
 function toRupeesOrZero(stored: number): number {
   return storedCostToRupees(stored) ?? 0
+}
+
+function paiseToPublicRupees(paise: number): number {
+  return paiseToRupees(paise)
 }
 
 function toPublicApproval(approval: ApprovalRow) {
@@ -72,6 +93,36 @@ function toPublicApproval(approval: ApprovalRow) {
   } as const
 }
 
+function buildPublicPricing(repair: RepairRow, partLines: PartChargeRow[]) {
+  if (repair.estimatedTotal == null) return undefined
+
+  try {
+    const partsCharges = sumPartsCharges(partLines)
+    const result = calculateRepairTotal({
+      laborCharges: repair.laborCharges,
+      partsCharges,
+      additionalCharges: repair.additionalCharges,
+      discount: repair.discount,
+      taxPercent: repair.taxPercent,
+    })
+
+    return {
+      laborCharges: paiseToPublicRupees(repair.laborCharges),
+      partsCharges: paiseToPublicRupees(result.partsCharges),
+      additionalCharges: paiseToPublicRupees(repair.additionalCharges),
+      discount: paiseToPublicRupees(repair.discount),
+      taxPercent: repair.taxPercent,
+      taxAmount: paiseToPublicRupees(result.taxAmount),
+      taxableValue: paiseToPublicRupees(result.taxableValue),
+      estimatedTotal: paiseToPublicRupees(repair.estimatedTotal),
+      finalTotal:
+        repair.finalTotal != null ? paiseToPublicRupees(repair.finalTotal) : null,
+    }
+  } catch {
+    return undefined
+  }
+}
+
 export function buildPublicTrackingPayload(
   repair: RepairRow,
   device: DeviceRow,
@@ -79,6 +130,7 @@ export function buildPublicTrackingPayload(
   history: HistoryRow[],
   approval?: ApprovalRow | null,
   photos?: { beforeUrl: string; afterUrl: string } | null,
+  partLines: PartChargeRow[] = [],
 ): PublicTrackingResponse {
   const payload: PublicTrackingResponse = {
     ticketNumber: repair.ticketNumber,
@@ -100,7 +152,11 @@ export function buildPublicTrackingPayload(
     })),
   }
 
-  if (repair.estimatedCost !== null) {
+  const pricing = buildPublicPricing(repair, partLines)
+  if (pricing) {
+    payload.pricing = pricing
+    payload.estimatedCost = pricing.estimatedTotal
+  } else if (repair.estimatedCost !== null) {
     const rupees = storedCostToRupees(repair.estimatedCost)
     if (rupees != null) payload.estimatedCost = rupees
   }
@@ -108,7 +164,7 @@ export function buildPublicTrackingPayload(
   if (approval) {
     payload.approval = toPublicApproval(approval)
 
-    if (approval.status === 'PENDING') {
+    if (approval.status === 'PENDING' && !pricing) {
       payload.estimatedCost = payload.approval.revisedTotal
     }
   }
@@ -129,6 +185,12 @@ async function loadPublicRepairData(repairId: string) {
       status: repairs.status,
       problemDescription: repairs.problemDescription,
       estimatedCost: repairs.estimatedCost,
+      laborCharges: repairs.laborCharges,
+      additionalCharges: repairs.additionalCharges,
+      discount: repairs.discount,
+      taxPercent: repairs.taxPercent,
+      estimatedTotal: repairs.estimatedTotal,
+      finalTotal: repairs.finalTotal,
       expectedCompletionDate: repairs.expectedCompletionDate,
       createdAt: repairs.createdAt,
       brand: devices.brand,
@@ -147,7 +209,7 @@ async function loadPublicRepairData(repairId: string) {
     return null
   }
 
-  const [history, latestApprovalRows, photos] = await Promise.all([
+  const [history, latestApprovalRows, photos, partLines] = await Promise.all([
     db
       .select({
         toStatus: repairStatusHistory.toStatus,
@@ -171,6 +233,13 @@ async function loadPublicRepairData(repairId: string) {
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
     getPublicRepairPhotos(row.shopId, repairId, row.status),
+    db
+      .select({
+        unitSellingPrice: repairParts.unitSellingPrice,
+        quantity: repairParts.quantity,
+      })
+      .from(repairParts)
+      .where(eq(repairParts.repairId, repairId)),
   ])
 
   return buildPublicTrackingPayload(
@@ -179,6 +248,12 @@ async function loadPublicRepairData(repairId: string) {
       status: row.status,
       problemDescription: row.problemDescription,
       estimatedCost: row.estimatedCost,
+      laborCharges: row.laborCharges,
+      additionalCharges: row.additionalCharges,
+      discount: row.discount,
+      taxPercent: row.taxPercent,
+      estimatedTotal: row.estimatedTotal,
+      finalTotal: row.finalTotal,
       expectedCompletionDate: row.expectedCompletionDate,
       createdAt: row.createdAt,
     },
@@ -195,6 +270,7 @@ async function loadPublicRepairData(repairId: string) {
     history,
     latestApprovalRows[0] ?? null,
     photos,
+    partLines,
   )
 }
 
