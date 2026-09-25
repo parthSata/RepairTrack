@@ -1,5 +1,15 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
 import { shops } from './users'
+
+export const stockMovementReasonEnum = pgEnum('stock_movement_reason', [
+  'PURCHASE',
+  'RETURN',
+  'DAMAGED',
+  'LOST',
+  'CORRECTION',
+  'REPAIR_USAGE',
+  'REPAIR_REVERSAL',
+])
 
 export const inventory = pgTable(
   'inventory',

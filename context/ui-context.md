@@ -134,8 +134,8 @@ Dashboard should provide:
 ## Inventory
 
 - Inventory List
-- Part Details
-- Add/Edit Part
+- Part Details (Stock History)
+- Add Part / Manage Part (Details + Stock tabs)
 
 ---
 

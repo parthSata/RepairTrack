@@ -121,6 +121,20 @@ export interface Repair {
     heldReason: string | null
   } | null
   photos?: RepairPhotosPayload
+  parts?: RepairPartLine[]
+}
+
+export interface RepairPartLine {
+  id: string
+  shopId: string
+  repairId: string
+  inventoryId: string
+  quantity: number
+  unitSellingPrice: number
+  createdAt: string
+  updatedAt: string
+  partName: string
+  partSku: string
 }
 
 export interface RepairPhotoItem {
