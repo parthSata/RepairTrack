@@ -25,6 +25,7 @@ import {
   syncAssignmentOnReassign,
 } from '@/server/services/repair-assignment.helpers'
 import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
+import { listRepairParts } from '@/server/services/repair-parts.service'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -386,7 +387,7 @@ export async function getRepairById({
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -498,6 +499,7 @@ export async function getRepairById({
       )
       .limit(1),
     getRepairPhotosForDetail({ shopId, userRole, userId, repairId: id }),
+    listRepairParts({ shopId, repairId: id }),
   ])
 
   const creator = creatorResult[0] || null
@@ -570,6 +572,7 @@ export async function getRepairById({
     statusHistory: resolvedStatusHistory,
     approval,
     photos: photosPayload,
+    parts,
     currentAssignment: currentAssignment
       ? {
           id: currentAssignment.id,

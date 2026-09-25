@@ -115,3 +115,16 @@ export const reopenRepairSchema = z.object({
 })
 
 export type ReopenRepairInput = z.infer<typeof reopenRepairSchema>
+
+export const addRepairPartSchema = z.object({
+  inventoryId: z.string().trim().min(1, 'Part is required'),
+  quantity: z.coerce.number().int().min(1, { message: 'Quantity must be at least 1' }),
+})
+
+export type AddRepairPartInput = z.infer<typeof addRepairPartSchema>
+
+export const updateRepairPartSchema = z.object({
+  quantity: z.coerce.number().int().min(1, { message: 'Quantity must be at least 1' }),
+})
+
+export type UpdateRepairPartInput = z.infer<typeof updateRepairPartSchema>

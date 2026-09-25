@@ -308,3 +308,55 @@ export function useRegenerateTrackingLink(repairId: string) {
   })
 }
 
+function repairPartErrorMessage(error: unknown, fallback: string) {
+  if (error && typeof error === 'object' && 'response' in error) {
+    const resData = (
+      error as { response?: { data?: { message?: string; error?: { message?: string } } } }
+    ).response?.data
+    if (resData?.message) return resData.message
+    if (resData?.error?.message) return resData.error.message
+  }
+  if (error instanceof Error) return error.message
+  return fallback
+}
+
+export function useAddRepairPart(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<unknown, Error, { inventoryId: string; quantity: number }>({
+    mutationFn: async (data) => {
+      const response = await apiClient.post(`/repairs/${repairId}/parts`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      toast.success('Part added to repair')
+    },
+    onError: (error: unknown) => {
+      toast.error(repairPartErrorMessage(error, 'Failed to add part'))
+    },
+  })
+}
+
+export function useRemoveRepairPart(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<{ success: true }, Error, string>({
+    mutationFn: async (partRowId) => {
+      const response = await apiClient.delete<{ success: true }>(
+        `/repairs/${repairId}/parts/${partRowId}`,
+      )
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      queryClient.invalidateQueries({ queryKey: ['inventory'] })
+      toast.success('Part removed from repair')
+    },
+    onError: (error: unknown) => {
+      toast.error(repairPartErrorMessage(error, 'Failed to remove part'))
+    },
+  })
+}
+

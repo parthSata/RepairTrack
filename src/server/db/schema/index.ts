@@ -5,5 +5,6 @@ export * from './repair-approvals'
 export * from './repair-assignments'
 export * from './staff-invitations'
 export * from './inventory'
-
+export * from './stock-movements'
+export * from './repair-parts'
 

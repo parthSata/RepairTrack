@@ -27,11 +27,18 @@ import {
 import { getTechnicians } from '@/server/services/staff.service'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
 import {
+  addRepairPartSchema,
   createRepairSchema,
   reopenRepairSchema,
   updateEstimatedCostSchema,
   updateExpectedCompletionDateSchema,
+  updateRepairPartSchema,
 } from '@/features/repairs/schemas'
+import {
+  addRepairPart,
+  removeRepairPart,
+  updateRepairPartQuantity,
+} from '@/server/services/repair-parts.service'
 import {
   repairPhotoConfirmSchema,
   repairPhotoTypeValues,
@@ -367,3 +374,61 @@ export const repairsRouter = new Hono()
       return c.json(payload)
     },
   )
+  .post(
+    '/:id/parts',
+    zValidator('json', addRepairPartSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const { inventoryId, quantity } = c.req.valid('json')
+      const part = await addRepairPart({
+        shopId,
+        repairId: id,
+        userRole,
+        userId,
+        inventoryId,
+        quantity,
+      })
+      return c.json(part, 201)
+    },
+  )
+  .patch(
+    '/:id/parts/:partRowId',
+    zValidator('json', updateRepairPartSchema, (result, c) => {
+      if (!result.success) {
+        return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
+      }
+    }),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const partRowId = c.req.param('partRowId')
+      const { quantity } = c.req.valid('json')
+      const part = await updateRepairPartQuantity({
+        shopId,
+        repairId: id,
+        partRowId,
+        userRole,
+        userId,
+        quantity,
+      })
+      return c.json(part)
+    },
+  )
+  .delete('/:id/parts/:partRowId', async (c) => {
+    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+    const id = c.req.param('id')
+    const partRowId = c.req.param('partRowId')
+    const result = await removeRepairPart({
+      shopId,
+      repairId: id,
+      partRowId,
+      userRole,
+      userId,
+    })
+    return c.json(result)
+  })

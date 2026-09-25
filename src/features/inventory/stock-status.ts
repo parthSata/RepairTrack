@@ -4,13 +4,14 @@ export const REORDER_THRESHOLD = 3
 export type PartStockStatus = 'OUT' | 'LOW' | 'OK'
 
 export const STOCK_STATUS_COPY = {
-  OUT: 'Out of stock — order this part.',
-  LOW: 'Low stock — order new stock soon.',
+  OUT: 'Out of Stock',
+  LOW: 'Low Stock',
+  OK: 'In Stock',
 } as const
 
 export function getPartStockStatus(quantity: number, stockAlert: number): PartStockStatus {
   if (quantity === 0) return 'OUT'
-  if (quantity <= REORDER_THRESHOLD || quantity <= stockAlert) return 'LOW'
+  if (stockAlert > 0 && quantity <= stockAlert) return 'LOW'
   return 'OK'
 }
 

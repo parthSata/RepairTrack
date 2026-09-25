@@ -74,7 +74,7 @@ export function PaisePriceField<TFieldValues extends FieldValues>({
                 'pl-7',
                 error ? 'border-destructive focus-visible:ring-destructive' : '',
               )}
-              value={formatPaiseAsRupeesInput(field.value)}
+              value={formatPaiseAsRupeesInput(field.value) || ''}
               onChange={(e) => {
                 const rupees = parseRupeesInput(e.target.value)
                 if (rupees == null) {

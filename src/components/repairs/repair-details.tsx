@@ -61,6 +61,7 @@ import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBanner } from './approval-status-badge'
 import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
+import { RepairPartsSection } from './repair-parts-section'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
@@ -165,6 +166,7 @@ export function RepairDetails({ id }: { id: string }) {
 
   const isAssignedTechnician = repair.assignedTechnicianId === userId
   const canEditDiagnosisAndNotes = ['OWNER', 'STAFF'].includes(userRole) || isAssignedTechnician
+  const canRecordParts = canEditDiagnosisAndNotes
   const canReassignTechnician = ['OWNER', 'STAFF'].includes(userRole)
   const canShowCustomerTracking = ['OWNER', 'STAFF'].includes(userRole)
   const canEditExpectedDate = canEditDiagnosisAndNotes
@@ -295,7 +297,7 @@ export function RepairDetails({ id }: { id: string }) {
             </div>
 
             {/* Status Control Box */}
-            <div className="flex w-full min-w-0 shrink-0 flex-col gap-4 rounded-xl border border-border/80 bg-gradient-to-b from-muted/40 to-muted/10 p-4 shadow-sm transition-shadow duration-200 hover:shadow-md lg:max-w-sm">
+            <div className="flex w-full min-w-0 shrink-0 flex-col gap-4 rounded-xl border border-border/80 bg-linear-to-b from-muted/40 to-muted/10 p-4 shadow-sm transition-shadow duration-200 hover:shadow-md lg:max-w-sm">
               <StatusChangeControl
                 repairId={repair.id}
                 ticketNumber={repair.ticketNumber}
@@ -723,6 +725,12 @@ export function RepairDetails({ id }: { id: string }) {
           </div>
         </CardContent>
       </Card>
+
+      <RepairPartsSection
+        repairId={id}
+        parts={repair.parts ?? []}
+        canEdit={canRecordParts}
+      />
 
       {/* Repair Notes Section (Append-only) */}
       <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">

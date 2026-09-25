@@ -428,11 +428,13 @@ powered off, dead, or missing its IMEI/serial. To avoid blocking intake:
 Users can:
 
 - Add parts
-- Edit parts
+- Edit parts (Manage Part → Details)
 - View stock
 - Search parts
 - Track stock quantity
-- Record parts used in repairs
+- Adjust stock (Manage Part → Stock) with reason
+- View stock history on Part Details
+- Record parts used in repairs (auto stock decrease)
 - Identify low-stock items
 
 ---

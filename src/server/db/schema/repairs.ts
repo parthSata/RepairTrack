@@ -4,6 +4,7 @@ import { shops, users } from './users'
 import { customers } from './customers'
 import { repairApprovals } from './repair-approvals'
 import { repairAssignments } from './repair-assignments'
+import { repairParts } from './repair-parts'
 
 export const repairStatusEnum = pgEnum('repair_status', [
   'RECEIVED',
@@ -192,6 +193,7 @@ export const repairsRelations = relations(repairs, ({ one, many }) => ({
   approvals: many(repairApprovals),
   assignments: many(repairAssignments),
   photos: many(repairPhotos),
+  parts: many(repairParts),
 }))
 
 export const repairNotesRelations = relations(repairNotes, ({ one }) => ({

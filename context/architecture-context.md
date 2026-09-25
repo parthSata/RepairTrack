@@ -416,6 +416,7 @@ Core entities may include:
 - repairs
 - repair_parts
 - inventory
+- stock_movements
 - invoices
 - payments
 - notifications

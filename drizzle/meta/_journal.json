@@ -141,6 +141,13 @@
       "when": 1790233682176,
       "tag": "0019_rename_minimum_stock_to_stock_alert",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790273555530,
+      "tag": "0020_bitter_black_tom",
+      "breakpoints": true
     }
   ]
 }

@@ -1,8 +1,18 @@
 'use client'
 
 import * as React from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ColumnDef } from '@tanstack/react-table'
-import { AlertTriangle, Package, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  History,
+  MoreVertical,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import { useParts, type Part } from '@/features/inventory/queries'
 import type { PartFilterInput } from '@/features/inventory/schemas'
 import {
@@ -14,8 +24,10 @@ import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { PartDeleteDialog } from '@/components/inventory/part-delete-dialog'
 import { PartForm } from '@/components/inventory/part-form'
 import { formatRupees } from '@/lib/format-money'
@@ -24,27 +36,76 @@ import { cn } from '@/lib/utils'
 
 function StockStatusBadge({ quantity, stockAlert }: { quantity: number; stockAlert: number }) {
   const status = getPartStockStatus(quantity, stockAlert)
-  if (status === 'OK') return null
+  const variant =
+    status === 'OUT' ? 'destructive' : status === 'LOW' ? 'warning' : 'success'
 
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap border shadow-2xs',
-        status === 'OUT'
-          ? 'border-red-200/90 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300'
-          : 'border-amber-300/90 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-200',
-      )}
-      title={STOCK_STATUS_COPY[status]}
-    >
-      <span
-        className={cn(
-          'h-1.5 w-1.5 rounded-full shrink-0',
-          status === 'OUT' ? 'bg-red-500' : 'bg-amber-500',
-        )}
-        aria-hidden="true"
-      />
-      {status === 'OUT' ? 'Out of stock' : 'Low stock'}
-    </span>
+    <Badge variant={variant} className="whitespace-nowrap">
+      {STOCK_STATUS_COPY[status]}
+    </Badge>
+  )
+}
+
+function PartRowActions({
+  part,
+  onManage,
+  onDelete,
+}: {
+  part: Part
+  onManage: (part: Part) => void
+  onDelete: (part: Part) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const router = useRouter()
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+          aria-label={`Actions for ${part.name}`}
+        >
+          <MoreVertical className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-48 p-1">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted"
+          onClick={() => {
+            setOpen(false)
+            onManage(part)
+          }}
+        >
+          <Pencil className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Manage Part
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-foreground hover:bg-muted"
+          onClick={() => {
+            setOpen(false)
+            router.push(`/inventory/${part.id}`)
+          }}
+        >
+          <History className="h-4 w-4 text-muted-foreground" aria-hidden />
+          Stock History
+        </button>
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-destructive hover:bg-destructive/10"
+          onClick={() => {
+            setOpen(false)
+            onDelete(part)
+          }}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden />
+          Delete
+        </button>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -58,8 +119,8 @@ export function PartTable() {
   })
   const [createOpen, setCreateOpen] = React.useState(false)
   const [createPending, setCreatePending] = React.useState(false)
-  const [editPart, setEditPart] = React.useState<Part | null>(null)
-  const [editPending, setEditPending] = React.useState(false)
+  const [managePart, setManagePart] = React.useState<Part | null>(null)
+  const [managePending, setManagePending] = React.useState(false)
   const [deletePart, setDeletePart] = React.useState<Part | null>(null)
 
   const { data, isLoading, isError, error, refetch } = useParts(filters)
@@ -67,15 +128,14 @@ export function PartTable() {
   const columns: ColumnDef<Part>[] = [
     {
       accessorKey: 'name',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Part Name" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Part" />,
       cell: ({ row }) => (
-        <div className="flex flex-col gap-1">
-          <span className="font-medium text-foreground">{row.original.name}</span>
-          <StockStatusBadge
-            quantity={row.original.quantity}
-            stockAlert={row.original.stockAlert}
-          />
-        </div>
+        <Link
+          href={`/inventory/${row.original.id}`}
+          className="font-medium text-foreground hover:underline"
+        >
+          {row.original.name}
+        </Link>
       ),
     },
     {
@@ -87,74 +147,60 @@ export function PartTable() {
     },
     {
       accessorKey: 'quantity',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Quantity" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock" />,
       cell: ({ row }) => (
-        <span className="text-sm font-semibold text-foreground">{row.original.quantity}</span>
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+          <span className="text-sm font-semibold tabular-nums text-foreground">
+            {row.original.quantity}
+          </span>
+          <StockStatusBadge
+            quantity={row.original.quantity}
+            stockAlert={row.original.stockAlert}
+          />
+        </div>
       ),
     },
     {
       accessorKey: 'stockAlert',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock Alert" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Min" />,
       cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.original.stockAlert}</span>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {row.original.stockAlert === 0 ? (
+            <span className="text-muted-foreground/60" title="Alert disabled">
+              —
+            </span>
+          ) : (
+            row.original.stockAlert
+          )}
+        </span>
       ),
     },
     {
       accessorKey: 'purchasePrice',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Purchase Price" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Purchase" />,
       cell: ({ row }) => (
         <span className="text-sm text-foreground">{formatRupees(row.original.purchasePrice)}</span>
       ),
     },
     {
       accessorKey: 'sellingPrice',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Selling Price" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Selling" />,
       cell: ({ row }) => (
         <span className="text-sm text-foreground">{formatRupees(row.original.sellingPrice)}</span>
       ),
     },
     {
-      accessorKey: 'supplier',
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
-      cell: ({ row }) => {
-        const supplier = row.original.supplier
-        return supplier ? (
-          <span className="truncate text-sm text-muted-foreground">{supplier}</span>
-        ) : (
-          <span className="text-xs italic text-muted-foreground/60">—</span>
-        )
-      },
-    },
-    {
       id: 'actions',
       header: () => <div className="pr-2 text-right">Actions</div>,
-      cell: ({ row }) => {
-        const part = row.original
-        return (
-          <div className="flex items-center justify-end gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-              aria-label={`Edit ${part.name}`}
-              title={`Edit ${part.name}`}
-              onClick={() => setEditPart(part)}
-            >
-              <Pencil className="h-4 w-4" aria-hidden="true" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-              aria-label={`Delete ${part.name}`}
-              title={`Delete ${part.name}`}
-              onClick={() => setDeletePart(part)}
-            >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        )
-      },
+      cell: ({ row }) => (
+        <div className="flex justify-end">
+          <PartRowActions
+            part={row.original}
+            onManage={setManagePart}
+            onDelete={setDeletePart}
+          />
+        </div>
+      ),
     },
   ]
 
@@ -261,7 +307,7 @@ export function PartTable() {
               >
                 <Button
                   variant="accent"
-                  className="mt-4 gap-2"
+                  className={cn('mt-4 gap-2')}
                   onClick={() => setCreateOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -298,36 +344,42 @@ export function PartTable() {
       </Dialog>
 
       <Dialog
-        open={Boolean(editPart)}
+        open={Boolean(managePart)}
         onOpenChange={(open) => {
-          if (editPending && !open) return
-          if (!open) setEditPart(null)
+          if (managePending && !open) return
+          if (!open) setManagePart(null)
         }}
-        preventDismiss={editPending}
+        preventDismiss={managePending}
       >
         <DialogHeader>
-          <DialogTitle>Edit Part</DialogTitle>
+          <DialogTitle>Manage Part</DialogTitle>
         </DialogHeader>
-        {editPart ? (
+        {managePart ? (
           <PartForm
+            key={managePart.id}
             mode="edit"
-            partId={editPart.id}
+            partId={managePart.id}
             initialData={{
-              name: editPart.name,
-              sku: editPart.sku,
-              quantity: editPart.quantity,
-              stockAlert: editPart.stockAlert,
-              purchasePrice: editPart.purchasePrice,
-              sellingPrice: editPart.sellingPrice,
-              supplier: editPart.supplier,
+              name: managePart.name,
+              sku: managePart.sku,
+              quantity: managePart.quantity,
+              stockAlert: managePart.stockAlert,
+              purchasePrice: managePart.purchasePrice,
+              sellingPrice: managePart.sellingPrice,
+              supplier: managePart.supplier ?? '',
             }}
-            onPendingChange={setEditPending}
-            onSuccess={() => {
-              setEditPending(false)
-              setEditPart(null)
+            onPendingChange={setManagePending}
+            onStockAdjusted={(updated) => {
+              setManagePart((prev) => (prev ? { ...prev, ...updated } : prev))
+            }}
+            onSuccess={(updated) => {
+              setManagePending(false)
+              if (updated) {
+                setManagePart((prev) => (prev ? { ...prev, ...updated } : prev))
+              }
             }}
             onCancel={() => {
-              if (!editPending) setEditPart(null)
+              if (!managePending) setManagePart(null)
             }}
           />
         ) : null}
