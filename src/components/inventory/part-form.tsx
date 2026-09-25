@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useForm, type Resolver } from 'react-hook-form'
+import { useForm, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Package, Tag, Warehouse, Truck } from 'lucide-react'
 import {
@@ -11,6 +11,7 @@ import {
   partDetailsSchema,
   STOCK_REASON_LABELS,
   type AdjustStockInput,
+  type PartDetailsFormValues,
   type PartDetailsInput,
 } from '@/features/inventory/schemas'
 import { useAdjustStock, useCreatePart, useUpdatePart } from '@/features/inventory/mutations'
@@ -36,7 +37,7 @@ type ManageTab = 'details' | 'stock'
 interface PartFormProps {
   mode: 'create' | 'edit'
   partId?: string
-  initialData?: Partial<PartDetailsInput> & { quantity?: number }
+  initialData?: Partial<PartDetailsFormValues> & { quantity?: number }
   initialTab?: ManageTab
   onSuccess: (part?: Part) => void
   onCancel?: () => void
@@ -77,8 +78,8 @@ export function PartForm({
     control,
     setError,
     formState: { errors },
-  } = useForm<PartDetailsInput>({
-    resolver: zodResolver(partDetailsSchema) as Resolver<PartDetailsInput>,
+  } = useForm<PartDetailsFormValues>({
+    resolver: zodResolver(partDetailsSchema) as Resolver<PartDetailsFormValues>,
     mode: 'onChange',
     reValidateMode: 'onChange',
     defaultValues: {
@@ -111,10 +112,14 @@ export function PartForm({
   const previewQuantity =
     direction === 'IN' ? currentQuantity + validAdjustQty : currentQuantity - validAdjustQty
 
-  const onSubmitDetails = async (values: PartDetailsInput) => {
+  const onSubmitDetails = async (values: PartDetailsFormValues) => {
     const payload: PartDetailsInput = {
-      ...values,
-      supplier: values.supplier?.trim() ? values.supplier.trim() : null,
+      name: values.name,
+      sku: values.sku,
+      stockAlert: values.stockAlert,
+      purchasePrice: values.purchasePrice,
+      sellingPrice: values.sellingPrice,
+      supplier: values.supplier.trim() ? values.supplier.trim() : null,
     }
 
     try {
@@ -260,26 +265,33 @@ export function PartForm({
               <Warehouse className="h-4 w-4 text-muted-foreground" />
               Stock alert (minimum)
             </Label>
-            <Input
-              id="stockAlert"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              disabled={detailsPending}
-              className={
-                errors.stockAlert ? 'border-destructive focus-visible:ring-destructive' : ''
-              }
-              {...register('stockAlert', {
-                setValueAs: (v) => {
-                  if (v === '' || v == null) return 0
-                  const n = typeof v === 'number' ? v : Number(v)
-                  return Number.isFinite(n) ? n : 0
-                },
-              })}
+            <Controller
+              name="stockAlert"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="stockAlert"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  step={1}
+                  disabled={detailsPending}
+                  className={
+                    errors.stockAlert ? 'border-destructive focus-visible:ring-destructive' : ''
+                  }
+                  name={field.name}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                  value={field.value ?? 0}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    field.onChange(raw === '' ? 0 : Number(raw))
+                  }}
+                />
+              )}
             />
             <p className="text-xs text-muted-foreground">
-              Low Stock warning appears when quantity reaches this level or below.
+              Alerts when quantity reaches this level or below. Set to 0 to disable low-stock alert.
             </p>
             <FieldError message={errors.stockAlert?.message} />
           </div>
@@ -309,12 +321,24 @@ export function PartForm({
               </Label>
               <span className="text-[11px] text-muted-foreground">Optional</span>
             </div>
-            <Input
-              id="supplier"
-              placeholder="e.g. PartsHub India"
-              disabled={detailsPending}
-              className={errors.supplier ? 'border-destructive focus-visible:ring-destructive' : ''}
-              {...register('supplier')}
+            <Controller
+              name="supplier"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="supplier"
+                  placeholder="e.g. PartsHub India"
+                  disabled={detailsPending}
+                  className={
+                    errors.supplier ? 'border-destructive focus-visible:ring-destructive' : ''
+                  }
+                  name={field.name}
+                  ref={field.ref}
+                  onBlur={field.onBlur}
+                  value={field.value ?? ''}
+                  onChange={(e) => field.onChange(e.target.value)}
+                />
+              )}
             />
             <FieldError message={errors.supplier?.message} />
           </div>

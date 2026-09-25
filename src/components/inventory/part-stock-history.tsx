@@ -237,7 +237,7 @@ export function PartStockHistory({ partId }: { partId: string }) {
             stockAlert: part.stockAlert,
             purchasePrice: part.purchasePrice,
             sellingPrice: part.sellingPrice,
-            supplier: part.supplier,
+            supplier: part.supplier ?? '',
           }}
           onPendingChange={setManagePending}
           onSuccess={() => {

@@ -164,7 +164,15 @@ export function PartTable() {
       accessorKey: 'stockAlert',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Min" />,
       cell: ({ row }) => (
-        <span className="text-sm tabular-nums text-muted-foreground">{row.original.stockAlert}</span>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {row.original.stockAlert === 0 ? (
+            <span className="text-muted-foreground/60" title="Alert disabled">
+              —
+            </span>
+          ) : (
+            row.original.stockAlert
+          )}
+        </span>
       ),
     },
     {
@@ -358,7 +366,7 @@ export function PartTable() {
               stockAlert: managePart.stockAlert,
               purchasePrice: managePart.purchasePrice,
               sellingPrice: managePart.sellingPrice,
-              supplier: managePart.supplier,
+              supplier: managePart.supplier ?? '',
             }}
             onPendingChange={setManagePending}
             onStockAdjusted={(updated) => {

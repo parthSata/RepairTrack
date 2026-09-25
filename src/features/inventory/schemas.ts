@@ -12,7 +12,7 @@ export const partDetailsSchema = z.object({
     .trim()
     .min(1, { message: 'SKU is required' })
     .max(100, { message: 'SKU cannot exceed 100 characters' }),
-  stockAlert: z.coerce.number().int().min(0).default(0),
+  stockAlert: z.coerce.number().int().min(0),
   purchasePrice: z.coerce
     .number()
     .int()
@@ -26,8 +26,19 @@ export const partDetailsSchema = z.object({
     .trim()
     .max(200, { message: 'Supplier cannot exceed 200 characters' })
     .optional()
-    .nullable(),
+    .nullable()
+    .transform((v) => (v == null || v === '' ? null : v)),
 })
+
+/** Form values — supplier kept as string in the UI; null is applied on submit. */
+export type PartDetailsFormValues = {
+  name: string
+  sku: string
+  stockAlert: number
+  purchasePrice: number
+  sellingPrice: number
+  supplier: string
+}
 
 export type PartDetailsInput = z.infer<typeof partDetailsSchema>
 

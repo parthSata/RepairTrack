@@ -4,14 +4,12 @@ import { db } from '@/server/db'
 import { inventory } from '@/server/db/schema/inventory'
 import { stockMovements } from '@/server/db/schema/stock-movements'
 import { repairParts } from '@/server/db/schema/repair-parts'
-import { repairs } from '@/server/db/schema/repairs'
 import type {
   AdjustStockInput,
   PartDetailsInput,
   PartFilterInput,
   StockMovementFilterInput,
 } from '@/features/inventory/schemas'
-import { REORDER_THRESHOLD } from '@/features/inventory/stock-status'
 
 type TxClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type DbClient = typeof db | TxClient
@@ -386,7 +384,7 @@ export async function listParts({
       .select({
         total: count(),
         outOfStockCount: sql<number>`count(*) filter (where ${inventory.quantity} = 0)::int`,
-        lowStockCount: sql<number>`count(*) filter (where ${inventory.quantity} > 0 and (${inventory.quantity} <= ${REORDER_THRESHOLD} or ${inventory.quantity} <= ${inventory.stockAlert}))::int`,
+        lowStockCount: sql<number>`count(*) filter (where ${inventory.quantity} > 0 and ${inventory.stockAlert} > 0 and ${inventory.quantity} <= ${inventory.stockAlert})::int`,
       })
       .from(inventory)
       .where(whereClause),

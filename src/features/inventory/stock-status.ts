@@ -11,7 +11,7 @@ export const STOCK_STATUS_COPY = {
 
 export function getPartStockStatus(quantity: number, stockAlert: number): PartStockStatus {
   if (quantity === 0) return 'OUT'
-  if (quantity <= REORDER_THRESHOLD || quantity <= stockAlert) return 'LOW'
+  if (stockAlert > 0 && quantity <= stockAlert) return 'LOW'
   return 'OK'
 }
 
