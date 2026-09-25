@@ -98,6 +98,12 @@ export const repairs = pgTable(
     diagnosis: text('diagnosis'),
     estimatedCost: integer('estimated_cost'),
     finalCost: integer('final_cost'),
+    laborCharges: integer('labor_charges').default(0).notNull(),
+    additionalCharges: integer('additional_charges').default(0).notNull(),
+    discount: integer('discount').default(0).notNull(),
+    taxPercent: integer('tax_percent').default(0).notNull(),
+    estimatedTotal: integer('estimated_total'),
+    finalTotal: integer('final_total'),
     priority: repairPriorityEnum('priority').default('MEDIUM').notNull(),
     expectedCompletionDate: timestamp('expected_completion_date', { withTimezone: true }),
     assignedTechnicianId: text('assigned_technician_id').references(() => users.id, {
