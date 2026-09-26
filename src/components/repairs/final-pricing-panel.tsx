@@ -3,41 +3,50 @@
 import * as React from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Calculator, IndianRupee } from 'lucide-react'
+import { IndianRupee, Receipt } from 'lucide-react'
 import {
   repairPricingFieldsSchema,
   type RepairPricingFieldsInput,
 } from '@/features/repairs/pricing-schemas'
-import { useUpdateEstimate } from '@/features/repairs/pricing-mutations'
+import { useConfirmFinalTotal } from '@/features/repairs/pricing-mutations'
 import type { RepairPartLine } from '@/features/repairs/queries'
-import { safeCalculateTotal, sumPartsCharges } from '@/features/repairs/pricing-calc'
+import {
+  differsFromEstimate,
+  safeCalculateTotal,
+  sumPartsCharges,
+} from '@/features/repairs/pricing-calc'
 import { PricingBreakdownRows } from '@/components/repairs/pricing-breakdown-rows'
 import { PricingChargeFields } from '@/components/repairs/pricing-charge-fields'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-type EstimatePricingPanelProps = {
+type FinalPricingPanelProps = {
   repairId: string
   parts: RepairPartLine[]
   laborCharges: number
   additionalCharges: number
   taxPercent: number
   estimatedTotal: number | null
-  canEdit: boolean
-  status?: string
+  finalTotal: number | null
+  canConfirm: boolean
 }
 
-export function EstimatePricingPanel({
+export function FinalPricingPanel({
   repairId,
   parts,
   laborCharges,
   additionalCharges,
   taxPercent,
   estimatedTotal,
-  canEdit,
-  status,
-}: EstimatePricingPanelProps) {
-  const saveMutation = useUpdateEstimate(repairId)
+  finalTotal,
+  canConfirm,
+}: FinalPricingPanelProps) {
+  const confirmMutation = useConfirmFinalTotal(repairId)
+  const [isUnlocked, setIsUnlocked] = React.useState(false)
+
+  const isConfirmed = finalTotal != null
+  const isEditing = canConfirm && (!isConfirmed || isUnlocked)
   const partsCharges = sumPartsCharges(parts)
 
   const {
@@ -46,7 +55,7 @@ export function EstimatePricingPanel({
     watch,
     reset,
     trigger,
-    formState: { errors, isDirty, isValid },
+    formState: { errors, isValid },
   } = useForm<RepairPricingFieldsInput>({
     resolver: zodResolver(repairPricingFieldsSchema) as Resolver<RepairPricingFieldsInput>,
     mode: 'onChange',
@@ -57,6 +66,10 @@ export function EstimatePricingPanel({
     reset({ laborCharges, additionalCharges, taxPercent })
     void trigger()
   }, [laborCharges, additionalCharges, taxPercent, reset, trigger])
+
+  React.useEffect(() => {
+    if (!isConfirmed) setIsUnlocked(false)
+  }, [isConfirmed])
 
   const watched = watch()
   const liveLabor = Number.isFinite(watched.laborCharges) ? watched.laborCharges : 0
@@ -77,12 +90,14 @@ export function EstimatePricingPanel({
     taxPercent,
   })
   const viewTotals =
-    savedTotals && estimatedTotal != null
-      ? { ...savedTotals, total: estimatedTotal }
-      : savedTotals
+    savedTotals && finalTotal != null ? { ...savedTotals, total: finalTotal } : savedTotals
+
+  const comparisonTotal = isEditing ? (liveTotals?.total ?? null) : finalTotal
+  const showDiffNote = differsFromEstimate(estimatedTotal, comparisonTotal)
 
   const onSubmit = handleSubmit(async (values) => {
-    await saveMutation.mutateAsync(values)
+    await confirmMutation.mutateAsync(values)
+    setIsUnlocked(false)
   })
 
   return (
@@ -90,29 +105,34 @@ export function EstimatePricingPanel({
       <CardContent className="space-y-5 pt-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-            <Calculator className="h-4 w-4 text-steel" aria-hidden />
+            <Receipt className="h-4 w-4 text-steel" aria-hidden />
           </div>
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold tracking-tight text-foreground">
-              Repair estimate
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {canEdit
-                ? 'Labor, parts, and tax — saved total is shared with customer tracking.'
-                : status === 'COMPLETED'
-                  ? 'Estimate is locked on completed repairs.'
-                  : 'Estimate is locked after customer approval.'}
-            </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold tracking-tight text-foreground">
+                Final pricing
+              </h3>
+              {isConfirmed && !isEditing ? (
+                <Badge variant="success" className="rounded-md font-medium">
+                  Confirmed
+                </Badge>
+              ) : null}
+            </div>
+            {isEditing ? (
+              <p className="text-xs text-muted-foreground">
+                Adjust charges, then confirm for invoicing.
+              </p>
+            ) : null}
           </div>
         </div>
 
-        {canEdit ? (
+        {isEditing ? (
           <form onSubmit={onSubmit} className="space-y-4">
             <PricingChargeFields
               control={control}
               errors={errors}
-              disabled={saveMutation.isPending}
-              taxFieldId="estimate-taxPercent"
+              disabled={confirmMutation.isPending}
+              taxFieldId="final-taxPercent"
             />
 
             <PricingBreakdownRows
@@ -121,32 +141,53 @@ export function EstimatePricingPanel({
               additionalCharges={liveAdditional}
               taxPercent={liveTaxPercent}
               totals={liveTotals}
-              totalLabel="Estimated total"
-              emptyMessage="Estimate not available."
+              totalLabel="Final total"
             />
+
+            {showDiffNote ? (
+              <p className="text-xs text-muted-foreground">Final total differs from estimate</p>
+            ) : null}
 
             <div className="flex justify-end">
               <Button
                 type="submit"
                 size="sm"
-                disabled={saveMutation.isPending || !isDirty || !isValid}
+                disabled={confirmMutation.isPending || !isValid}
                 className="gap-1.5"
               >
                 <IndianRupee className="h-3.5 w-3.5" aria-hidden />
-                {saveMutation.isPending ? 'Saving…' : 'Save estimate'}
+                {confirmMutation.isPending ? 'Confirming…' : 'Confirm Final Total'}
               </Button>
             </div>
           </form>
         ) : (
-          <PricingBreakdownRows
-            laborCharges={laborCharges}
-            partsCharges={partsCharges}
-            additionalCharges={additionalCharges}
-            taxPercent={taxPercent}
-            totals={viewTotals}
-            totalLabel="Estimated total"
-            emptyMessage="Estimate not available."
-          />
+          <div className="space-y-4">
+            <PricingBreakdownRows
+              laborCharges={laborCharges}
+              partsCharges={partsCharges}
+              additionalCharges={additionalCharges}
+              taxPercent={taxPercent}
+              totals={viewTotals}
+              totalLabel="Final total"
+            />
+
+            {showDiffNote ? (
+              <p className="text-xs text-muted-foreground">Final total differs from estimate</p>
+            ) : null}
+
+            {canConfirm && isConfirmed ? (
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsUnlocked(true)}
+                >
+                  Unlock to edit
+                </Button>
+              </div>
+            ) : null}
+          </div>
         )}
       </CardContent>
     </Card>

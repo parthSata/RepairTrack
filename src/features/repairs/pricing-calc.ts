@@ -50,3 +50,26 @@ export function calculateRepairTotal(input: CalculateRepairTotalInput): Calculat
 
   return { partsCharges, taxableValue, taxAmount, total }
 }
+
+/** Live preview helper — returns null if inputs are invalid for calculation. */
+export function safeCalculateTotal(
+  input: CalculateRepairTotalInput,
+): CalculateRepairTotalResult | null {
+  try {
+    return calculateRepairTotal(input)
+  } catch {
+    return null
+  }
+}
+
+const DEFAULT_ESTIMATE_DIFF_THRESHOLD_PAISE = 100
+
+/** True when final and estimated totals differ by more than threshold (default ₹1). */
+export function differsFromEstimate(
+  estimatedTotalPaise: number | null | undefined,
+  finalTotalPaise: number | null | undefined,
+  thresholdPaise = DEFAULT_ESTIMATE_DIFF_THRESHOLD_PAISE,
+): boolean {
+  if (estimatedTotalPaise == null || finalTotalPaise == null) return false
+  return Math.abs(finalTotalPaise - estimatedTotalPaise) > thresholdPaise
+}

@@ -33,8 +33,15 @@ import {
 import {
   canEditEstimatePricing,
   ESTIMATE_PRICING_LOCKED_MESSAGE,
-  isEstimatePricingEditableStatus,
+  ESTIMATE_PRICING_TECHNICIAN_LOCKED_MESSAGE,
 } from '@/features/repairs/estimate-edit-rules'
+import {
+  canConfirmFinalPricing,
+  FINAL_PRICING_COMPLETED_MESSAGE,
+  FINAL_PRICING_FORBIDDEN_MESSAGE,
+  FINAL_PRICING_STATUS_MESSAGE,
+  isFinalPricingVisibleStatus,
+} from '@/features/repairs/final-pricing-rules'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -1160,6 +1167,35 @@ export async function updateEstimatedCost({
   return updated!
 }
 
+async function resolveRepairPricingTotal({
+  shopId,
+  repairId,
+  laborCharges,
+  additionalCharges,
+  taxPercent,
+}: {
+  shopId: string
+  repairId: string
+  laborCharges: number
+  additionalCharges: number
+  taxPercent: number
+}) {
+  const parts = await listRepairParts({ shopId, repairId })
+  const partsCharges = sumPartsCharges(parts)
+
+  try {
+    return calculateRepairTotal({
+      laborCharges,
+      partsCharges,
+      additionalCharges,
+      taxPercent,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Invalid pricing values'
+    throw new HTTPException(400, { message })
+  }
+}
+
 export async function updateRepairEstimatePricing({
   shopId,
   userRole,
@@ -1196,29 +1232,30 @@ export async function updateRepairEstimatePricing({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (!isEstimatePricingEditableStatus(existing.status)) {
-    throw new HTTPException(400, { message: ESTIMATE_PRICING_LOCKED_MESSAGE })
-  }
-
   if (!canEditEstimatePricing({
     status: existing.status,
     userRole,
     userId,
     assignedTechnicianId: existing.assignedTechnicianId,
   })) {
-    throw new HTTPException(403, {
-      message:
-        userRole === 'TECHNICIAN'
-          ? 'Forbidden: Technicians can only edit repairs assigned to them.'
-          : 'Not authorized to update estimate pricing',
-    })
+    if (existing.status === 'COMPLETED') {
+      throw new HTTPException(400, { message: ESTIMATE_PRICING_LOCKED_MESSAGE })
+    }
+    if (userRole === 'TECHNICIAN') {
+      const assigned = existing.assignedTechnicianId === userId
+      throw new HTTPException(assigned ? 400 : 403, {
+        message: assigned
+          ? ESTIMATE_PRICING_TECHNICIAN_LOCKED_MESSAGE
+          : 'Forbidden: Technicians can only edit repairs assigned to them.',
+      })
+    }
+    throw new HTTPException(403, { message: 'Not authorized to update estimate pricing' })
   }
 
-  const parts = await listRepairParts({ shopId, repairId: id })
-  const partsCharges = sumPartsCharges(parts)
-  const { total } = calculateRepairTotal({
+  const { total } = await resolveRepairPricingTotal({
+    shopId,
+    repairId: id,
     laborCharges,
-    partsCharges,
     additionalCharges,
     taxPercent,
   })
@@ -1250,6 +1287,69 @@ export async function updateRepairEstimatePricing({
         .where(eq(repairApprovals.id, existing.approvalPendingId))
     }
   })
+
+  return getRepairById({ shopId, userRole, userId, id })
+}
+
+export async function updateRepairFinalTotal({
+  shopId,
+  userRole,
+  userId,
+  id,
+  laborCharges,
+  additionalCharges,
+  taxPercent,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  laborCharges: number
+  additionalCharges: number
+  taxPercent: number
+}) {
+  const [existing] = await db
+    .select({
+      id: repairs.id,
+      status: repairs.status,
+    })
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (!isFinalPricingVisibleStatus(existing.status)) {
+    throw new HTTPException(400, { message: FINAL_PRICING_STATUS_MESSAGE })
+  }
+
+  if (!canConfirmFinalPricing({ userRole, status: existing.status })) {
+    if (existing.status === 'COMPLETED') {
+      throw new HTTPException(400, { message: FINAL_PRICING_COMPLETED_MESSAGE })
+    }
+    throw new HTTPException(403, { message: FINAL_PRICING_FORBIDDEN_MESSAGE })
+  }
+
+  const { total } = await resolveRepairPricingTotal({
+    shopId,
+    repairId: id,
+    laborCharges,
+    additionalCharges,
+    taxPercent,
+  })
+
+  await db
+    .update(repairs)
+    .set({
+      laborCharges,
+      additionalCharges,
+      taxPercent,
+      finalTotal: total,
+      finalCost: total,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
 
   return getRepairById({ shopId, userRole, userId, id })
 }

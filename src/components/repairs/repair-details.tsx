@@ -63,10 +63,14 @@ import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
 import { EstimatePricingPanel } from './estimate-pricing-panel'
+import { FinalPricingPanel } from './final-pricing-panel'
 import {
   canEditEstimatePricing,
-  isEstimatePricingEditableStatus,
 } from '@/features/repairs/estimate-edit-rules'
+import {
+  canConfirmFinalPricing,
+  isFinalPricingVisibleStatus,
+} from '@/features/repairs/final-pricing-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
@@ -170,7 +174,12 @@ export function RepairDetails({ id }: { id: string }) {
     assignedTechnicianId: repair.assignedTechnicianId,
   })
   const showEstimatePanel =
-    isEstimatePricingEditableStatus(repair.status) || repair.estimatedTotal != null
+    canEditEstimate || repair.estimatedTotal != null
+  const showFinalPricingPanel = isFinalPricingVisibleStatus(repair.status)
+  const canConfirmFinal = canConfirmFinalPricing({
+    userRole,
+    status: repair.status,
+  })
 
   const showModelConfirmationCard =
     repair.status === 'DIAGNOSING' &&
@@ -632,9 +641,11 @@ export function RepairDetails({ id }: { id: string }) {
             ) : (
               <>
                 <p className="text-[11px] text-muted-foreground">
-                  {isEstimatePricingEditableStatus(repair.status)
+                  {canEditEstimate
                     ? 'Edit labor, parts, and tax in Repair estimate below.'
-                    : 'Estimate is locked after customer approval.'}
+                    : repair.status === 'COMPLETED'
+                      ? 'Estimate is locked on completed repairs.'
+                      : 'Estimate is locked after customer approval.'}
                 </p>
                 {(repair.estimatedTotal ?? repair.estimatedCost) != null ? (
                   <div className="rounded-xl border border-accent/25 bg-accent/10 px-5 py-5">
@@ -668,6 +679,20 @@ export function RepairDetails({ id }: { id: string }) {
           taxPercent={repair.taxPercent ?? 0}
           estimatedTotal={repair.estimatedTotal ?? null}
           canEdit={canEditEstimate}
+          status={repair.status}
+        />
+      ) : null}
+
+      {showFinalPricingPanel ? (
+        <FinalPricingPanel
+          repairId={id}
+          parts={repair.parts ?? []}
+          laborCharges={repair.laborCharges ?? 0}
+          additionalCharges={repair.additionalCharges ?? 0}
+          taxPercent={repair.taxPercent ?? 0}
+          estimatedTotal={repair.estimatedTotal ?? null}
+          finalTotal={repair.finalTotal ?? null}
+          canConfirm={canConfirmFinal}
         />
       ) : null}
 

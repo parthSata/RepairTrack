@@ -24,3 +24,21 @@ export function useUpdateEstimate(repairId: string) {
     },
   })
 }
+
+export function useConfirmFinalTotal(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<Repair, Error, RepairPricingFieldsInput>({
+    mutationFn: async (data) => {
+      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/final-total`, data)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      toast.success('Final total confirmed')
+    },
+    onError: (error: unknown) => {
+      toast.error(getApiErrorMessage(error, 'Failed to confirm final total'))
+    },
+  })
+}

@@ -17,6 +17,7 @@ import {
   updateEstimatedCost,
   updateExpectedCompletionDate,
   updateRepairEstimatePricing,
+  updateRepairFinalTotal,
   updateRepairStatus,
 } from '@/server/services/repair.service'
 import {
@@ -266,6 +267,24 @@ export const repairsRouter = new Hono()
       const body = c.req.valid('json')
 
       const updated = await updateRepairEstimatePricing({
+        shopId,
+        userRole,
+        userId,
+        id,
+        ...body,
+      })
+      return c.json(updated)
+    },
+  )
+  .patch(
+    '/:id/final-total',
+    zValidator('json', repairPricingFieldsSchema),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const body = c.req.valid('json')
+
+      const updated = await updateRepairFinalTotal({
         shopId,
         userRole,
         userId,
