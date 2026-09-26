@@ -96,6 +96,11 @@ export interface Repair {
   diagnosis: string | null
   estimatedCost: number | null
   finalCost: number | null
+  laborCharges: number
+  additionalCharges: number
+  taxPercent: number
+  estimatedTotal: number | null
+  finalTotal: number | null
   priority: RepairPriority
   expectedCompletionDate: string | null
   isOverdue?: boolean

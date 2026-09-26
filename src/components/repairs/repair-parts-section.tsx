@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Boxes, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { Part } from '@/features/inventory/queries'
 import { useAddRepairPart, useRemoveRepairPart } from '@/features/repairs/mutations'
 import type { RepairPartLine } from '@/features/repairs/queries'
@@ -9,6 +10,7 @@ import { formatRupees } from '@/lib/format-money'
 import { PartCombobox } from '@/components/repairs/part-combobox'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -19,24 +21,40 @@ interface RepairPartsSectionProps {
 }
 
 export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSectionProps) {
-  const [inventoryId, setInventoryId] = React.useState<string | null>(null)
+  const [selectedPart, setSelectedPart] = React.useState<Part | null>(null)
   const [quantity, setQuantity] = React.useState('1')
+  const [qtyError, setQtyError] = React.useState<string | undefined>()
 
   const addMutation = useAddRepairPart(repairId)
   const removeMutation = useRemoveRepairPart(repairId)
 
+  const stockOnHand = selectedPart?.quantity ?? null
+
   const handlePartChange = (part: Part | null) => {
-    setInventoryId(part?.id ?? null)
+    setSelectedPart(part)
+    setQtyError(undefined)
   }
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inventoryId) return
-    const qty = Number.parseInt(quantity, 10)
-    if (!Number.isFinite(qty) || qty < 1) return
+    if (!selectedPart) return
 
-    await addMutation.mutateAsync({ inventoryId, quantity: qty })
-    setInventoryId(null)
+    const qty = Number.parseInt(quantity, 10)
+    if (!Number.isFinite(qty) || qty < 1) {
+      setQtyError('Quantity must be at least 1')
+      return
+    }
+
+    if (qty > selectedPart.quantity) {
+      const message = `Only ${selectedPart.quantity} in stock for this part.`
+      setQtyError(message)
+      toast.error(message)
+      return
+    }
+
+    setQtyError(undefined)
+    await addMutation.mutateAsync({ inventoryId: selectedPart.id, quantity: qty })
+    setSelectedPart(null)
     setQuantity('1')
   }
 
@@ -60,10 +78,13 @@ export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSect
                 <Label htmlFor="part-combobox">Part</Label>
                 <PartCombobox
                   id="part-combobox"
-                  value={inventoryId}
+                  value={selectedPart?.id ?? null}
                   onChange={handlePartChange}
                   disabled={addMutation.isPending}
                 />
+                {stockOnHand != null ? (
+                  <p className="text-xs text-muted-foreground">{stockOnHand} in stock</p>
+                ) : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="part-qty">Qty</Label>
@@ -71,18 +92,24 @@ export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSect
                   id="part-qty"
                   type="number"
                   min={1}
+                  max={stockOnHand ?? undefined}
                   step={1}
                   value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
+                  onChange={(e) => {
+                    setQuantity(e.target.value)
+                    setQtyError(undefined)
+                  }}
                   disabled={addMutation.isPending}
+                  aria-invalid={Boolean(qtyError)}
                 />
+                <FieldError message={qtyError} />
               </div>
               <div className="flex items-end">
                 <Button
                   type="submit"
                   size="sm"
                   className="h-10 w-full gap-1.5 sm:w-auto"
-                  disabled={addMutation.isPending || !inventoryId}
+                  disabled={addMutation.isPending || !selectedPart}
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {addMutation.isPending ? 'Adding…' : 'Add'}

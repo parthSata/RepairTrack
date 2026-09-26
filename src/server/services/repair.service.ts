@@ -26,6 +26,10 @@ import {
 } from '@/server/services/repair-assignment.helpers'
 import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
+import {
+  calculateRepairTotal,
+  sumPartsCharges,
+} from '@/server/services/repair-pricing.service'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -354,6 +358,11 @@ export async function getRepairById({
       diagnosis: repairs.diagnosis,
       estimatedCost: repairs.estimatedCost,
       finalCost: repairs.finalCost,
+      laborCharges: repairs.laborCharges,
+      additionalCharges: repairs.additionalCharges,
+      taxPercent: repairs.taxPercent,
+      estimatedTotal: repairs.estimatedTotal,
+      finalTotal: repairs.finalTotal,
       expectedCompletionDate: repairs.expectedCompletionDate,
       assignedTechnicianId: repairs.assignedTechnicianId,
       customerPhotosHidden: repairs.customerPhotosHidden,
@@ -1144,6 +1153,91 @@ export async function updateEstimatedCost({
     .limit(1)
 
   return updated!
+}
+
+export async function updateRepairEstimatePricing({
+  shopId,
+  userRole,
+  userId,
+  id,
+  laborCharges,
+  additionalCharges,
+  taxPercent,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  laborCharges: number
+  additionalCharges: number
+  taxPercent: number
+}) {
+  const [existing] = await db
+    .select({
+      id: repairs.id,
+      assignedTechnicianId: repairs.assignedTechnicianId,
+      approvalPendingId: repairApprovals.id,
+      approvalInitialEstimatedCost: repairApprovals.initialEstimatedCost,
+    })
+    .from(repairs)
+    .leftJoin(
+      repairApprovals,
+      and(eq(repairApprovals.repairId, repairs.id), eq(repairApprovals.status, 'PENDING')),
+    )
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (!['OWNER', 'STAFF', 'TECHNICIAN'].includes(userRole)) {
+    throw new HTTPException(403, { message: 'Not authorized to update estimate pricing' })
+  }
+
+  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Technicians can only edit repairs assigned to them.',
+    })
+  }
+
+  const parts = await listRepairParts({ shopId, repairId: id })
+  const partsCharges = sumPartsCharges(parts)
+  const { total } = calculateRepairTotal({
+    laborCharges,
+    partsCharges,
+    additionalCharges,
+    taxPercent,
+  })
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(repairs)
+      .set({
+        laborCharges,
+        additionalCharges,
+        taxPercent,
+        estimatedTotal: total,
+        estimatedCost: total,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+    if (existing.approvalPendingId) {
+      const initialEstimatedCost =
+        normalizeStoredCostToPaise(existing.approvalInitialEstimatedCost) ?? total
+      const additionalEstimatedCost = Math.max(0, total - initialEstimatedCost)
+
+      await tx
+        .update(repairApprovals)
+        .set({
+          additionalEstimatedCost,
+          updatedAt: new Date(),
+        })
+        .where(eq(repairApprovals.id, existing.approvalPendingId))
+    }
+  })
+
+  return getRepairById({ shopId, userRole, userId, id })
 }
 
 export async function addRepairNote({

@@ -62,6 +62,7 @@ import { ApprovalStatusBanner } from './approval-status-badge'
 import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
+import { RepairEstimatePricingPanel } from './repair-estimate-pricing-panel'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
@@ -730,6 +731,16 @@ export function RepairDetails({ id }: { id: string }) {
         repairId={id}
         parts={repair.parts ?? []}
         canEdit={canRecordParts}
+      />
+
+      <RepairEstimatePricingPanel
+        repairId={id}
+        parts={repair.parts ?? []}
+        laborCharges={repair.laborCharges ?? 0}
+        additionalCharges={repair.additionalCharges ?? 0}
+        taxPercent={repair.taxPercent ?? 0}
+        estimatedTotal={repair.estimatedTotal ?? null}
+        canEdit={canEditDiagnosisAndNotes}
       />
 
       {/* Repair Notes Section (Append-only) */}
