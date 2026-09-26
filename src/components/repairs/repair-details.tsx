@@ -62,7 +62,11 @@ import { ApprovalStatusBanner } from './approval-status-badge'
 import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
-import { RepairEstimatePricingPanel } from './repair-estimate-pricing-panel'
+import { EstimatePricingPanel } from './estimate-pricing-panel'
+import {
+  canEditEstimatePricing,
+  isEstimatePricingEditableStatus,
+} from '@/features/repairs/estimate-edit-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
@@ -70,10 +74,9 @@ import {
   useAddRepairNote,
   useReassignTechnician,
   useUpdateDiagnosis,
-  useUpdateEstimatedCost,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
-import { formatINRFromPaise, formatRupeesInputValue, getApprovalEstimateBreakdownRupees, parseRupeesInput, rupeesToPaise } from '@/features/repairs/money'
+import { formatINRFromPaise, getApprovalEstimateBreakdownRupees } from '@/features/repairs/money'
 import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
 import { toast } from 'sonner'
@@ -88,7 +91,6 @@ export function RepairDetails({ id }: { id: string }) {
 
   const reassignMutation = useReassignTechnician(id)
   const diagnosisMutation = useUpdateDiagnosis(id)
-  const estimatedCostMutation = useUpdateEstimatedCost(id)
   const addNoteMutation = useAddRepairNote(id)
   const updateExpectedDateMutation = useUpdateExpectedCompletionDate(id)
 
@@ -96,8 +98,6 @@ export function RepairDetails({ id }: { id: string }) {
   const [diagnosisText, setDiagnosisText] = React.useState<string>('')
   const [prevRepairId, setPrevRepairId] = React.useState<string | null>(null)
   const [isDiagnosisEditing, setIsDiagnosisEditing] = React.useState<boolean>(false)
-  const [isEstimatedCostEditing, setIsEstimatedCostEditing] = React.useState<boolean>(false)
-  const [estimatedCostValue, setEstimatedCostValue] = React.useState<string>('')
   const [newNoteText, setNewNoteText] = React.useState<string>('')
   const [isEditingExpectedDate, setIsEditingExpectedDate] = React.useState<boolean>(false)
   const [expectedDateValue, setExpectedDateValue] = React.useState<string>('')
@@ -106,15 +106,6 @@ export function RepairDetails({ id }: { id: string }) {
     setPrevRepairId(repair.id)
     setSelectedTechId(repair.assignedTechnicianId ?? '')
     setDiagnosisText(repair.diagnosis ?? '')
-    const pendingBreakdown =
-      repair.approval?.status === 'PENDING'
-        ? getApprovalEstimateBreakdownRupees(repair.approval)
-        : null
-    setEstimatedCostValue(
-      pendingBreakdown
-        ? formatRupeesInputValue(rupeesToPaise(pendingBreakdown.revised))
-        : formatRupeesInputValue(repair.estimatedCost),
-    )
     if (repair.expectedCompletionDate) {
       const dateObj = new Date(repair.expectedCompletionDate)
       if (!isNaN(dateObj.getTime())) {
@@ -172,6 +163,14 @@ export function RepairDetails({ id }: { id: string }) {
   const canShowCustomerTracking = ['OWNER', 'STAFF'].includes(userRole)
   const canEditExpectedDate = canEditDiagnosisAndNotes
   const todayDateMin = formatDateInputValue()
+  const canEditEstimate = canEditEstimatePricing({
+    status: repair.status,
+    userRole,
+    userId: userId ?? '',
+    assignedTechnicianId: repair.assignedTechnicianId,
+  })
+  const showEstimatePanel =
+    isEstimatePricingEditableStatus(repair.status) || repair.estimatedTotal != null
 
   const showModelConfirmationCard =
     repair.status === 'DIAGNOSING' &&
@@ -192,18 +191,6 @@ export function RepairDetails({ id }: { id: string }) {
   const handleSaveDiagnosis = async () => {
     await diagnosisMutation.mutateAsync({ diagnosis: diagnosisText })
     setIsDiagnosisEditing(false)
-    refetch()
-  }
-
-  const handleSaveEstimatedCost = async () => {
-    const parsed = parseRupeesInput(estimatedCostValue)
-    if (estimatedCostValue.trim() && parsed === null) {
-      toast.error('Enter a valid estimated cost in rupees')
-      return
-    }
-
-    await estimatedCostMutation.mutateAsync({ estimatedCost: parsed })
-    setIsEstimatedCostEditing(false)
     refetch()
   }
 
@@ -623,105 +610,44 @@ export function RepairDetails({ id }: { id: string }) {
           )}
 
           <div className="space-y-3 border-t border-border/70 pt-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h4 className="text-sm font-semibold tracking-tight text-foreground">
-                {pendingApprovalBreakdown ? 'Repair estimate' : 'Original estimate'}
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹)</span>
-              </h4>
-              {canEditDiagnosisAndNotes && !isEstimatedCostEditing && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEstimatedCostValue(
-                      pendingApprovalBreakdown
-                        ? formatRupeesInputValue(rupeesToPaise(pendingApprovalBreakdown.revised))
-                        : formatRupeesInputValue(repair.estimatedCost),
-                    )
-                    setIsEstimatedCostEditing(true)
-                  }}
-                  className="h-8 w-full gap-1.5 text-xs sm:w-auto"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  {pendingApprovalBreakdown ? 'Edit revised total' : 'Edit'}
-                </Button>
-              )}
-            </div>
+            <h4 className="text-sm font-semibold tracking-tight text-foreground">
+              {pendingApprovalBreakdown ? 'Repair estimate' : 'Estimated total'}
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹)</span>
+            </h4>
 
             {pendingApprovalBreakdown ? (
-              <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                Breakdown sent to the customer. Editing the revised total updates their tracking
-                page.
-              </p>
-            ) : (
-              <p className="text-[11px] text-muted-foreground">
-                Set at intake; additional costs are added when requesting approval.
-              </p>
-            )}
-
-            {isEstimatedCostEditing ? (
-              <div className="space-y-3">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder={pendingApprovalBreakdown ? 'Revised total e.g. 10000' : 'e.g. 1500'}
-                  value={estimatedCostValue}
-                  onChange={(e) => setEstimatedCostValue(e.target.value)}
-                  className="w-full max-w-sm text-sm"
+              <>
+                <p className="text-[11px] text-amber-800 dark:text-amber-300">
+                  Breakdown sent to the customer. Revise totals in Repair estimate below while
+                  waiting for approval.
+                </p>
+                <ApprovalEstimateBreakdown
+                  variant="default"
+                  diagnosis={repair.diagnosis?.trim() || 'No diagnosis recorded.'}
+                  initialEstimateRupees={pendingApprovalBreakdown.initial}
+                  additionalCostRupees={pendingApprovalBreakdown.additional}
+                  revisedTotalRupees={pendingApprovalBreakdown.revised}
                 />
-                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setEstimatedCostValue(
-                        pendingApprovalBreakdown
-                          ? formatRupeesInputValue(rupeesToPaise(pendingApprovalBreakdown.revised))
-                          : formatRupeesInputValue(repair.estimatedCost),
-                      )
-                      setIsEstimatedCostEditing(false)
-                    }}
-                    className="h-8 text-xs"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={handleSaveEstimatedCost}
-                    disabled={estimatedCostMutation.isPending}
-                    className="h-8 text-xs"
-                  >
-                    {estimatedCostMutation.isPending ? 'Saving...' : 'Save Cost'}
-                  </Button>
-                </div>
-              </div>
-            ) : pendingApprovalBreakdown ? (
-              <ApprovalEstimateBreakdown
-                variant="default"
-                diagnosis={repair.diagnosis?.trim() || 'No diagnosis recorded.'}
-                initialEstimateRupees={pendingApprovalBreakdown.initial}
-                additionalCostRupees={pendingApprovalBreakdown.additional}
-                revisedTotalRupees={pendingApprovalBreakdown.revised}
-              />
+              </>
             ) : (
-              <div
-                className={
-                  repair.estimatedCost !== null
-                    ? 'rounded-xl border border-accent/25 bg-accent/10 px-5 py-5'
-                    : undefined
-                }
-              >
-                {repair.estimatedCost !== null ? (
-                  <p className="text-3xl font-bold tracking-tight text-foreground">
-                    {formatINRFromPaise(repair.estimatedCost)}
-                  </p>
+              <>
+                <p className="text-[11px] text-muted-foreground">
+                  {isEstimatePricingEditableStatus(repair.status)
+                    ? 'Edit labor, parts, and tax in Repair estimate below.'
+                    : 'Estimate is locked after customer approval.'}
+                </p>
+                {(repair.estimatedTotal ?? repair.estimatedCost) != null ? (
+                  <div className="rounded-xl border border-accent/25 bg-accent/10 px-5 py-5">
+                    <p className="text-3xl font-bold tracking-tight text-foreground">
+                      {formatINRFromPaise(repair.estimatedTotal ?? repair.estimatedCost)}
+                    </p>
+                  </div>
                 ) : (
                   <p className="text-sm italic text-muted-foreground">
-                    Not set — enter amount in rupees before requesting approval
+                    Not set — save a Repair estimate before requesting approval
                   </p>
                 )}
-              </div>
+              </>
             )}
           </div>
         </CardContent>
@@ -733,15 +659,17 @@ export function RepairDetails({ id }: { id: string }) {
         canEdit={canRecordParts}
       />
 
-      <RepairEstimatePricingPanel
-        repairId={id}
-        parts={repair.parts ?? []}
-        laborCharges={repair.laborCharges ?? 0}
-        additionalCharges={repair.additionalCharges ?? 0}
-        taxPercent={repair.taxPercent ?? 0}
-        estimatedTotal={repair.estimatedTotal ?? null}
-        canEdit={canEditDiagnosisAndNotes}
-      />
+      {showEstimatePanel ? (
+        <EstimatePricingPanel
+          repairId={id}
+          parts={repair.parts ?? []}
+          laborCharges={repair.laborCharges ?? 0}
+          additionalCharges={repair.additionalCharges ?? 0}
+          taxPercent={repair.taxPercent ?? 0}
+          estimatedTotal={repair.estimatedTotal ?? null}
+          canEdit={canEditEstimate}
+        />
+      ) : null}
 
       {/* Repair Notes Section (Append-only) */}
       <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
