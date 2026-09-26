@@ -1,0 +1,1 @@
+ALTER TABLE "repairs" DROP COLUMN "discount";

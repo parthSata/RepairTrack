@@ -30,6 +30,11 @@ import {
   calculateRepairTotal,
   sumPartsCharges,
 } from '@/server/services/repair-pricing.service'
+import {
+  canEditEstimatePricing,
+  ESTIMATE_PRICING_LOCKED_MESSAGE,
+  isEstimatePricingEditableStatus,
+} from '@/features/repairs/estimate-edit-rules'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -1175,6 +1180,7 @@ export async function updateRepairEstimatePricing({
   const [existing] = await db
     .select({
       id: repairs.id,
+      status: repairs.status,
       assignedTechnicianId: repairs.assignedTechnicianId,
       approvalPendingId: repairApprovals.id,
       approvalInitialEstimatedCost: repairApprovals.initialEstimatedCost,
@@ -1190,13 +1196,21 @@ export async function updateRepairEstimatePricing({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (!['OWNER', 'STAFF', 'TECHNICIAN'].includes(userRole)) {
-    throw new HTTPException(403, { message: 'Not authorized to update estimate pricing' })
+  if (!isEstimatePricingEditableStatus(existing.status)) {
+    throw new HTTPException(400, { message: ESTIMATE_PRICING_LOCKED_MESSAGE })
   }
 
-  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+  if (!canEditEstimatePricing({
+    status: existing.status,
+    userRole,
+    userId,
+    assignedTechnicianId: existing.assignedTechnicianId,
+  })) {
     throw new HTTPException(403, {
-      message: 'Forbidden: Technicians can only edit repairs assigned to them.',
+      message:
+        userRole === 'TECHNICIAN'
+          ? 'Forbidden: Technicians can only edit repairs assigned to them.'
+          : 'Not authorized to update estimate pricing',
     })
   }
 

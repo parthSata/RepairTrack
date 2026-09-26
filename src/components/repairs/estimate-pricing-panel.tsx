@@ -8,12 +8,13 @@ import {
   repairPricingFieldsSchema,
   type RepairPricingFieldsInput,
 } from '@/features/repairs/pricing-schemas'
-import { useUpdateEstimatePricing } from '@/features/repairs/mutations'
+import { useUpdateEstimate } from '@/features/repairs/pricing-mutations'
 import type { RepairPartLine } from '@/features/repairs/queries'
 import {
   calculateRepairTotal,
   GST_TAX_RATES,
   sumPartsCharges,
+  type CalculateRepairTotalResult,
 } from '@/features/repairs/pricing-calc'
 import { formatRupees } from '@/lib/format-money'
 import { Button } from '@/components/ui/button'
@@ -29,7 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-type RepairEstimatePricingPanelProps = {
+type EstimatePricingPanelProps = {
   repairId: string
   parts: RepairPartLine[]
   laborCharges: number
@@ -53,14 +54,62 @@ function PricingRow({
       <span className={emphasize ? 'font-semibold text-foreground' : 'text-muted-foreground'}>
         {label}
       </span>
-      <span className={emphasize ? 'text-base font-bold text-foreground' : 'font-medium text-foreground'}>
+      <span
+        className={emphasize ? 'text-base font-bold text-foreground' : 'font-medium text-foreground'}
+      >
         {formatRupees(valuePaise)}
       </span>
     </div>
   )
 }
 
-export function RepairEstimatePricingPanel({
+function PricingBreakdownRows({
+  laborCharges,
+  partsCharges,
+  additionalCharges,
+  taxPercent,
+  totals,
+}: {
+  laborCharges: number
+  partsCharges: number
+  additionalCharges: number
+  taxPercent: number
+  totals: CalculateRepairTotalResult | null
+}) {
+  return (
+    <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 px-3.5 py-3">
+      <PricingRow label="Labor charges" valuePaise={laborCharges} />
+      <PricingRow label="Parts charges" valuePaise={partsCharges} />
+      <PricingRow label="Additional charges" valuePaise={additionalCharges} />
+      {totals ? (
+        <>
+          <PricingRow label="Taxable value" valuePaise={totals.taxableValue} />
+          <PricingRow label={`Tax (${taxPercent}%)`} valuePaise={totals.taxAmount} />
+          <div className="border-t border-border/70 pt-2">
+            <PricingRow label="Estimated total" valuePaise={totals.total} emphasize />
+          </div>
+        </>
+      ) : (
+        <p className="text-sm italic text-muted-foreground">Estimate not available.</p>
+      )}
+    </div>
+  )
+}
+
+function safeCalculateTotal(input: {
+  laborCharges: number
+  partsCharges: number
+  additionalCharges: number
+  taxPercent: number
+}): CalculateRepairTotalResult | null {
+  try {
+    return calculateRepairTotal(input)
+  } catch {
+    return null
+  }
+}
+
+export function EstimatePricingPanel({
   repairId,
   parts,
   laborCharges,
@@ -68,8 +117,8 @@ export function RepairEstimatePricingPanel({
   taxPercent,
   estimatedTotal,
   canEdit,
-}: RepairEstimatePricingPanelProps) {
-  const saveMutation = useUpdateEstimatePricing(repairId)
+}: EstimatePricingPanelProps) {
+  const saveMutation = useUpdateEstimate(repairId)
   const partsCharges = sumPartsCharges(parts)
 
   const {
@@ -81,19 +130,11 @@ export function RepairEstimatePricingPanel({
   } = useForm<RepairPricingFieldsInput>({
     resolver: zodResolver(repairPricingFieldsSchema) as Resolver<RepairPricingFieldsInput>,
     mode: 'onChange',
-    defaultValues: {
-      laborCharges,
-      additionalCharges,
-      taxPercent,
-    },
+    defaultValues: { laborCharges, additionalCharges, taxPercent },
   })
 
   React.useEffect(() => {
-    reset({
-      laborCharges,
-      additionalCharges,
-      taxPercent,
-    })
+    reset({ laborCharges, additionalCharges, taxPercent })
   }, [laborCharges, additionalCharges, taxPercent, reset])
 
   const watched = watch()
@@ -101,17 +142,23 @@ export function RepairEstimatePricingPanel({
   const liveAdditional = Number.isFinite(watched.additionalCharges) ? watched.additionalCharges : 0
   const liveTaxPercent = Number.isFinite(watched.taxPercent) ? watched.taxPercent : 0
 
-  let preview: ReturnType<typeof calculateRepairTotal> | null = null
-  try {
-    preview = calculateRepairTotal({
-      laborCharges: liveLabor,
-      partsCharges,
-      additionalCharges: liveAdditional,
-      taxPercent: liveTaxPercent,
-    })
-  } catch {
-    preview = null
-  }
+  const liveTotals = safeCalculateTotal({
+    laborCharges: liveLabor,
+    partsCharges,
+    additionalCharges: liveAdditional,
+    taxPercent: liveTaxPercent,
+  })
+
+  const savedTotals = safeCalculateTotal({
+    laborCharges,
+    partsCharges,
+    additionalCharges,
+    taxPercent,
+  })
+  const viewTotals =
+    savedTotals && estimatedTotal != null
+      ? { ...savedTotals, total: estimatedTotal }
+      : savedTotals
 
   const onSubmit = handleSubmit(async (values) => {
     await saveMutation.mutateAsync(values)
@@ -129,7 +176,9 @@ export function RepairEstimatePricingPanel({
               Repair estimate
             </h3>
             <p className="text-xs text-muted-foreground">
-              Labor, parts, and tax — saved total is shared with customer tracking.
+              {canEdit
+                ? 'Labor, parts, and tax — saved total is shared with customer tracking.'
+                : 'Estimate is locked after customer approval.'}
             </p>
           </div>
         </div>
@@ -154,7 +203,7 @@ export function RepairEstimatePricingPanel({
                 disabled={saveMutation.isPending}
               />
               <div className="space-y-1.5">
-                <Label htmlFor="taxPercent" className="flex items-center gap-2 text-sm font-medium">
+                <Label htmlFor="taxPercent" className="text-sm font-medium">
                   Tax rate (GST)
                 </Label>
                 <Controller
@@ -192,23 +241,13 @@ export function RepairEstimatePricingPanel({
               </div>
             </div>
 
-            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 px-3.5 py-3">
-              <PricingRow label="Labor charges" valuePaise={liveLabor} />
-              <PricingRow label="Parts charges" valuePaise={partsCharges} />
-              <PricingRow label="Additional charges" valuePaise={liveAdditional} />
-              {preview ? (
-                <>
-                  <PricingRow label="Taxable value" valuePaise={preview.taxableValue} />
-                  <PricingRow
-                    label={`Tax (${liveTaxPercent}%)`}
-                    valuePaise={preview.taxAmount}
-                  />
-                  <div className="border-t border-border/70 pt-2">
-                    <PricingRow label="Estimated total" valuePaise={preview.total} emphasize />
-                  </div>
-                </>
-              ) : null}
-            </div>
+            <PricingBreakdownRows
+              laborCharges={liveLabor}
+              partsCharges={partsCharges}
+              additionalCharges={liveAdditional}
+              taxPercent={liveTaxPercent}
+              totals={liveTotals}
+            />
 
             <div className="flex justify-end">
               <Button
@@ -223,38 +262,13 @@ export function RepairEstimatePricingPanel({
             </div>
           </form>
         ) : (
-          <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 px-3.5 py-3">
-            <PricingRow label="Labor charges" valuePaise={laborCharges} />
-            <PricingRow label="Parts charges" valuePaise={partsCharges} />
-            <PricingRow label="Additional charges" valuePaise={additionalCharges} />
-            {(() => {
-              try {
-                const result = calculateRepairTotal({
-                  laborCharges,
-                  partsCharges,
-                  additionalCharges,
-                  taxPercent,
-                })
-                return (
-                  <>
-                    <PricingRow label="Taxable value" valuePaise={result.taxableValue} />
-                    <PricingRow label={`Tax (${taxPercent}%)`} valuePaise={result.taxAmount} />
-                    <div className="border-t border-border/70 pt-2">
-                      <PricingRow
-                        label="Estimated total"
-                        valuePaise={estimatedTotal ?? result.total}
-                        emphasize
-                      />
-                    </div>
-                  </>
-                )
-              } catch {
-                return (
-                  <p className="text-sm italic text-muted-foreground">Estimate not available.</p>
-                )
-              }
-            })()}
-          </div>
+          <PricingBreakdownRows
+            laborCharges={laborCharges}
+            partsCharges={partsCharges}
+            additionalCharges={additionalCharges}
+            taxPercent={taxPercent}
+            totals={viewTotals}
+          />
         )}
       </CardContent>
     </Card>

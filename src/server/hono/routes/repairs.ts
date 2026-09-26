@@ -258,7 +258,7 @@ export const repairsRouter = new Hono()
     },
   )
   .patch(
-    '/:id/estimate-pricing',
+    '/:id/estimate',
     zValidator('json', repairPricingFieldsSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)

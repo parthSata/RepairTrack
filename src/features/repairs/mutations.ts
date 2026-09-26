@@ -6,7 +6,6 @@ import { apiClient } from '@/lib/api-client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { repairKeys, type Repair } from './queries'
 import type { CreateRepairInput, ReopenRepairInput } from './schemas'
-import type { RepairPricingFieldsInput } from './pricing-schemas'
 
 export function useCreateRepair() {
   const queryClient = useQueryClient()
@@ -346,24 +345,6 @@ export function useRemoveRepairPart(repairId: string) {
     },
     onError: (error: unknown) => {
       toast.error(getApiErrorMessage(error, 'Failed to remove part'))
-    },
-  })
-}
-
-export function useUpdateEstimatePricing(repairId: string) {
-  const queryClient = useQueryClient()
-
-  return useMutation<Repair, Error, RepairPricingFieldsInput>({
-    mutationFn: async (data) => {
-      const response = await apiClient.patch<Repair>(`/repairs/${repairId}/estimate-pricing`, data)
-      return response.data
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
-      toast.success('Estimate pricing saved')
-    },
-    onError: (error: unknown) => {
-      toast.error(getApiErrorMessage(error, 'Failed to save estimate pricing'))
     },
   })
 }
