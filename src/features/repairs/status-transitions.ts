@@ -1,7 +1,7 @@
 import {
   getCompletedTransitionError,
   isFinalBillConfirmed,
-} from '@/features/repairs/final-pricing-rules'
+} from '@/features/repairs/pricing-rules'
 
 export const REPAIR_STATUSES = [
   'RECEIVED',
@@ -20,11 +20,21 @@ export type RepairStatus = (typeof REPAIR_STATUSES)[number]
 
 export type StatusTransitionOptions = {
   finalTotal?: number | null
+  /** Latest customer approval status; APPROVED switches the ticket to the post-approval phase. */
+  approvalStatus?: string | null
 }
 
-const PRE_APPROVAL_STATUSES = ['RECEIVED', 'DIAGNOSING'] as const satisfies readonly RepairStatus[]
+/**
+ * Statuses the dropdown cannot leave: closed tickets use Reopen/Restore, and a pending customer
+ * approval is resolved from the tracking page.
+ */
+const LOCKED_SOURCE_STATUSES = new Set<string>(['COMPLETED', 'CANCELLED', 'WAITING_FOR_APPROVAL'])
 
-const POST_APPROVAL_STATUSES = [
+/** Before the customer approves; the ticket moves forward only through Request Customer Approval. */
+const PRE_APPROVAL_STATUSES: readonly RepairStatus[] = ['RECEIVED', 'DIAGNOSING']
+
+/** After the customer approves; intake statuses are hidden. */
+const POST_APPROVAL_STATUSES: readonly RepairStatus[] = [
   'APPROVED',
   'WAITING_FOR_PARTS',
   'IN_REPAIR',
@@ -32,51 +42,48 @@ const POST_APPROVAL_STATUSES = [
   'READY_FOR_PICKUP',
   'COMPLETED',
   'CANCELLED',
-] as const satisfies readonly RepairStatus[]
+]
 
-function baseAllowedDestinations(currentStatus: string): readonly RepairStatus[] {
-  if (currentStatus === 'RECEIVED' || currentStatus === 'DIAGNOSING') {
-    return PRE_APPROVAL_STATUSES
-  }
+export const WAITING_FOR_APPROVAL_MANUAL_MESSAGE =
+  'Use Request Customer Approval to send an estimate for approval.'
 
-  if (
-    currentStatus === 'APPROVED' ||
-    currentStatus === 'WAITING_FOR_PARTS' ||
-    currentStatus === 'IN_REPAIR' ||
-    currentStatus === 'QUALITY_CHECK' ||
-    currentStatus === 'READY_FOR_PICKUP'
-  ) {
-    return POST_APPROVAL_STATUSES
-  }
+const NEEDS_APPROVAL_MESSAGE =
+  'Send the estimate with Request Customer Approval. Repair statuses unlock after the customer approves.'
 
-  return []
+const INTAKE_AFTER_APPROVAL_MESSAGE =
+  'Customer has approved the estimate. Received and Diagnosing are no longer available.'
+
+export function isCustomerApproved(approvalStatus: string | null | undefined): boolean {
+  return approvalStatus === 'APPROVED'
 }
+
+function baseAllowedDestinations(
+  currentStatus: string,
+  approvalStatus: string | null | undefined,
+): readonly RepairStatus[] {
+  if (LOCKED_SOURCE_STATUSES.has(currentStatus)) return []
+  const phaseStatuses = isCustomerApproved(approvalStatus)
+    ? POST_APPROVAL_STATUSES
+    : PRE_APPROVAL_STATUSES
+  return phaseStatuses.filter((status) => status !== currentStatus)
+}
+
 export function getAllowedManualStatusDestinations(
   currentStatus: string,
   options?: StatusTransitionOptions,
 ): readonly RepairStatus[] {
-  const base = baseAllowedDestinations(currentStatus)
+  const base = baseAllowedDestinations(currentStatus, options?.approvalStatus)
   if (isFinalBillConfirmed(options?.finalTotal)) return base
   return base.filter((status) => status !== 'COMPLETED')
 }
 
-/** True when COMPLETED is in the phase list but blocked until final bill is confirmed. */
+/** True when COMPLETED would be selectable but is blocked until the bill is finalized. */
 export function isCompletedAwaitingFinalBill(
   currentStatus: string,
-  finalTotal: number | null | undefined,
-): boolean {
-  if (isFinalBillConfirmed(finalTotal)) return false
-  return baseAllowedDestinations(currentStatus).includes('COMPLETED')
-}
-
-export function isManualStatusTransitionAllowed(
-  currentStatus: string,
-  nextStatus: string,
   options?: StatusTransitionOptions,
 ): boolean {
-  return getAllowedManualStatusDestinations(currentStatus, options).includes(
-    nextStatus as RepairStatus,
-  )
+  if (isFinalBillConfirmed(options?.finalTotal)) return false
+  return baseAllowedDestinations(currentStatus, options?.approvalStatus).includes('COMPLETED')
 }
 
 export function getManualStatusTransitionError(
@@ -84,9 +91,12 @@ export function getManualStatusTransitionError(
   nextStatus: string,
   options?: StatusTransitionOptions,
 ): string | null {
-  if (nextStatus === 'WAITING_FOR_APPROVAL') {
-    return 'Use Request Customer Approval to send an estimate for approval.'
-  }
+  if (nextStatus === 'WAITING_FOR_APPROVAL') return WAITING_FOR_APPROVAL_MANUAL_MESSAGE
+
+  const isApproved = isCustomerApproved(options?.approvalStatus)
+  const next = nextStatus as RepairStatus
+  if (!isApproved && !PRE_APPROVAL_STATUSES.includes(next)) return NEEDS_APPROVAL_MESSAGE
+  if (isApproved && !POST_APPROVAL_STATUSES.includes(next)) return INTAKE_AFTER_APPROVAL_MESSAGE
 
   const completedError = getCompletedTransitionError({
     nextStatus,
@@ -94,13 +104,8 @@ export function getManualStatusTransitionError(
   })
   if (completedError) return completedError
 
-  if (isManualStatusTransitionAllowed(currentStatus, nextStatus, options)) {
-    return null
-  }
+  const allowed = getAllowedManualStatusDestinations(currentStatus, options)
+  if (allowed.includes(next)) return null
 
-  if (currentStatus === 'RECEIVED' || currentStatus === 'DIAGNOSING') {
-    return 'This status change is not allowed until the repair is approved.'
-  }
-
-  return 'Invalid status transition.'
+  return 'This status change is not allowed.'
 }

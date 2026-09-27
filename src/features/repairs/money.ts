@@ -45,16 +45,6 @@ export function normalizeStoredCostToPaise(stored: number | null | undefined): n
   return rupeesToPaise(rupees)
 }
 
-/** Breakdown in rupees for a pending approval row (handles legacy stored units). */
-export function getApprovalEstimateBreakdownRupees(approval: {
-  initialEstimatedCost: number
-  additionalEstimatedCost: number
-}): { initial: number; additional: number; revised: number } {
-  const initial = storedCostToRupees(approval.initialEstimatedCost) ?? 0
-  const additional = storedCostToRupees(approval.additionalEstimatedCost) ?? 0
-  return { initial, additional, revised: initial + additional }
-}
-
 /** Format a stored DB amount (paise or legacy rupees) for display. */
 export function formatINRFromPaise(stored: number | null | undefined): string {
   const rupees = storedCostToRupees(stored)

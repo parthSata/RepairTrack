@@ -56,7 +56,7 @@ export function TrackApprovalSummaryCard({
           </p>
           <p className="mt-1 text-sm leading-relaxed text-amber-50/95">
             {isPending
-              ? 'Our technician inspected your device. Please review the diagnosis and estimate before the shop continues.'
+              ? 'Our technician inspected your device. Review the diagnosis here and the repair charges below.'
               : isApproved
                 ? `You approved this repair${decisionTimestamp ? ` on ${decisionTimestamp}` : ''}.`
                 : `You declined this repair${decisionTimestamp ? ` on ${decisionTimestamp}` : ''}.`}
@@ -67,10 +67,7 @@ export function TrackApprovalSummaryCard({
           <ApprovalEstimateBreakdown
             variant="prominent"
             diagnosis={approval.diagnosis}
-            initialEstimateRupees={approval.initialEstimate}
-            additionalCostRupees={approval.additionalCost}
-            revisedTotalRupees={approval.revisedTotal}
-            showCosts={isPending}
+            showCosts={false}
           />
 
           {isPending ? (
@@ -100,12 +97,6 @@ export function TrackApprovalSummaryCard({
                 <p className="mt-2 text-sm">Reason: {approval.rejectionReason}</p>
               ) : null}
             </div>
-          ) : null}
-
-          {isPending ? (
-            <p className="text-center text-xs text-muted-foreground">
-              All amounts are shown in Indian Rupees (Rs).
-            </p>
           ) : null}
         </CardContent>
       </Card>

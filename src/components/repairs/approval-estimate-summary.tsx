@@ -1,5 +1,5 @@
 import { ClipboardList } from 'lucide-react'
-import { formatINR, formatINRFromPaise, storedCostToRupees } from '@/features/repairs/money'
+import { formatINR, storedCostToRupees } from '@/features/repairs/money'
 import { cn } from '@/lib/utils'
 
 type ApprovalEstimateBreakdownProps = {
@@ -82,6 +82,8 @@ export function ApprovalEstimateBreakdown({
   const isProminent = variant === 'prominent'
   const showCostTable =
     showCosts && initial != null && additional != null && revised != null
+  // Current approvals store the full total with no add-on; older ones had original + additional.
+  const hasAdditionalCost = additional != null && additional > 0
 
   return (
     <div
@@ -135,11 +137,15 @@ export function ApprovalEstimateBreakdown({
             )}
           >
             <div className="space-y-2.5 text-sm">
-              <CostRow label="Original Estimate" amount={formatINR(initial)} />
-              <CostRow label="Additional Repair Cost" amount={`+ ${formatINR(additional)}`} />
-              <div className="space-y-1 border-t border-border pt-2.5">
+              {hasAdditionalCost ? (
+                <>
+                  <CostRow label="Original Estimate" amount={formatINR(initial)} />
+                  <CostRow label="Additional Repair Cost" amount={`+ ${formatINR(additional)}`} />
+                </>
+              ) : null}
+              <div className={cn('space-y-1', hasAdditionalCost && 'border-t border-border pt-2.5')}>
                 <CostRow
-                  label="Revised Estimated Total"
+                  label={hasAdditionalCost ? 'Revised Estimated Total' : 'Estimated Total'}
                   amount={formatINR(revised)}
                   isTotal
                   amountClassName={cn(
@@ -155,50 +161,4 @@ export function ApprovalEstimateBreakdown({
       </div>
     </div>
   )
-}
-
-/** @deprecated Use ApprovalEstimateBreakdown */
-export function ApprovalEstimateSummary({
-  diagnosis,
-  estimatedCostPaise,
-  estimatedCostRupees,
-  variant = 'default',
-  className,
-}: {
-  diagnosis: string
-  estimatedCostPaise?: number
-  estimatedCostRupees?: number
-  variant?: 'default' | 'prominent'
-  className?: string
-}) {
-  const revised =
-    estimatedCostRupees ??
-    (estimatedCostPaise != null ? storedCostToRupees(estimatedCostPaise) : null)
-
-  return (
-    <ApprovalEstimateBreakdown
-      diagnosis={diagnosis}
-      initialEstimateRupees={revised ?? 0}
-      additionalCostRupees={0}
-      revisedTotalRupees={revised ?? 0}
-      variant={variant}
-      className={className}
-    />
-  )
-}
-
-export function formatBreakdownFromPaise({
-  initialEstimatePaise,
-  additionalCostPaise,
-  revisedTotalPaise,
-}: {
-  initialEstimatePaise: number
-  additionalCostPaise: number
-  revisedTotalPaise: number
-}) {
-  return {
-    initialLabel: formatINRFromPaise(initialEstimatePaise),
-    additionalLabel: formatINRFromPaise(additionalCostPaise),
-    revisedLabel: formatINRFromPaise(revisedTotalPaise),
-  }
 }

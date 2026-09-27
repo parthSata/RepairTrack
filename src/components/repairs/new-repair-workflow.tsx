@@ -673,8 +673,12 @@ export function NewRepairWorkflow() {
                           setValue('estimatedCost', val)
                         }}
                       />
-                      {errors.estimatedCost && (
+                      {errors.estimatedCost ? (
                         <p className="text-xs text-destructive">{errors.estimatedCost.message}</p>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground">
+                          Starts as the Labor charge when the estimate is sent for approval.
+                        </p>
                       )}
                     </div>
                   </div>

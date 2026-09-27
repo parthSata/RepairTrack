@@ -10,7 +10,6 @@ import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
   normalizeStoredCostToPaise,
   rupeesInputToStoredPaise,
-  rupeesToPaise,
 } from '@/features/repairs/money'
 import {
   computeIsRepairOverdue,
@@ -31,17 +30,14 @@ import {
   sumPartsCharges,
 } from '@/server/services/repair-pricing.service'
 import {
-  canEditEstimatePricing,
-  ESTIMATE_PRICING_LOCKED_MESSAGE,
-  ESTIMATE_PRICING_TECHNICIAN_LOCKED_MESSAGE,
-} from '@/features/repairs/estimate-edit-rules'
-import {
-  canConfirmFinalPricing,
-  FINAL_PRICING_COMPLETED_MESSAGE,
-  FINAL_PRICING_FORBIDDEN_MESSAGE,
-  FINAL_PRICING_STATUS_MESSAGE,
-  isFinalPricingVisibleStatus,
-} from '@/features/repairs/final-pricing-rules'
+  getCompletedTransitionError,
+  getEstimateEditViolation,
+  getFinalizeBillViolation,
+  getSendApprovalViolation,
+  PRICING_MESSAGES,
+  type ApprovalStatus,
+  type PricingRuleViolation,
+} from '@/features/repairs/pricing-rules'
 
 export function applyTechnicianRepairScope(
   conditions: SQL[],
@@ -669,21 +665,26 @@ export async function updateRepairStatus({
     })
   }
 
-  const [pendingApproval] = await db
-    .select({ id: repairApprovals.id })
-    .from(repairApprovals)
-    .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
-    .limit(1)
+  const latestApproval = await getLatestApproval(id)
 
-  if (pendingApproval || existing.status === 'WAITING_FOR_APPROVAL') {
-    throw new HTTPException(400, {
+  if (latestApproval?.status === 'PENDING' || existing.status === 'WAITING_FOR_APPROVAL') {
+    throw new HTTPException(409, {
       message:
         'Customer approval is pending. Status cannot be changed until the customer responds.',
     })
   }
 
+  const completedError = getCompletedTransitionError({
+    nextStatus: status,
+    finalTotal: existing.finalTotal,
+  })
+  if (completedError) {
+    throw new HTTPException(409, { message: completedError })
+  }
+
   const transitionError = getManualStatusTransitionError(existing.status, status, {
     finalTotal: existing.finalTotal,
+    approvalStatus: latestApproval?.status,
   })
   if (transitionError) {
     throw new HTTPException(400, { message: transitionError })
@@ -721,120 +722,87 @@ export async function updateRepairStatus({
   return updated
 }
 
+/**
+ * Technician/staff send the full estimate (diagnosis + charges) in one step. Charges are saved,
+ * any earlier final bill is cleared, and the approval snapshot stores the complete total.
+ */
 export async function requestCustomerApproval({
   shopId,
   userRole,
   userId,
   id,
-  additionalEstimatedCostRupees,
+  diagnosis,
+  laborCharges,
+  additionalCharges,
+  taxPercent,
 }: {
   shopId: string
   userRole: string
   userId: string
   id: string
-  additionalEstimatedCostRupees: number
+  diagnosis: string
+  laborCharges: number
+  additionalCharges: number
+  taxPercent: number
 }) {
-  if (userRole === 'OWNER') {
-    throw new HTTPException(403, {
-      message:
-        'Owner cannot change repair status directly. Status changes belong to the technicians and staff working on the repair.',
-    })
-  }
-
-  const [existing] = await db
+  const [row] = await db
     .select({
       id: repairs.id,
       status: repairs.status,
-      diagnosis: repairs.diagnosis,
-      estimatedCost: repairs.estimatedCost,
       assignedTechnicianId: repairs.assignedTechnicianId,
     })
     .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+  const existing = assertRepairFound(row)
 
-  if (!existing) {
-    throw new HTTPException(404, { message: 'Repair ticket not found' })
-  }
+  const latestApproval = await getLatestApproval(id)
+  throwIfViolation(
+    getSendApprovalViolation({
+      userRole,
+      userId,
+      assignedTechnicianId: existing.assignedTechnicianId,
+      status: existing.status,
+      approvalStatus: latestApproval?.status,
+    }),
+  )
 
-  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
-    throw new HTTPException(403, {
-      message: 'Forbidden: Technicians can only change status on repairs assigned to them.',
-    })
-  }
+  const { total } = await resolveRepairPricingTotal({
+    shopId,
+    repairId: id,
+    laborCharges,
+    additionalCharges,
+    taxPercent,
+  })
 
-  if (['COMPLETED', 'CANCELLED'].includes(existing.status)) {
-    throw new HTTPException(400, {
-      message:
-        'Completed or cancelled tickets cannot have status updated directly. Use the reopen action instead.',
-    })
-  }
-
-  if (existing.status !== 'DIAGNOSING') {
-    throw new HTTPException(400, {
-      message: 'Customer approval can only be requested while the repair is in Diagnosing.',
-    })
-  }
-
-  if (!existing.diagnosis?.trim()) {
-    throw new HTTPException(400, {
-      message: 'Add a diagnosis before requesting customer approval',
-    })
-  }
-
-  if (existing.estimatedCost === null) {
-    throw new HTTPException(400, {
-      message: 'Set an estimated cost before requesting customer approval',
-    })
-  }
-
-  if (additionalEstimatedCostRupees < 0 || additionalEstimatedCostRupees > 1_000_000) {
-    throw new HTTPException(400, {
-      message: 'Additional repair cost must be between ₹0 and ₹10,00,000',
-    })
-  }
-
-  const [pendingApproval] = await db
-    .select({ id: repairApprovals.id })
-    .from(repairApprovals)
-    .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
-    .limit(1)
-
-  if (pendingApproval) {
-    throw new HTTPException(400, {
-      message: 'Customer approval is already pending for this repair',
-    })
-  }
-
-  const requestedAt = new Date()
-  const diagnosisSnapshot = existing.diagnosis.trim()
-  const initialEstimatedCost = normalizeStoredCostToPaise(existing.estimatedCost)
-  if (initialEstimatedCost == null) {
-    throw new HTTPException(400, {
-      message: 'Set an estimated cost before requesting customer approval',
-    })
-  }
-  const additionalEstimatedCost = rupeesToPaise(additionalEstimatedCostRupees)
-  const revisedEstimatedCost = initialEstimatedCost + additionalEstimatedCost
+  const now = new Date()
+  const diagnosisSnapshot = diagnosis.trim()
 
   await db.transaction(async (tx) => {
-    await tx.insert(repairApprovals).values({
-      repairId: id,
-      status: 'PENDING',
-      diagnosisSnapshot,
-      initialEstimatedCost,
-      additionalEstimatedCost,
-      requestedBy: userId,
-      requestedAt,
-    })
-
     await tx
       .update(repairs)
       .set({
         status: 'WAITING_FOR_APPROVAL',
-        estimatedCost: revisedEstimatedCost,
-        updatedAt: new Date(),
+        diagnosis: diagnosisSnapshot,
+        laborCharges,
+        additionalCharges,
+        taxPercent,
+        estimatedTotal: total,
+        estimatedCost: total,
+        finalTotal: null,
+        finalCost: null,
+        updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+    await tx.insert(repairApprovals).values({
+      repairId: id,
+      status: 'PENDING',
+      diagnosisSnapshot,
+      initialEstimatedCost: total,
+      additionalEstimatedCost: 0,
+      requestedBy: userId,
+      requestedAt: now,
+    })
 
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
@@ -1170,6 +1138,37 @@ export async function updateEstimatedCost({
   return updated!
 }
 
+function assertRepairFound<T>(row: T | undefined): T {
+  if (!row) throw new HTTPException(404, { message: PRICING_MESSAGES.repairNotFound })
+  return row
+}
+
+function throwIfViolation(violation: PricingRuleViolation | null) {
+  if (violation) throw new HTTPException(violation.status, { message: violation.message })
+}
+
+/** Latest approval request (a pending one is always the newest). Caller must scope the repair to the shop first. */
+async function getLatestApproval(
+  repairId: string,
+): Promise<{ id: string; status: ApprovalStatus } | null> {
+  const [latest] = await db
+    .select({ id: repairApprovals.id, status: repairApprovals.status })
+    .from(repairApprovals)
+    .where(eq(repairApprovals.repairId, repairId))
+    .orderBy(desc(repairApprovals.requestedAt))
+    .limit(1)
+  return latest ?? null
+}
+
+async function getRepairPricingContext({ shopId, id }: { shopId: string; id: string }) {
+  const [row] = await db
+    .select({ id: repairs.id, status: repairs.status })
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+  const repair = assertRepairFound(row)
+  return { ...repair, latestApproval: await getLatestApproval(id) }
+}
+
 async function resolveRepairPricingTotal({
   shopId,
   repairId,
@@ -1216,44 +1215,14 @@ export async function updateRepairEstimatePricing({
   additionalCharges: number
   taxPercent: number
 }) {
-  const [existing] = await db
-    .select({
-      id: repairs.id,
-      status: repairs.status,
-      assignedTechnicianId: repairs.assignedTechnicianId,
-      approvalPendingId: repairApprovals.id,
-      approvalInitialEstimatedCost: repairApprovals.initialEstimatedCost,
-    })
-    .from(repairs)
-    .leftJoin(
-      repairApprovals,
-      and(eq(repairApprovals.repairId, repairs.id), eq(repairApprovals.status, 'PENDING')),
-    )
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
-
-  if (!existing) {
-    throw new HTTPException(404, { message: 'Repair ticket not found' })
-  }
-
-  if (!canEditEstimatePricing({
-    status: existing.status,
-    userRole,
-    userId,
-    assignedTechnicianId: existing.assignedTechnicianId,
-  })) {
-    if (existing.status === 'COMPLETED') {
-      throw new HTTPException(400, { message: ESTIMATE_PRICING_LOCKED_MESSAGE })
-    }
-    if (userRole === 'TECHNICIAN') {
-      const assigned = existing.assignedTechnicianId === userId
-      throw new HTTPException(assigned ? 400 : 403, {
-        message: assigned
-          ? ESTIMATE_PRICING_TECHNICIAN_LOCKED_MESSAGE
-          : 'Forbidden: Technicians can only edit repairs assigned to them.',
-      })
-    }
-    throw new HTTPException(403, { message: 'Not authorized to update estimate pricing' })
-  }
+  const existing = await getRepairPricingContext({ shopId, id })
+  throwIfViolation(
+    getEstimateEditViolation({
+      userRole,
+      status: existing.status,
+      approvalStatus: existing.latestApproval?.status,
+    }),
+  )
 
   const { total } = await resolveRepairPricingTotal({
     shopId,
@@ -1263,7 +1232,11 @@ export async function updateRepairEstimatePricing({
     taxPercent,
   })
 
+  const pendingApprovalId =
+    existing.latestApproval?.status === 'PENDING' ? existing.latestApproval.id : null
+
   await db.transaction(async (tx) => {
+    const now = new Date()
     await tx
       .update(repairs)
       .set({
@@ -1272,22 +1245,16 @@ export async function updateRepairEstimatePricing({
         taxPercent,
         estimatedTotal: total,
         estimatedCost: total,
-        updatedAt: new Date(),
+        updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
 
-    if (existing.approvalPendingId) {
-      const initialEstimatedCost =
-        normalizeStoredCostToPaise(existing.approvalInitialEstimatedCost) ?? total
-      const additionalEstimatedCost = Math.max(0, total - initialEstimatedCost)
-
+    // Keep the customer-facing snapshot in step with the revised estimate.
+    if (pendingApprovalId) {
       await tx
         .update(repairApprovals)
-        .set({
-          additionalEstimatedCost,
-          updatedAt: new Date(),
-        })
-        .where(eq(repairApprovals.id, existing.approvalPendingId))
+        .set({ initialEstimatedCost: total, additionalEstimatedCost: 0, updatedAt: now })
+        .where(eq(repairApprovals.id, pendingApprovalId))
     }
   })
 
@@ -1311,28 +1278,14 @@ export async function updateRepairFinalTotal({
   additionalCharges: number
   taxPercent: number
 }) {
-  const [existing] = await db
-    .select({
-      id: repairs.id,
-      status: repairs.status,
-    })
-    .from(repairs)
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
-
-  if (!existing) {
-    throw new HTTPException(404, { message: 'Repair ticket not found' })
-  }
-
-  if (!isFinalPricingVisibleStatus(existing.status)) {
-    throw new HTTPException(400, { message: FINAL_PRICING_STATUS_MESSAGE })
-  }
-
-  if (!canConfirmFinalPricing({ userRole, status: existing.status })) {
-    if (existing.status === 'COMPLETED') {
-      throw new HTTPException(400, { message: FINAL_PRICING_COMPLETED_MESSAGE })
-    }
-    throw new HTTPException(403, { message: FINAL_PRICING_FORBIDDEN_MESSAGE })
-  }
+  const existing = await getRepairPricingContext({ shopId, id })
+  throwIfViolation(
+    getFinalizeBillViolation({
+      userRole,
+      status: existing.status,
+      approvalStatus: existing.latestApproval?.status,
+    }),
+  )
 
   const { total } = await resolveRepairPricingTotal({
     shopId,

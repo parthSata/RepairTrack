@@ -1,190 +1,167 @@
 'use client'
 
 import * as React from 'react'
-import { useForm, type Resolver } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { Calculator, IndianRupee } from 'lucide-react'
-import {
-  repairPricingFieldsSchema,
-  type RepairPricingFieldsInput,
-} from '@/features/repairs/pricing-schemas'
-import { useUpdateEstimate } from '@/features/repairs/pricing-mutations'
+import { Calculator } from 'lucide-react'
 import type { RepairPartLine } from '@/features/repairs/queries'
-import { safeCalculateTotal, sumPartsCharges } from '@/features/repairs/pricing-calc'
-import { formatINR } from '@/features/repairs/money'
+import type { ApprovalStatus, PricingPanelMode } from '@/features/repairs/pricing-rules'
+import { differsFromEstimate } from '@/features/repairs/pricing-calc'
+import { useConfirmFinalTotal, useUpdateEstimate } from '@/features/repairs/pricing-mutations'
+import { usePricingForm } from '@/features/repairs/use-pricing-form'
+import { formatRupees } from '@/lib/format-money'
 import { PricingBreakdownRows } from '@/components/repairs/pricing-breakdown-rows'
-import { PricingChargeFields } from '@/components/repairs/pricing-charge-fields'
-import { Button } from '@/components/ui/button'
+import { PricingFormSection } from '@/components/repairs/pricing-form-section'
+import { PricingPanelActions } from '@/components/repairs/pricing-panel-actions'
+import { PricingStateBadge, type PricingState } from '@/components/repairs/pricing-state-badge'
 import { Card, CardContent } from '@/components/ui/card'
-
-type PendingApprovalBreakdown = {
-  initial: number
-  additional: number
-  revised: number
-}
 
 type EstimatePricingPanelProps = {
   repairId: string
+  mode: Exclude<PricingPanelMode, 'hidden'>
+  status: string
+  approvalStatus: ApprovalStatus | null
   parts: RepairPartLine[]
   laborCharges: number
   additionalCharges: number
   taxPercent: number
   estimatedTotal: number | null
-  canEdit: boolean
-  status?: string
-  pendingApprovalBreakdown?: PendingApprovalBreakdown | null
+  finalTotal: number | null
 }
 
-function PendingApprovalStrip({ breakdown }: { breakdown: PendingApprovalBreakdown }) {
-  return (
-    <div className="space-y-2 rounded-xl border border-amber-200/70 bg-amber-50/50 px-3.5 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
-      <p className="text-xs text-amber-900 dark:text-amber-200">
-        Sent to customer — revise charges below while waiting for approval.
-      </p>
-      <div className="space-y-1.5 text-sm">
-        <div className="flex justify-between gap-3">
-          <span className="text-muted-foreground">Original estimate</span>
-          <span className="font-medium">{formatINR(breakdown.initial)}</span>
-        </div>
-        <div className="flex justify-between gap-3">
-          <span className="text-muted-foreground">Additional</span>
-          <span className="font-medium">+ {formatINR(breakdown.additional)}</span>
-        </div>
-        <div className="flex justify-between gap-3 border-t border-amber-200/60 pt-1.5 dark:border-amber-800/50">
-          <span className="font-semibold text-foreground">Revised total</span>
-          <span className="font-semibold">{formatINR(breakdown.revised)}</span>
-        </div>
-      </div>
-    </div>
-  )
+function getPricingState(isFinalized: boolean, approvalStatus: ApprovalStatus | null): PricingState | null {
+  if (isFinalized) return 'final'
+  if (approvalStatus === 'PENDING') return 'awaiting'
+  if (approvalStatus === 'APPROVED') return 'approved'
+  return null
+}
+
+function getSubtitle({ mode, status, isEditing, isFinalized, approvalStatus }: {
+  mode: EstimatePricingPanelProps['mode']
+  status: string
+  isEditing: boolean
+  isFinalized: boolean
+  approvalStatus: ApprovalStatus | null
+}): string {
+  if (mode === 'view') {
+    return status === 'COMPLETED'
+      ? 'Pricing is locked on completed repairs.'
+      : 'Charges are set when sending the estimate for customer approval.'
+  }
+  if (mode === 'editEstimate') {
+    return approvalStatus === 'PENDING'
+      ? 'Saving updates the estimate the customer is reviewing.'
+      : 'Labor, parts, and GST — shared with customer tracking.'
+  }
+  if (isEditing) return 'Adjust charges, then finalize the bill.'
+  return isFinalized
+    ? 'Bill finalized — the repair can be marked completed.'
+    : 'Review the approved estimate, then finalize the bill.'
 }
 
 export function EstimatePricingPanel({
   repairId,
+  mode,
+  status,
+  approvalStatus,
   parts,
   laborCharges,
   additionalCharges,
   taxPercent,
   estimatedTotal,
-  canEdit,
-  status,
-  pendingApprovalBreakdown = null,
+  finalTotal,
 }: EstimatePricingPanelProps) {
+  const pricing = usePricingForm({ parts, saved: { laborCharges, additionalCharges, taxPercent } })
   const saveMutation = useUpdateEstimate(repairId)
-  const partsCharges = sumPartsCharges(parts)
+  const finalizeMutation = useConfirmFinalTotal(repairId)
+  const [isUnlocked, setIsUnlocked] = React.useState(false)
 
-  const {
-    control,
-    handleSubmit,
-    watch,
-    reset,
-    trigger,
-    formState: { errors, isDirty, isValid },
-  } = useForm<RepairPricingFieldsInput>({
-    resolver: zodResolver(repairPricingFieldsSchema) as Resolver<RepairPricingFieldsInput>,
-    mode: 'onChange',
-    defaultValues: { laborCharges, additionalCharges, taxPercent },
-  })
+  const isFinalized = finalTotal != null
+  const isEditing = mode === 'editEstimate' || (mode === 'finalize' && isUnlocked)
+  const activeMutation = mode === 'finalize' ? finalizeMutation : saveMutation
+  const { isDirty, isValid } = pricing.form.formState
+  const canSubmit = mode === 'finalize' ? isValid : isDirty && isValid
 
-  React.useEffect(() => {
-    reset({ laborCharges, additionalCharges, taxPercent })
-    void trigger()
-  }, [laborCharges, additionalCharges, taxPercent, reset, trigger])
-
-  const watched = watch()
-  const liveLabor = Number.isFinite(watched.laborCharges) ? watched.laborCharges : 0
-  const liveAdditional = Number.isFinite(watched.additionalCharges) ? watched.additionalCharges : 0
-  const liveTaxPercent = Number.isFinite(watched.taxPercent) ? watched.taxPercent : 0
-
-  const liveTotals = safeCalculateTotal({
-    laborCharges: liveLabor,
-    partsCharges,
-    additionalCharges: liveAdditional,
-    taxPercent: liveTaxPercent,
-  })
-
-  const savedTotals = safeCalculateTotal({
-    laborCharges,
-    partsCharges,
-    additionalCharges,
-    taxPercent,
-  })
+  const storedTotal = isFinalized ? finalTotal : estimatedTotal
   const viewTotals =
-    savedTotals && estimatedTotal != null
-      ? { ...savedTotals, total: estimatedTotal }
-      : savedTotals
+    pricing.savedTotals && storedTotal != null
+      ? { ...pricing.savedTotals, total: storedTotal }
+      : pricing.savedTotals
+  const comparedTotal = isEditing ? (pricing.liveTotals?.total ?? null) : finalTotal
+  const showEstimateDiff = mode !== 'editEstimate' && differsFromEstimate(estimatedTotal, comparedTotal)
+  const pricingState = getPricingState(isFinalized, approvalStatus)
+  const totalLabel = isFinalized || (mode === 'finalize' && isEditing) ? 'Final total' : 'Estimated total'
 
-  const onSubmit = handleSubmit(async (values) => {
-    await saveMutation.mutateAsync(values)
+  const handleCancel = () => {
+    pricing.resetToSaved()
+    setIsUnlocked(false)
+  }
+
+  const onSubmit = pricing.form.handleSubmit(async (values) => {
+    try {
+      await activeMutation.mutateAsync(values)
+      setIsUnlocked(false)
+    } catch {
+      // Toast + 409 resync are handled by the mutation; keep the form open with the user's input.
+    }
   })
 
   return (
     <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <CardContent className="space-y-5 pt-6">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-            <Calculator className="h-4 w-4 text-steel" aria-hidden />
+      <CardContent className="pt-6">
+        <form onSubmit={onSubmit} className="space-y-5">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Calculator className="h-4 w-4 text-steel" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-semibold tracking-tight text-foreground">
+                  Repair estimate
+                </h3>
+                {pricingState ? <PricingStateBadge state={pricingState} /> : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {getSubtitle({ mode, status, isEditing, isFinalized, approvalStatus })}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold tracking-tight text-foreground">
-              Repair estimate
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              {canEdit
-                ? 'Labor, parts, and tax — saved total is shared with customer tracking.'
-                : status === 'COMPLETED'
-                  ? 'Estimate is locked on completed repairs.'
-                  : 'Estimate is locked after customer approval.'}
-            </p>
-          </div>
-        </div>
 
-        {pendingApprovalBreakdown ? (
-          <PendingApprovalStrip breakdown={pendingApprovalBreakdown} />
-        ) : null}
-
-        {canEdit ? (
-          <form onSubmit={onSubmit} className="space-y-4">
-            <PricingChargeFields
-              control={control}
-              errors={errors}
-              disabled={saveMutation.isPending}
-              taxFieldId="estimate-taxPercent"
+          {isEditing ? (
+            <PricingFormSection
+              pricing={pricing}
+              totalLabel={totalLabel}
+              taxFieldId={`pricing-tax-${repairId}`}
+              disabled={activeMutation.isPending}
             />
-
+          ) : (
             <PricingBreakdownRows
-              laborCharges={liveLabor}
-              partsCharges={partsCharges}
-              additionalCharges={liveAdditional}
-              taxPercent={liveTaxPercent}
-              totals={liveTotals}
-              totalLabel="Estimated total"
+              laborCharges={laborCharges}
+              partsCharges={pricing.partsCharges}
+              additionalCharges={additionalCharges}
+              taxPercent={taxPercent}
+              totals={viewTotals}
+              totalLabel={totalLabel}
               emptyMessage="Estimate not available."
             />
+          )}
 
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                size="sm"
-                disabled={saveMutation.isPending || !isDirty || !isValid}
-                className="gap-1.5"
-              >
-                <IndianRupee className="h-3.5 w-3.5" aria-hidden />
-                {saveMutation.isPending ? 'Saving…' : 'Save estimate'}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <PricingBreakdownRows
-            laborCharges={laborCharges}
-            partsCharges={partsCharges}
-            additionalCharges={additionalCharges}
-            taxPercent={taxPercent}
-            totals={viewTotals}
-            totalLabel="Estimated total"
-            emptyMessage="Estimate not available."
-          />
-        )}
+          {showEstimateDiff && estimatedTotal != null ? (
+            <p className="text-xs text-muted-foreground">
+              Differs from the approved estimate of {formatRupees(estimatedTotal)}.
+            </p>
+          ) : null}
+
+          {mode === 'view' ? null : (
+            <PricingPanelActions
+              mode={mode}
+              isUnlocked={isUnlocked}
+              isFinalized={isFinalized}
+              isPending={activeMutation.isPending}
+              canSubmit={canSubmit}
+              onUnlock={() => setIsUnlocked(true)}
+              onCancel={handleCancel}
+            />
+          )}
+        </form>
       </CardContent>
     </Card>
   )

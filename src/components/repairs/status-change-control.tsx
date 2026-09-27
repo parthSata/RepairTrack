@@ -25,10 +25,12 @@ import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useReopenRepair } from '@/features/repairs/mutations'
+import { TicketSummaryGrid } from '@/components/repairs/ticket-summary-grid'
 import {
   getAllowedManualStatusDestinations,
   getManualStatusTransitionError,
   isCompletedAwaitingFinalBill,
+  isCustomerApproved,
 } from '@/features/repairs/status-transitions'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
@@ -42,6 +44,7 @@ interface StatusChangeControlProps {
   deviceSummary: string
   assignedTechnicianId?: string | null
   finalTotal?: number | null
+  approvalStatus?: string | null
   onStatusUpdated?: () => void
 }
 
@@ -67,6 +70,7 @@ export function StatusChangeControl({
   deviceSummary,
   assignedTechnicianId,
   finalTotal = null,
+  approvalStatus = null,
   onStatusUpdated,
 }: StatusChangeControlProps) {
   const { data: session } = useSession()
@@ -102,19 +106,26 @@ export function StatusChangeControl({
   const isManualApprovalTransition =
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
-  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, { finalTotal })
-  const showCompletedLockedHint = isCompletedAwaitingFinalBill(currentStatus, finalTotal)
-  const statusOptions = showCompletedLockedHint
-    ? ([...selectableStatuses, 'COMPLETED'] as const)
-    : selectableStatuses
+  const transitionOptions = { finalTotal, approvalStatus }
+  const isApproved = isCustomerApproved(approvalStatus)
+  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, transitionOptions)
+  const showCompletedLockedHint = isCompletedAwaitingFinalBill(currentStatus, transitionOptions)
+  const statusOptions = [
+    currentStatus,
+    ...selectableStatuses,
+    ...(showCompletedLockedHint ? ['COMPLETED'] : []),
+  ]
 
   const handleStatusSelect = (newStatus: string) => {
     setSelectedStatus(newStatus)
     setValidationError(null)
+    if (newStatus === currentStatus) return
 
-    const transitionError = getManualStatusTransitionError(currentStatus, newStatus, {
-      finalTotal,
-    })
+    const transitionError = getManualStatusTransitionError(
+      currentStatus,
+      newStatus,
+      transitionOptions,
+    )
     if (transitionError) {
       setValidationError(transitionError)
     }
@@ -130,16 +141,13 @@ export function StatusChangeControl({
       return
     }
 
-    const transitionError = getManualStatusTransitionError(currentStatus, selectedStatus, {
-      finalTotal,
-    })
+    const transitionError = getManualStatusTransitionError(
+      currentStatus,
+      selectedStatus,
+      transitionOptions,
+    )
     if (transitionError) {
       setValidationError(transitionError)
-      return
-    }
-
-    if (isManualApprovalTransition) {
-      setValidationError('Use Request Customer Approval to send an estimate for approval.')
       return
     }
 
@@ -263,7 +271,7 @@ export function StatusChangeControl({
                   return (
                     <SelectItem key={status} value={status} disabled={isCompletedLocked}>
                       {isCompletedLocked
-                        ? `${getRepairStatusLabel(status)} (confirm final pricing first)`
+                        ? `${getRepairStatusLabel(status)} (finalize bill first)`
                         : getRepairStatusLabel(status)}
                     </SelectItem>
                   )
@@ -287,6 +295,13 @@ export function StatusChangeControl({
             </Button>
           </div>
         </div>
+
+        {!isApproved && (
+          <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Repair statuses unlock after the customer approves the estimate.</span>
+          </p>
+        )}
 
         {validationError && (
           <div className="flex items-center gap-1.5 text-xs font-medium text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -352,34 +367,12 @@ export function StatusChangeControl({
           </AlertDialogHeader>
 
           <div className="space-y-5">
-            <div className="grid gap-4 rounded-xl border border-border bg-muted/20 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Ticket Number
-                </Label>
-                <p className="text-sm font-semibold text-foreground">#{ticketNumber}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Current Status
-                </Label>
-                <p className="text-sm font-semibold text-foreground">
-                  {getRepairStatusLabel(currentStatus)}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Customer
-                </Label>
-                <p className="text-sm text-foreground">{customerName}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Device
-                </Label>
-                <p className="text-sm text-foreground">{deviceSummary}</p>
-              </div>
-            </div>
+            <TicketSummaryGrid
+              ticketNumber={ticketNumber}
+              statusLabel={getRepairStatusLabel(currentStatus)}
+              customerName={customerName}
+              deviceSummary={deviceSummary}
+            />
 
             <div className="space-y-2">
               <Label

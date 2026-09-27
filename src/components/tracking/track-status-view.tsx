@@ -45,6 +45,8 @@ export function TrackStatusView({
 }: TrackStatusViewProps) {
   const approval = data.approval
   const hasPendingApproval = approval?.status === 'PENDING'
+  // Rendered once: next to the approval decision while pending, otherwise in the details flow.
+  const pricingSummary = data.pricing ? <TrackPricingSummary pricing={data.pricing} /> : null
   const deviceLabel = data.device.model
     ? `${data.device.brand} ${data.device.model}`
     : data.device.brand
@@ -129,6 +131,8 @@ export function TrackStatusView({
         />
       ) : null}
 
+      {pricingSummary && hasPendingApproval ? pricingSummary : null}
+
       <Card className="w-full min-w-0 border-border">
         <CardContent className="flex w-full min-w-0 flex-col gap-4 p-4 sm:p-6">
           <TrackSectionHeader icon={MapPin} title="Where your repair is now" />
@@ -147,9 +151,7 @@ export function TrackStatusView({
         hasPendingApproval={hasPendingApproval}
       />
 
-      {data.pricing && !hasPendingApproval ? (
-        <TrackPricingSummary pricing={data.pricing} />
-      ) : null}
+      {pricingSummary && !hasPendingApproval ? pricingSummary : null}
 
       {data.photos ? (
         <TrackRepairPhotos beforeUrl={data.photos.beforeUrl} afterUrl={data.photos.afterUrl} />
