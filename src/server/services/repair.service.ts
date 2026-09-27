@@ -639,6 +639,7 @@ export async function updateRepairStatus({
       id: repairs.id,
       status: repairs.status,
       assignedTechnicianId: repairs.assignedTechnicianId,
+      finalTotal: repairs.finalTotal,
     })
     .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
@@ -681,7 +682,9 @@ export async function updateRepairStatus({
     })
   }
 
-  const transitionError = getManualStatusTransitionError(existing.status, status)
+  const transitionError = getManualStatusTransitionError(existing.status, status, {
+    finalTotal: existing.finalTotal,
+  })
   if (transitionError) {
     throw new HTTPException(400, { message: transitionError })
   }

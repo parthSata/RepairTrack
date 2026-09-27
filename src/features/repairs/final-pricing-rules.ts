@@ -30,3 +30,23 @@ export const FINAL_PRICING_COMPLETED_MESSAGE =
 
 export const FINAL_PRICING_FORBIDDEN_MESSAGE =
   'Only owners and staff can confirm final pricing.'
+
+/** Final bill is confirmed when staff/owner have written final_total. */
+export function isFinalBillConfirmed(finalTotal: number | null | undefined): boolean {
+  return finalTotal != null
+}
+
+export const COMPLETED_REQUIRES_FINAL_MESSAGE =
+  'Confirm final pricing before marking this repair completed.'
+
+export function getCompletedTransitionError({
+  nextStatus,
+  finalTotal,
+}: {
+  nextStatus: string
+  finalTotal: number | null | undefined
+}): string | null {
+  if (nextStatus !== 'COMPLETED') return null
+  if (isFinalBillConfirmed(finalTotal)) return null
+  return COMPLETED_REQUIRES_FINAL_MESSAGE
+}

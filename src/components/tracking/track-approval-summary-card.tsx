@@ -34,6 +34,7 @@ export function TrackApprovalSummaryCard({
 }: TrackApprovalSummaryCardProps) {
   const isPending = approval.status === 'PENDING'
   const isApproved = approval.status === 'APPROVED'
+  const isRejected = approval.status === 'REJECTED'
   const decisionTimestamp = formatDecisionTimestamp(approval.decidedAt)
 
   return (
@@ -69,6 +70,7 @@ export function TrackApprovalSummaryCard({
             initialEstimateRupees={approval.initialEstimate}
             additionalCostRupees={approval.additionalCost}
             revisedTotalRupees={approval.revisedTotal}
+            showCosts={isPending}
           />
 
           {isPending ? (
@@ -91,29 +93,20 @@ export function TrackApprovalSummaryCard({
                 estimate in read-only mode.
               </div>
             )
-          ) : (
-            <div
-              className={`rounded-xl border p-4 text-sm ${
-                isApproved
-                  ? 'border-emerald-300 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-100'
-                  : 'border-rose-300 bg-rose-50/70 text-rose-900 dark:border-rose-800 dark:bg-rose-950/20 dark:text-rose-100'
-              }`}
-            >
-              <p className="font-semibold">
-                {isApproved ? 'Repair approved' : 'Repair not approved'}
-              </p>
-              <p className="mt-1">
-                {decisionTimestamp ? `Decision recorded on ${decisionTimestamp}.` : 'Decision recorded.'}
-              </p>
-              {!isApproved && approval.rejectionReason ? (
+          ) : isRejected ? (
+            <div className="rounded-xl border border-rose-300 bg-rose-50/70 p-4 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950/20 dark:text-rose-100">
+              <p className="font-semibold">Repair not approved</p>
+              {approval.rejectionReason ? (
                 <p className="mt-2 text-sm">Reason: {approval.rejectionReason}</p>
               ) : null}
             </div>
-          )}
+          ) : null}
 
-          <p className="text-center text-xs text-muted-foreground">
-            All amounts are shown in Indian Rupees (Rs).
-          </p>
+          {isPending ? (
+            <p className="text-center text-xs text-muted-foreground">
+              All amounts are shown in Indian Rupees (Rs).
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     </section>

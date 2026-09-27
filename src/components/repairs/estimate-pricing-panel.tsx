@@ -11,10 +11,17 @@ import {
 import { useUpdateEstimate } from '@/features/repairs/pricing-mutations'
 import type { RepairPartLine } from '@/features/repairs/queries'
 import { safeCalculateTotal, sumPartsCharges } from '@/features/repairs/pricing-calc'
+import { formatINR } from '@/features/repairs/money'
 import { PricingBreakdownRows } from '@/components/repairs/pricing-breakdown-rows'
 import { PricingChargeFields } from '@/components/repairs/pricing-charge-fields'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+
+type PendingApprovalBreakdown = {
+  initial: number
+  additional: number
+  revised: number
+}
 
 type EstimatePricingPanelProps = {
   repairId: string
@@ -25,6 +32,31 @@ type EstimatePricingPanelProps = {
   estimatedTotal: number | null
   canEdit: boolean
   status?: string
+  pendingApprovalBreakdown?: PendingApprovalBreakdown | null
+}
+
+function PendingApprovalStrip({ breakdown }: { breakdown: PendingApprovalBreakdown }) {
+  return (
+    <div className="space-y-2 rounded-xl border border-amber-200/70 bg-amber-50/50 px-3.5 py-3 dark:border-amber-900/40 dark:bg-amber-950/20">
+      <p className="text-xs text-amber-900 dark:text-amber-200">
+        Sent to customer — revise charges below while waiting for approval.
+      </p>
+      <div className="space-y-1.5 text-sm">
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">Original estimate</span>
+          <span className="font-medium">{formatINR(breakdown.initial)}</span>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span className="text-muted-foreground">Additional</span>
+          <span className="font-medium">+ {formatINR(breakdown.additional)}</span>
+        </div>
+        <div className="flex justify-between gap-3 border-t border-amber-200/60 pt-1.5 dark:border-amber-800/50">
+          <span className="font-semibold text-foreground">Revised total</span>
+          <span className="font-semibold">{formatINR(breakdown.revised)}</span>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function EstimatePricingPanel({
@@ -36,6 +68,7 @@ export function EstimatePricingPanel({
   estimatedTotal,
   canEdit,
   status,
+  pendingApprovalBreakdown = null,
 }: EstimatePricingPanelProps) {
   const saveMutation = useUpdateEstimate(repairId)
   const partsCharges = sumPartsCharges(parts)
@@ -105,6 +138,10 @@ export function EstimatePricingPanel({
             </p>
           </div>
         </div>
+
+        {pendingApprovalBreakdown ? (
+          <PendingApprovalStrip breakdown={pendingApprovalBreakdown} />
+        ) : null}
 
         {canEdit ? (
           <form onSubmit={onSubmit} className="space-y-4">

@@ -11,6 +11,8 @@ type ApprovalEstimateBreakdownProps = {
   additionalCostRupees?: number
   revisedTotalRupees?: number
   variant?: 'default' | 'prominent'
+  /** When false, diagnosis only — no Original/Additional/Revised cost table. */
+  showCosts?: boolean
   className?: string
 }
 
@@ -67,6 +69,7 @@ export function ApprovalEstimateBreakdown({
   additionalCostRupees,
   revisedTotalRupees,
   variant = 'default',
+  showCosts = true,
   className,
 }: ApprovalEstimateBreakdownProps) {
   const initial = resolveRupees(initialEstimatePaise, initialEstimateRupees)
@@ -77,6 +80,8 @@ export function ApprovalEstimateBreakdown({
     revisedFromParts ?? resolveRupees(revisedTotalPaise, revisedTotalRupees)
 
   const isProminent = variant === 'prominent'
+  const showCostTable =
+    showCosts && initial != null && additional != null && revised != null
 
   return (
     <div
@@ -120,7 +125,7 @@ export function ApprovalEstimateBreakdown({
           </div>
         </div>
 
-        {initial != null && additional != null && revised != null ? (
+        {showCostTable ? (
           <div
             className={cn(
               'rounded-lg border border-amber-300/50 bg-white/70 dark:border-amber-800/50 dark:bg-background/40',

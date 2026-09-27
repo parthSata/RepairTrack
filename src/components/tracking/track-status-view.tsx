@@ -147,7 +147,9 @@ export function TrackStatusView({
         hasPendingApproval={hasPendingApproval}
       />
 
-      {data.pricing ? <TrackPricingSummary pricing={data.pricing} /> : null}
+      {data.pricing && !hasPendingApproval ? (
+        <TrackPricingSummary pricing={data.pricing} />
+      ) : null}
 
       {data.photos ? (
         <TrackRepairPhotos beforeUrl={data.photos.beforeUrl} afterUrl={data.photos.afterUrl} />

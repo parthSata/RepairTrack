@@ -122,6 +122,10 @@ export function FinalPricingPanel({
               <p className="text-xs text-muted-foreground">
                 Adjust charges, then confirm for invoicing.
               </p>
+            ) : isConfirmed ? (
+              <p className="text-xs text-muted-foreground">
+                Final total confirmed for invoicing.
+              </p>
             ) : null}
           </div>
         </div>

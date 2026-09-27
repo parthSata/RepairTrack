@@ -23,10 +23,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { useReopenRepair } from '@/features/repairs/mutations'
 import {
   getAllowedManualStatusDestinations,
   getManualStatusTransitionError,
+  isCompletedAwaitingFinalBill,
 } from '@/features/repairs/status-transitions'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
@@ -39,6 +41,7 @@ interface StatusChangeControlProps {
   customerName: string
   deviceSummary: string
   assignedTechnicianId?: string | null
+  finalTotal?: number | null
   onStatusUpdated?: () => void
 }
 
@@ -63,6 +66,7 @@ export function StatusChangeControl({
   customerName,
   deviceSummary,
   assignedTechnicianId,
+  finalTotal = null,
   onStatusUpdated,
 }: StatusChangeControlProps) {
   const { data: session } = useSession()
@@ -98,13 +102,19 @@ export function StatusChangeControl({
   const isManualApprovalTransition =
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
-  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus)
+  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, { finalTotal })
+  const showCompletedLockedHint = isCompletedAwaitingFinalBill(currentStatus, finalTotal)
+  const statusOptions = showCompletedLockedHint
+    ? ([...selectableStatuses, 'COMPLETED'] as const)
+    : selectableStatuses
 
   const handleStatusSelect = (newStatus: string) => {
     setSelectedStatus(newStatus)
     setValidationError(null)
 
-    const transitionError = getManualStatusTransitionError(currentStatus, newStatus)
+    const transitionError = getManualStatusTransitionError(currentStatus, newStatus, {
+      finalTotal,
+    })
     if (transitionError) {
       setValidationError(transitionError)
     }
@@ -120,7 +130,9 @@ export function StatusChangeControl({
       return
     }
 
-    const transitionError = getManualStatusTransitionError(currentStatus, selectedStatus)
+    const transitionError = getManualStatusTransitionError(currentStatus, selectedStatus, {
+      finalTotal,
+    })
     if (transitionError) {
       setValidationError(transitionError)
       return
@@ -137,15 +149,7 @@ export function StatusChangeControl({
       toast.success(`Repair status updated to ${getRepairStatusLabel(selectedStatus)}`)
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
-      const errorObj = err as {
-        response?: { data?: { message?: string; error?: { message?: string } } }
-        message?: string
-      }
-      const msg =
-        errorObj?.response?.data?.message ||
-        errorObj?.response?.data?.error?.message ||
-        errorObj?.message ||
-        'Failed to update status'
+      const msg = getApiErrorMessage(err, 'Failed to update status')
       setValidationError(msg)
       toast.error(msg)
     } finally {
@@ -192,16 +196,9 @@ export function StatusChangeControl({
       setReopenReason('')
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
-      const errorObj = err as {
-        response?: { data?: { message?: string; error?: { message?: string } } }
-        message?: string
-      }
-      const msg =
-        errorObj?.response?.data?.message ||
-        errorObj?.response?.data?.error?.message ||
-        errorObj?.message ||
-        'Failed to update repair ticket'
+      const msg = getApiErrorMessage(err, 'Failed to update repair ticket')
       setValidationError(msg)
+      toast.error(msg)
     }
   }
 
@@ -260,11 +257,17 @@ export function StatusChangeControl({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                {selectableStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {getRepairStatusLabel(status)}
-                  </SelectItem>
-                ))}
+                {statusOptions.map((status) => {
+                  const isCompletedLocked =
+                    status === 'COMPLETED' && showCompletedLockedHint
+                  return (
+                    <SelectItem key={status} value={status} disabled={isCompletedLocked}>
+                      {isCompletedLocked
+                        ? `${getRepairStatusLabel(status)} (confirm final pricing first)`
+                        : getRepairStatusLabel(status)}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
 
@@ -272,7 +275,12 @@ export function StatusChangeControl({
               type="button"
               variant="accent"
               onClick={handleUpdate}
-              disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
+              disabled={
+                isUpdating ||
+                selectedStatus === currentStatus ||
+                isManualApprovalTransition ||
+                (selectedStatus === 'COMPLETED' && showCompletedLockedHint)
+              }
               className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-34"
             >
               {isUpdating ? 'Updating…' : 'Update'}
