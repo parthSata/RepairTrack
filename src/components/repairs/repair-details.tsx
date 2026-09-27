@@ -56,17 +56,13 @@ import { CustomerTrackingSection } from './customer-tracking-section'
 import { RepairPhotosSection } from './repair-photos-section'
 import { StatusChangeControl } from './status-change-control'
 import { StatusHistoryTimeline } from './status-history-timeline'
-import { ApprovalEstimateBreakdown } from './approval-estimate-summary'
 import { RequestApprovalControl } from './request-approval-control'
 import { ApprovalStatusBanner } from './approval-status-badge'
 import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
 import { EstimatePricingPanel } from './estimate-pricing-panel'
-import {
-  canEditEstimatePricing,
-  isEstimatePricingEditableStatus,
-} from '@/features/repairs/estimate-edit-rules'
+import { getPricingPanelMode } from '@/features/repairs/pricing-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
 import { useRepair, useTechnicians } from '@/features/repairs/queries'
@@ -76,7 +72,6 @@ import {
   useUpdateDiagnosis,
   useUpdateExpectedCompletionDate,
 } from '@/features/repairs/mutations'
-import { formatINRFromPaise, getApprovalEstimateBreakdownRupees } from '@/features/repairs/money'
 import { formatDateInputValue, isExpectedCompletionDateInPast } from '@/features/repairs/overdue'
 import { useSession } from '@/lib/auth-client'
 import { toast } from 'sonner'
@@ -163,25 +158,24 @@ export function RepairDetails({ id }: { id: string }) {
   const canShowCustomerTracking = ['OWNER', 'STAFF'].includes(userRole)
   const canEditExpectedDate = canEditDiagnosisAndNotes
   const todayDateMin = formatDateInputValue()
-  const canEditEstimate = canEditEstimatePricing({
-    status: repair.status,
+  const approvalStatus = repair.approval?.status ?? null
+  const pricingPanelMode = getPricingPanelMode({
     userRole,
-    userId: userId ?? '',
-    assignedTechnicianId: repair.assignedTechnicianId,
+    status: repair.status,
+    approvalStatus,
+    hasEstimate: repair.estimatedTotal != null,
   })
-  const showEstimatePanel =
-    isEstimatePricingEditableStatus(repair.status) || repair.estimatedTotal != null
+  const deviceSummary = [repair.device.brand, repair.device.model].filter(Boolean).join(' ')
+  const savedPricing = {
+    laborCharges: repair.laborCharges ?? 0,
+    additionalCharges: repair.additionalCharges ?? 0,
+    taxPercent: repair.taxPercent ?? 0,
+  }
 
   const showModelConfirmationCard =
     repair.status === 'DIAGNOSING' &&
     repair.device.modelVerified === false &&
     Boolean(repair.assignedTechnicianId)
-
-  const pendingApprovalBreakdown =
-    repair.approval?.status === 'PENDING'
-      ? getApprovalEstimateBreakdownRupees(repair.approval)
-      : null
-
   const handleReassign = async () => {
     const techId = selectedTechId || null
     await reassignMutation.mutateAsync({ technicianId: techId })
@@ -291,8 +285,10 @@ export function RepairDetails({ id }: { id: string }) {
                 ticketNumber={repair.ticketNumber}
                 currentStatus={repair.status}
                 customerName={repair.customer.name}
-                deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}
+                deviceSummary={deviceSummary}
                 assignedTechnicianId={repair.assignedTechnicianId}
+                finalTotal={repair.finalTotal}
+                approvalStatus={approvalStatus}
                 onStatusUpdated={() => refetch()}
               />
               <div className="h-px w-full bg-border/70" />
@@ -300,12 +296,15 @@ export function RepairDetails({ id }: { id: string }) {
                 repairId={repair.id}
                 ticketNumber={repair.ticketNumber}
                 customerName={repair.customer.name}
-                deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}
+                deviceSummary={deviceSummary}
                 diagnosis={repair.diagnosis}
-                estimatedCost={repair.estimatedCost}
                 approval={repair.approval}
                 currentStatus={repair.status}
                 assignedTechnicianId={repair.assignedTechnicianId}
+                parts={repair.parts ?? []}
+                savedPricing={savedPricing}
+                estimatedTotal={repair.estimatedTotal ?? null}
+                intakeEstimatedCost={repair.estimatedCost}
                 onRequested={() => refetch()}
               />
             </div>
@@ -608,48 +607,6 @@ export function RepairDetails({ id }: { id: string }) {
               )}
             </p>
           )}
-
-          <div className="space-y-3 border-t border-border/70 pt-4">
-            <h4 className="text-sm font-semibold tracking-tight text-foreground">
-              {pendingApprovalBreakdown ? 'Repair estimate' : 'Estimated total'}
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground">(₹)</span>
-            </h4>
-
-            {pendingApprovalBreakdown ? (
-              <>
-                <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                  Breakdown sent to the customer. Revise totals in Repair estimate below while
-                  waiting for approval.
-                </p>
-                <ApprovalEstimateBreakdown
-                  variant="default"
-                  diagnosis={repair.diagnosis?.trim() || 'No diagnosis recorded.'}
-                  initialEstimateRupees={pendingApprovalBreakdown.initial}
-                  additionalCostRupees={pendingApprovalBreakdown.additional}
-                  revisedTotalRupees={pendingApprovalBreakdown.revised}
-                />
-              </>
-            ) : (
-              <>
-                <p className="text-[11px] text-muted-foreground">
-                  {isEstimatePricingEditableStatus(repair.status)
-                    ? 'Edit labor, parts, and tax in Repair estimate below.'
-                    : 'Estimate is locked after customer approval.'}
-                </p>
-                {(repair.estimatedTotal ?? repair.estimatedCost) != null ? (
-                  <div className="rounded-xl border border-accent/25 bg-accent/10 px-5 py-5">
-                    <p className="text-3xl font-bold tracking-tight text-foreground">
-                      {formatINRFromPaise(repair.estimatedTotal ?? repair.estimatedCost)}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">
-                    Not set — save a Repair estimate before requesting approval
-                  </p>
-                )}
-              </>
-            )}
-          </div>
         </CardContent>
       </Card>
 
@@ -659,15 +616,16 @@ export function RepairDetails({ id }: { id: string }) {
         canEdit={canRecordParts}
       />
 
-      {showEstimatePanel ? (
+      {pricingPanelMode !== 'hidden' ? (
         <EstimatePricingPanel
           repairId={id}
+          mode={pricingPanelMode}
+          status={repair.status}
+          approvalStatus={approvalStatus}
           parts={repair.parts ?? []}
-          laborCharges={repair.laborCharges ?? 0}
-          additionalCharges={repair.additionalCharges ?? 0}
-          taxPercent={repair.taxPercent ?? 0}
+          {...savedPricing}
           estimatedTotal={repair.estimatedTotal ?? null}
-          canEdit={canEditEstimate}
+          finalTotal={repair.finalTotal ?? null}
         />
       ) : null}
 

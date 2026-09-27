@@ -15,24 +15,50 @@ function Row({
   label,
   amount,
   emphasize,
+  muted,
 }: {
   label: string
   amount: number
   emphasize?: boolean
+  muted?: boolean
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={emphasize ? 'font-semibold text-foreground' : 'text-muted-foreground'}>
+      <span
+        className={
+          emphasize
+            ? 'font-semibold text-foreground'
+            : muted
+              ? 'text-xs text-muted-foreground'
+              : 'text-muted-foreground'
+        }
+      >
         {label}
       </span>
-      <span className={emphasize ? 'text-lg font-bold text-foreground' : 'font-medium text-foreground'}>
+      <span
+        className={
+          emphasize
+            ? 'text-lg font-bold text-foreground'
+            : muted
+              ? 'text-xs font-medium text-muted-foreground'
+              : 'font-medium text-foreground'
+        }
+      >
         {formatINR(amount)}
       </span>
     </div>
   )
 }
 
+function differsFromEstimateRupees(estimated: number, final: number): boolean {
+  return Math.abs(final - estimated) > 1
+}
+
 export function TrackPricingSummary({ pricing }: TrackPricingSummaryProps) {
+  const hasFinal = pricing.finalTotal != null
+  const showEstimateDiff =
+    hasFinal && differsFromEstimateRupees(pricing.estimatedTotal, pricing.finalTotal!)
+
   return (
     <Card className="w-full min-w-0 border-border">
       <CardContent className="flex w-full min-w-0 flex-col gap-3 p-4 sm:p-6">
@@ -49,13 +75,19 @@ export function TrackPricingSummary({ pricing }: TrackPricingSummaryProps) {
           <Row label="Taxable value" amount={pricing.taxableValue} />
           <Row label={`Tax (${pricing.taxPercent}%)`} amount={pricing.taxAmount} />
           <div className="border-t border-border/80 pt-2">
-            <Row label="Estimated total" amount={pricing.estimatedTotal} emphasize />
+            {hasFinal ? (
+              <>
+                <Row label="Final total" amount={pricing.finalTotal!} emphasize />
+                {showEstimateDiff ? (
+                  <div className="mt-1.5">
+                    <Row label="Estimated total" amount={pricing.estimatedTotal} muted />
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <Row label="Estimated total" amount={pricing.estimatedTotal} emphasize />
+            )}
           </div>
-          {pricing.finalTotal != null ? (
-            <div className="border-t border-border/80 pt-2">
-              <Row label="Final total" amount={pricing.finalTotal} emphasize />
-            </div>
-          ) : null}
         </div>
       </CardContent>
     </Card>

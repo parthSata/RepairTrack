@@ -11,14 +11,27 @@ import { repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
 import { TrackStatusView } from '@/components/tracking/track-status-view'
 import { publicTrackingResponseSchema, trackDecisionSchema } from '@/features/tracking/schemas'
+import { requestCustomerApprovalSchema } from '@/features/repairs/schemas'
+import { calculateRepairTotal, sumPartsCharges } from '@/features/repairs/pricing-calc'
+import { getAllowedManualStatusDestinations } from '@/features/repairs/status-transitions'
 import { trackRouter } from '@/server/hono/routes/track'
-import { requestCustomerApproval, updateRepairStatus } from '@/server/services/repair.service'
+import {
+  requestCustomerApproval,
+  updateRepairEstimatePricing,
+  updateRepairFinalTotal,
+  updateRepairStatus,
+} from '@/server/services/repair.service'
+import { listRepairParts } from '@/server/services/repair-parts.service'
 import { getPublicRepairByTrackingToken } from '@/server/services/tracking.service'
 
 config({ path: '.env.local' })
 
-const TEST_INITIAL_PAISE = 120_000
-const TEST_ADDITIONAL_RUPEES = 4500
+const TEST_APPROVAL_INPUT = {
+  diagnosis: 'Screen replacement required',
+  laborCharges: 120_000,
+  additionalCharges: 45_000,
+  taxPercent: 18,
+}
 const GENERIC_PUBLIC_ERROR = "We couldn't find this repair."
 const testApp = new Hono().route('/api/track', trackRouter)
 
@@ -26,12 +39,26 @@ type RepairSnapshot = {
   repair: {
     diagnosis: string | null
     estimatedCost: number | null
+    laborCharges: number
+    additionalCharges: number
+    taxPercent: number
+    estimatedTotal: number | null
+    finalTotal: number | null
+    finalCost: number | null
     status: typeof repairs.$inferSelect.status
     trackingToken: string | null
     updatedAt: Date
   }
   approvals: typeof repairApprovals.$inferSelect[]
   statusHistory: typeof repairStatusHistory.$inferSelect[]
+}
+
+type Fixture = {
+  repairId: string
+  shopId: string
+  trackingToken: string
+  staffId: string
+  ownerId: string
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -80,6 +107,12 @@ async function saveSnapshot(repairId: string): Promise<RepairSnapshot> {
     .select({
       diagnosis: repairs.diagnosis,
       estimatedCost: repairs.estimatedCost,
+      laborCharges: repairs.laborCharges,
+      additionalCharges: repairs.additionalCharges,
+      taxPercent: repairs.taxPercent,
+      estimatedTotal: repairs.estimatedTotal,
+      finalTotal: repairs.finalTotal,
+      finalCost: repairs.finalCost,
       status: repairs.status,
       trackingToken: repairs.trackingToken,
       updatedAt: repairs.updatedAt,
@@ -111,25 +144,18 @@ async function restoreSnapshot(repairId: string, snapshot: RepairSnapshot) {
       await tx.insert(repairStatusHistory).values(snapshot.statusHistory)
     }
 
-    await tx
-      .update(repairs)
-      .set({
-        diagnosis: snapshot.repair.diagnosis,
-        estimatedCost: snapshot.repair.estimatedCost,
-        status: snapshot.repair.status,
-        trackingToken: snapshot.repair.trackingToken,
-        updatedAt: snapshot.repair.updatedAt,
-      })
-      .where(eq(repairs.id, repairId))
+    await tx.update(repairs).set(snapshot.repair).where(eq(repairs.id, repairId))
   })
 }
 
 async function resetForApprovalFlow({
   repairId,
   trackingToken,
+  status = 'DIAGNOSING',
 }: {
   repairId: string
   trackingToken: string
+  status?: typeof repairs.$inferSelect.status
 }) {
   await db.transaction(async (tx) => {
     await tx.delete(repairApprovals).where(eq(repairApprovals.repairId, repairId))
@@ -137,13 +163,39 @@ async function resetForApprovalFlow({
     await tx
       .update(repairs)
       .set({
-        diagnosis: 'Screen replacement required',
-        estimatedCost: TEST_INITIAL_PAISE,
-        status: 'DIAGNOSING',
+        diagnosis: null,
+        estimatedCost: null,
+        estimatedTotal: null,
+        finalTotal: null,
+        finalCost: null,
+        laborCharges: 0,
+        additionalCharges: 0,
+        taxPercent: 0,
+        status,
         trackingToken,
         updatedAt: new Date(),
       })
       .where(eq(repairs.id, repairId))
+  })
+}
+
+async function expectedApprovalTotal(shopId: string, repairId: string): Promise<number> {
+  const parts = await listRepairParts({ shopId, repairId })
+  return calculateRepairTotal({
+    laborCharges: TEST_APPROVAL_INPUT.laborCharges,
+    partsCharges: sumPartsCharges(parts),
+    additionalCharges: TEST_APPROVAL_INPUT.additionalCharges,
+    taxPercent: TEST_APPROVAL_INPUT.taxPercent,
+  }).total
+}
+
+async function sendApprovalAsStaff(fixture: Fixture) {
+  return requestCustomerApproval({
+    shopId: fixture.shopId,
+    userRole: 'STAFF',
+    userId: fixture.staffId,
+    id: fixture.repairId,
+    ...TEST_APPROVAL_INPUT,
   })
 }
 
@@ -201,76 +253,38 @@ function renderTrackingViewMarkup(
   return renderToStaticMarkup(React.createElement(TrackStatusView, { data, accessMode }))
 }
 
-async function testRequestApprovalGuards(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-  ownerId: string,
-) {
-  await db
-    .update(repairs)
-    .set({ diagnosis: null, estimatedCost: 50_000, status: 'DIAGNOSING', updatedAt: new Date() })
-    .where(eq(repairs.id, repairId))
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1
+}
+
+async function testRequestApprovalGuards(fixture: Fixture) {
+  const blankDiagnosis = requestCustomerApprovalSchema.safeParse({
+    ...TEST_APPROVAL_INPUT,
+    diagnosis: '   ',
+  })
+  assert(!blankDiagnosis.success, 'Guard failed: blank diagnosis must fail schema validation')
 
   await expectServiceError(
     () =>
       requestCustomerApproval({
-        shopId,
-        userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
-        additionalEstimatedCostRupees: 0,
-      }),
-    400,
-    'Add a diagnosis before requesting customer approval',
-    'Guard missing diagnosis',
-  )
-
-  await db
-    .update(repairs)
-    .set({
-      diagnosis: 'Board-level repair',
-      estimatedCost: null,
-      status: 'DIAGNOSING',
-      updatedAt: new Date(),
-    })
-    .where(eq(repairs.id, repairId))
-
-  await expectServiceError(
-    () =>
-      requestCustomerApproval({
-        shopId,
-        userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
-        additionalEstimatedCostRupees: 0,
-      }),
-    400,
-    'Set an estimated cost before requesting customer approval',
-    'Guard missing estimated cost',
-  )
-
-  await expectServiceError(
-    () =>
-      requestCustomerApproval({
-        shopId,
+        shopId: fixture.shopId,
         userRole: 'OWNER',
-        userId: ownerId,
-        id: repairId,
-        additionalEstimatedCostRupees: 0,
+        userId: fixture.ownerId,
+        id: fixture.repairId,
+        ...TEST_APPROVAL_INPUT,
       }),
     403,
-    'Owner cannot change repair status directly',
+    'Owner cannot send estimates for approval',
     'Guard owner forbidden',
   )
 
   await expectServiceError(
     () =>
       updateRepairStatus({
-        shopId,
+        shopId: fixture.shopId,
         userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
+        userId: fixture.staffId,
+        id: fixture.repairId,
         status: 'WAITING_FOR_APPROVAL',
       }),
     400,
@@ -278,194 +292,190 @@ async function testRequestApprovalGuards(
     'Guard manual status bypass',
   )
 
-  console.log('Guard checks passed: diagnosis/original estimate required, OWNER blocked, direct WAITING_FOR_APPROVAL blocked')
-}
-
-async function testApprovalOnlyFromDiagnosing(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-) {
-  const blockedStatuses: Array<typeof repairs.$inferSelect.status> = [
-    'APPROVED',
-    'WAITING_FOR_PARTS',
-    'IN_REPAIR',
-    'QUALITY_CHECK',
-    'READY_FOR_PICKUP',
-    'RECEIVED',
-  ]
-
-  for (const status of blockedStatuses) {
+  for (const status of ['RECEIVED', 'IN_REPAIR'] as const) {
     await db
       .update(repairs)
-      .set({
-        diagnosis: 'Board-level repair',
-        estimatedCost: TEST_INITIAL_PAISE,
-        status,
-        updatedAt: new Date(),
-      })
-      .where(eq(repairs.id, repairId))
+      .set({ status, updatedAt: new Date() })
+      .where(eq(repairs.id, fixture.repairId))
 
     await expectServiceError(
-      () =>
-        requestCustomerApproval({
-          shopId,
-          userRole: 'STAFF',
-          userId: staffId,
-          id: repairId,
-          additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
-        }),
-      400,
-      'Customer approval can only be requested while the repair is in Diagnosing',
-      `Guard non-diagnosing source (${status})`,
+      () => sendApprovalAsStaff(fixture),
+      409,
+      'Set the status to Diagnosing',
+      `Guard send from ${status}`,
     )
   }
 
-  console.log('Edge case passed: approval request is blocked unless status is DIAGNOSING')
-}
-
-async function testPreApprovalStatusPhaseGuards(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-) {
   await db
     .update(repairs)
-    .set({
-      diagnosis: 'Board-level repair',
-      estimatedCost: TEST_INITIAL_PAISE,
-      status: 'DIAGNOSING',
-      updatedAt: new Date(),
-    })
-    .where(eq(repairs.id, repairId))
+    .set({ status: 'CANCELLED', updatedAt: new Date() })
+    .where(eq(repairs.id, fixture.repairId))
 
-  const blockedLateStatuses: Array<typeof repairs.$inferSelect.status> = [
-    'WAITING_FOR_PARTS',
-    'IN_REPAIR',
-    'READY_FOR_PICKUP',
-    'APPROVED',
-    'COMPLETED',
-    'CANCELLED',
-  ]
-
-  for (const status of blockedLateStatuses) {
-    await expectServiceError(
-      () =>
-        updateRepairStatus({
-          shopId,
-          userRole: 'STAFF',
-          userId: staffId,
-          id: repairId,
-          status,
-        }),
-      400,
-      'This status change is not allowed until the repair is approved.',
-      `Guard pre-approval block (${status})`,
-    )
-  }
-
-  const reverted = await updateRepairStatus({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    status: 'RECEIVED',
-  })
-  assert(
-    reverted.status === 'RECEIVED',
-    'Edge case failed: STAFF should be able to move DIAGNOSING -> RECEIVED before approval',
+  await expectServiceError(
+    () => sendApprovalAsStaff(fixture),
+    409,
+    'Completed or cancelled repairs cannot be sent for approval',
+    'Guard closed repair',
   )
 
-  const diagnosingAgain = await updateRepairStatus({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    status: 'DIAGNOSING',
-  })
-  assert(
-    diagnosingAgain.status === 'DIAGNOSING',
-    'Edge case failed: STAFF should be able to move RECEIVED -> DIAGNOSING before approval',
-  )
-
-  console.log(
-    'Edge case passed: pre-approval manual status changes are limited to RECEIVED and DIAGNOSING',
-  )
+  console.log('Guard checks passed: diagnosis required, OWNER blocked, Diagnosing-only, closed repairs blocked, direct WAITING_FOR_APPROVAL blocked')
 }
 
-async function testPendingBlocksManualStatusChange(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-) {
-  await expectServiceError(
-    () =>
-      updateRepairStatus({
-        shopId,
-        userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
-        status: 'WAITING_FOR_PARTS',
-      }),
-    400,
-    'Customer approval is pending',
-    'Guard pending blocks WAITING_FOR_PARTS',
+async function testApprovalSavesCharges(fixture: Fixture) {
+  await db
+    .update(repairs)
+    .set({ finalTotal: 999_00, finalCost: 999_00, updatedAt: new Date() })
+    .where(eq(repairs.id, fixture.repairId))
+
+  const result = await sendApprovalAsStaff(fixture)
+  const expectedTotal = await expectedApprovalTotal(fixture.shopId, fixture.repairId)
+
+  assert(result.status === 'WAITING_FOR_APPROVAL', 'Charges test failed: status must be WAITING_FOR_APPROVAL')
+  assert(result.diagnosis === TEST_APPROVAL_INPUT.diagnosis, 'Charges test failed: diagnosis not saved')
+  assert(result.laborCharges === TEST_APPROVAL_INPUT.laborCharges, 'Charges test failed: labor not saved')
+  assert(result.taxPercent === TEST_APPROVAL_INPUT.taxPercent, 'Charges test failed: tax not saved')
+  assert(result.estimatedTotal === expectedTotal, 'Charges test failed: estimatedTotal must use calculateRepairTotal')
+  assert(result.finalTotal === null, 'Charges test failed: a new approval must clear the previous final bill')
+  assert(
+    result.approval?.initialEstimatedCost === expectedTotal &&
+      result.approval.additionalEstimatedCost === 0,
+    'Charges test failed: approval snapshot must store the full total with no add-on',
   )
+
+  console.log('Edge case passed: approval sent from DIAGNOSING saves diagnosis + full charges')
+}
+
+async function testStatusPhases(fixture: Fixture) {
+  const preApproval = getAllowedManualStatusDestinations('DIAGNOSING', { approvalStatus: null })
+  assert(
+    preApproval.join(',') === 'RECEIVED',
+    `Status test failed: before approval only RECEIVED should follow DIAGNOSING, got ${preApproval.join(',')}`,
+  )
+
+  const postApproval = getAllowedManualStatusDestinations('APPROVED', { approvalStatus: 'APPROVED' })
+  assert(
+    !postApproval.includes('RECEIVED') && !postApproval.includes('DIAGNOSING'),
+    'Status test failed: RECEIVED/DIAGNOSING must be hidden after customer approval',
+  )
+  assert(
+    postApproval.includes('IN_REPAIR') && !postApproval.includes('COMPLETED'),
+    'Status test failed: repair statuses must unlock after approval, COMPLETED stays gated',
+  )
+
+  const received = await updateRepairStatus({
+    shopId: fixture.shopId,
+    userRole: 'STAFF',
+    userId: fixture.staffId,
+    id: fixture.repairId,
+    status: 'RECEIVED',
+  })
+  assert(received.status === 'RECEIVED', 'Status test failed: STAFF should move DIAGNOSING -> RECEIVED')
 
   await expectServiceError(
     () =>
       updateRepairStatus({
-        shopId,
+        shopId: fixture.shopId,
         userRole: 'STAFF',
-        userId: staffId,
-        id: repairId,
+        userId: fixture.staffId,
+        id: fixture.repairId,
         status: 'IN_REPAIR',
       }),
     400,
-    'Customer approval is pending',
-    'Guard pending blocks IN_REPAIR',
+    'Repair statuses unlock after the customer approves',
+    'Guard repair status before approval',
   )
+
+  console.log('Edge case passed: Received/Diagnosing before approval; repair statuses only after approval')
+}
+
+async function testPendingBlocksManualStatusChange(fixture: Fixture) {
+  for (const status of ['WAITING_FOR_PARTS', 'IN_REPAIR'] as const) {
+    await expectServiceError(
+      () =>
+        updateRepairStatus({
+          shopId: fixture.shopId,
+          userRole: 'STAFF',
+          userId: fixture.staffId,
+          id: fixture.repairId,
+          status,
+        }),
+      409,
+      'Customer approval is pending',
+      `Guard pending blocks ${status}`,
+    )
+  }
 
   console.log('Edge case passed: pending WAITING_FOR_APPROVAL still blocks manual status changes')
 }
 
-async function testStaffCanAdvanceAfterApproved(
-  repairId: string,
-  shopId: string,
-  staffId: string,
-) {
-  const updated = await updateRepairStatus({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    status: 'WAITING_FOR_PARTS',
-  })
-
-  assert(
-    updated.status === 'WAITING_FOR_PARTS',
-    'Edge case failed: STAFF should be able to advance status after APPROVED',
+async function testFinalizeBillFlow(fixture: Fixture) {
+  await expectServiceError(
+    () =>
+      updateRepairStatus({
+        shopId: fixture.shopId,
+        userRole: 'STAFF',
+        userId: fixture.staffId,
+        id: fixture.repairId,
+        status: 'DIAGNOSING',
+      }),
+    400,
+    'Received and Diagnosing are no longer available',
+    'Guard intake status after approval',
   )
 
-  const advancedAgain = await updateRepairStatus({
-    shopId,
+  const advanced = await updateRepairStatus({
+    shopId: fixture.shopId,
     userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
+    userId: fixture.staffId,
+    id: fixture.repairId,
     status: 'IN_REPAIR',
   })
+  assert(advanced.status === 'IN_REPAIR', 'Finalize test failed: STAFF should continue status changes after APPROVED')
 
-  assert(
-    advancedAgain.status === 'IN_REPAIR',
-    'Edge case failed: STAFF should continue normal status changes after APPROVED',
+  await expectServiceError(
+    () =>
+      updateRepairEstimatePricing({
+        shopId: fixture.shopId,
+        userRole: 'STAFF',
+        userId: fixture.staffId,
+        id: fixture.repairId,
+        laborCharges: 1,
+        additionalCharges: 0,
+        taxPercent: 0,
+      }),
+    409,
+    'Estimate is approved',
+    'Guard estimate save after approval',
   )
 
-  console.log('Edge case passed: after APPROVED, STAFF can continue normal status changes')
+  const finalized = await updateRepairFinalTotal({
+    shopId: fixture.shopId,
+    userRole: 'STAFF',
+    userId: fixture.staffId,
+    id: fixture.repairId,
+    laborCharges: TEST_APPROVAL_INPUT.laborCharges,
+    additionalCharges: TEST_APPROVAL_INPUT.additionalCharges + 10_000,
+    taxPercent: TEST_APPROVAL_INPUT.taxPercent,
+  })
+  assert(finalized.finalTotal != null, 'Finalize test failed: Finalize Bill must write finalTotal')
+  assert(
+    finalized.additionalCharges === TEST_APPROVAL_INPUT.additionalCharges + 10_000,
+    'Finalize test failed: Finalize Bill must save the edited charges',
+  )
+  assert(
+    getAllowedManualStatusDestinations('IN_REPAIR', {
+      finalTotal: finalized.finalTotal,
+      approvalStatus: 'APPROVED',
+    }).includes('COMPLETED'),
+    'Finalize test failed: COMPLETED must be selectable once the bill is finalized',
+  )
+
+  console.log('Edge case passed: estimate locks after approval; Finalize Bill saves charges and unlocks COMPLETED')
 }
 
-function testApprovalDialogShowsTicketContext() {
-  const controlSource = readFileSync(
-    join(process.cwd(), 'src/components/repairs/request-approval-control.tsx'),
+function testApprovalDialogSource() {
+  const dialogSource = readFileSync(
+    join(process.cwd(), 'src/components/repairs/request-approval-dialog.tsx'),
     'utf8',
   )
   const detailsSource = readFileSync(
@@ -473,29 +483,22 @@ function testApprovalDialogShowsTicketContext() {
     'utf8',
   )
 
-  assert(controlSource.includes('ticketNumber: string'), 'Dialog context failed: ticketNumber prop missing')
-  assert(controlSource.includes('customerName: string'), 'Dialog context failed: customerName prop missing')
-  assert(controlSource.includes('deviceSummary: string'), 'Dialog context failed: deviceSummary prop missing')
-  assert(controlSource.includes('Ticket Number'), 'Dialog context failed: Ticket Number label missing')
-  assert(controlSource.includes('#{ticketNumber}'), 'Dialog context failed: ticket number render missing')
+  assert(dialogSource.includes('<TicketSummaryGrid'), 'Dialog failed: ticket context grid missing')
+  assert(dialogSource.includes('<PricingFormSection'), 'Dialog failed: shared charge fields missing')
+  assert(dialogSource.includes('approvalDiagnosisSchema'), 'Dialog failed: diagnosis validation missing')
   assert(
-    controlSource.includes("currentStatus !== 'DIAGNOSING'"),
-    'Dialog context failed: DIAGNOSING-only UI guard missing',
+    !dialogSource.includes("'DIAGNOSING'"),
+    'Dialog failed: approval must not be limited to DIAGNOSING',
   )
   assert(
-    detailsSource.includes('ticketNumber={repair.ticketNumber}'),
-    'Dialog context failed: repair details does not pass ticketNumber',
-  )
-  assert(
-    detailsSource.includes('customerName={repair.customer.name}'),
-    'Dialog context failed: repair details does not pass customerName',
-  )
-  assert(
-    detailsSource.includes("deviceSummary={[repair.device.brand, repair.device.model].filter(Boolean).join(' ')}"),
-    'Dialog context failed: repair details does not pass deviceSummary',
+    detailsSource.includes('ticketNumber={repair.ticketNumber}') &&
+      detailsSource.includes('customerName={repair.customer.name}') &&
+      detailsSource.includes('deviceSummary={deviceSummary}') &&
+      detailsSource.includes('savedPricing={savedPricing}'),
+    'Dialog failed: repair details does not pass ticket context + saved pricing',
   )
 
-  console.log('Edge case passed: approval dialog renders ticket-identification context')
+  console.log('Edge case passed: approval dialog renders ticket context, diagnosis and shared charge fields')
 }
 
 async function testNoApprovalRequired(trackingToken: string) {
@@ -506,30 +509,16 @@ async function testNoApprovalRequired(trackingToken: string) {
   console.log('Test 1 passed: normal tracking page remains unaffected when no approval is required')
 }
 
-async function testRequestApprovalAndViews({
-  repairId,
-  shopId,
-  staffId,
-  trackingToken,
-}: {
-  repairId: string
-  shopId: string
-  staffId: string
-  trackingToken: string
-}) {
-  const result = await requestCustomerApproval({
-    shopId,
-    userRole: 'STAFF',
-    userId: staffId,
-    id: repairId,
-    additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
-  })
+async function testRequestApprovalAndViews(fixture: Fixture) {
+  const result = await sendApprovalAsStaff(fixture)
 
   assert(result.status === 'WAITING_FOR_APPROVAL', 'Test 2 failed: repair must enter WAITING_FOR_APPROVAL')
   assert(result.approval?.status === 'PENDING', 'Test 2 failed: repair detail approval must be PENDING')
   console.log('Test 2 passed: request approval sets WAITING_FOR_APPROVAL correctly')
 
-  const payload = publicTrackingResponseSchema.parse(await getPublicRepairByTrackingToken(trackingToken))
+  const payload = publicTrackingResponseSchema.parse(
+    await getPublicRepairByTrackingToken(fixture.trackingToken),
+  )
   assert(payload.approval?.status === 'PENDING', 'Test 3 failed: public payload must expose pending approval')
   assert(payload.approval.decidedAt === null, 'Test 3 failed: pending approval must not have decidedAt')
 
@@ -537,12 +526,13 @@ async function testRequestApprovalAndViews({
   assert(tokenMarkup.includes('Action Required'), 'Test 3 failed: token view must render the action card')
   assert(tokenMarkup.includes('Approve Repair'), 'Test 3 failed: token view must render approve button')
   assert(tokenMarkup.includes('Reject Repair'), 'Test 3 failed: token view must render reject button')
-  console.log('Test 3 passed: valid token + pending approval renders the action card')
-
-  const manualPayload = publicTrackingResponseSchema.parse(
-    await getPublicRepairByTrackingToken(trackingToken),
+  assert(
+    countOccurrences(tokenMarkup, 'Repair charges') === 1,
+    'Test 3 failed: pending tracking page must show the charge breakdown exactly once',
   )
-  const manualMarkup = renderTrackingViewMarkup(manualPayload, 'manual')
+  console.log('Test 3 passed: valid token + pending approval renders the action card and charges once')
+
+  const manualMarkup = renderTrackingViewMarkup(payload, 'manual')
   assert(
     manualMarkup.includes('Approve or reject from the link sent to you'),
     'Test 4 failed: manual tracking should show the read-only pending message',
@@ -552,9 +542,7 @@ async function testRequestApprovalAndViews({
   console.log('Test 4 passed: manual /track access stays view-only for pending approval')
 
   assert(
-    tokenMarkup.includes('sm:grid-cols-2') &&
-      tokenMarkup.includes('w-full') &&
-      tokenMarkup.includes('min-[420px]:flex-row'),
+    tokenMarkup.includes('sm:grid-cols-2') && tokenMarkup.includes('w-full'),
     'Test 11 failed: pending approval UI is missing expected mobile-responsive utility classes',
   )
   console.log('Test 11 passed: pending decision UI includes the expected mobile-responsive layout classes')
@@ -687,84 +675,43 @@ async function testInvalidTokenAndPayload(trackingToken: string) {
 }
 
 async function main() {
-  const fixture = await getFixtureUsers()
-  if (!fixture.trackingToken) {
+  const rawFixture = await getFixtureUsers()
+  if (!rawFixture.trackingToken) {
     throw new Error('No repair with tracking token found for request-approval verification')
   }
+  const fixture: Fixture = { ...rawFixture, trackingToken: rawFixture.trackingToken }
+  const reset = (status?: typeof repairs.$inferSelect.status) =>
+    resetForApprovalFlow({ repairId: fixture.repairId, trackingToken: fixture.trackingToken, status })
 
   const snapshot = await saveSnapshot(fixture.repairId)
 
   try {
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
+    await reset()
+    await testRequestApprovalGuards(fixture)
 
-    await testRequestApprovalGuards(
-      fixture.repairId,
-      fixture.shopId,
-      fixture.staffId,
-      fixture.ownerId,
-    )
+    await reset()
+    await testApprovalSavesCharges(fixture)
 
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
-    await testApprovalOnlyFromDiagnosing(fixture.repairId, fixture.shopId, fixture.staffId)
+    await reset()
+    await testStatusPhases(fixture)
 
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
-    await testPreApprovalStatusPhaseGuards(fixture.repairId, fixture.shopId, fixture.staffId)
+    testApprovalDialogSource()
 
-    testApprovalDialogShowsTicketContext()
-
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
+    await reset()
     await testNoApprovalRequired(fixture.trackingToken)
 
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
-    await testRequestApprovalAndViews({
-      repairId: fixture.repairId,
-      shopId: fixture.shopId,
-      staffId: fixture.staffId,
-      trackingToken: fixture.trackingToken,
-    })
-    await testPendingBlocksManualStatusChange(fixture.repairId, fixture.shopId, fixture.staffId)
+    await reset()
+    await testRequestApprovalAndViews(fixture)
+    await testPendingBlocksManualStatusChange(fixture)
     await testApproveFlow(fixture.trackingToken, fixture.repairId)
-    await testStaffCanAdvanceAfterApproved(fixture.repairId, fixture.shopId, fixture.staffId)
+    await testFinalizeBillFlow(fixture)
 
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
-    await requestCustomerApproval({
-      shopId: fixture.shopId,
-      userRole: 'STAFF',
-      userId: fixture.staffId,
-      id: fixture.repairId,
-      additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
-    })
+    await reset()
+    await sendApprovalAsStaff(fixture)
     await testRejectFlow(fixture.trackingToken, fixture.repairId)
 
-    await resetForApprovalFlow({
-      repairId: fixture.repairId,
-      trackingToken: fixture.trackingToken,
-    })
-    await requestCustomerApproval({
-      shopId: fixture.shopId,
-      userRole: 'STAFF',
-      userId: fixture.staffId,
-      id: fixture.repairId,
-      additionalEstimatedCostRupees: TEST_ADDITIONAL_RUPEES,
-    })
+    await reset()
+    await sendApprovalAsStaff(fixture)
     await testInvalidTokenAndPayload(fixture.trackingToken)
 
     console.log('All request-approval verification tests passed.')

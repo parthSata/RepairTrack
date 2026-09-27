@@ -23,10 +23,14 @@ import {
 } from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { useReopenRepair } from '@/features/repairs/mutations'
+import { TicketSummaryGrid } from '@/components/repairs/ticket-summary-grid'
 import {
   getAllowedManualStatusDestinations,
   getManualStatusTransitionError,
+  isCompletedAwaitingFinalBill,
+  isCustomerApproved,
 } from '@/features/repairs/status-transitions'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
@@ -39,6 +43,8 @@ interface StatusChangeControlProps {
   customerName: string
   deviceSummary: string
   assignedTechnicianId?: string | null
+  finalTotal?: number | null
+  approvalStatus?: string | null
   onStatusUpdated?: () => void
 }
 
@@ -63,6 +69,8 @@ export function StatusChangeControl({
   customerName,
   deviceSummary,
   assignedTechnicianId,
+  finalTotal = null,
+  approvalStatus = null,
   onStatusUpdated,
 }: StatusChangeControlProps) {
   const { data: session } = useSession()
@@ -98,13 +106,26 @@ export function StatusChangeControl({
   const isManualApprovalTransition =
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
-  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus)
+  const transitionOptions = { finalTotal, approvalStatus }
+  const isApproved = isCustomerApproved(approvalStatus)
+  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, transitionOptions)
+  const showCompletedLockedHint = isCompletedAwaitingFinalBill(currentStatus, transitionOptions)
+  const statusOptions = [
+    currentStatus,
+    ...selectableStatuses,
+    ...(showCompletedLockedHint ? ['COMPLETED'] : []),
+  ]
 
   const handleStatusSelect = (newStatus: string) => {
     setSelectedStatus(newStatus)
     setValidationError(null)
+    if (newStatus === currentStatus) return
 
-    const transitionError = getManualStatusTransitionError(currentStatus, newStatus)
+    const transitionError = getManualStatusTransitionError(
+      currentStatus,
+      newStatus,
+      transitionOptions,
+    )
     if (transitionError) {
       setValidationError(transitionError)
     }
@@ -120,14 +141,13 @@ export function StatusChangeControl({
       return
     }
 
-    const transitionError = getManualStatusTransitionError(currentStatus, selectedStatus)
+    const transitionError = getManualStatusTransitionError(
+      currentStatus,
+      selectedStatus,
+      transitionOptions,
+    )
     if (transitionError) {
       setValidationError(transitionError)
-      return
-    }
-
-    if (isManualApprovalTransition) {
-      setValidationError('Use Request Customer Approval to send an estimate for approval.')
       return
     }
 
@@ -137,15 +157,7 @@ export function StatusChangeControl({
       toast.success(`Repair status updated to ${getRepairStatusLabel(selectedStatus)}`)
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
-      const errorObj = err as {
-        response?: { data?: { message?: string; error?: { message?: string } } }
-        message?: string
-      }
-      const msg =
-        errorObj?.response?.data?.message ||
-        errorObj?.response?.data?.error?.message ||
-        errorObj?.message ||
-        'Failed to update status'
+      const msg = getApiErrorMessage(err, 'Failed to update status')
       setValidationError(msg)
       toast.error(msg)
     } finally {
@@ -192,16 +204,9 @@ export function StatusChangeControl({
       setReopenReason('')
       if (onStatusUpdated) onStatusUpdated()
     } catch (err: unknown) {
-      const errorObj = err as {
-        response?: { data?: { message?: string; error?: { message?: string } } }
-        message?: string
-      }
-      const msg =
-        errorObj?.response?.data?.message ||
-        errorObj?.response?.data?.error?.message ||
-        errorObj?.message ||
-        'Failed to update repair ticket'
+      const msg = getApiErrorMessage(err, 'Failed to update repair ticket')
       setValidationError(msg)
+      toast.error(msg)
     }
   }
 
@@ -260,11 +265,17 @@ export function StatusChangeControl({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                {selectableStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {getRepairStatusLabel(status)}
-                  </SelectItem>
-                ))}
+                {statusOptions.map((status) => {
+                  const isCompletedLocked =
+                    status === 'COMPLETED' && showCompletedLockedHint
+                  return (
+                    <SelectItem key={status} value={status} disabled={isCompletedLocked}>
+                      {isCompletedLocked
+                        ? `${getRepairStatusLabel(status)} (finalize bill first)`
+                        : getRepairStatusLabel(status)}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
 
@@ -272,13 +283,25 @@ export function StatusChangeControl({
               type="button"
               variant="accent"
               onClick={handleUpdate}
-              disabled={isUpdating || selectedStatus === currentStatus || isManualApprovalTransition}
+              disabled={
+                isUpdating ||
+                selectedStatus === currentStatus ||
+                isManualApprovalTransition ||
+                (selectedStatus === 'COMPLETED' && showCompletedLockedHint)
+              }
               className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-34"
             >
               {isUpdating ? 'Updating…' : 'Update'}
             </Button>
           </div>
         </div>
+
+        {!isApproved && (
+          <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Repair statuses unlock after the customer approves the estimate.</span>
+          </p>
+        )}
 
         {validationError && (
           <div className="flex items-center gap-1.5 text-xs font-medium text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -344,34 +367,12 @@ export function StatusChangeControl({
           </AlertDialogHeader>
 
           <div className="space-y-5">
-            <div className="grid gap-4 rounded-xl border border-border bg-muted/20 p-5 sm:grid-cols-2 sm:p-6">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Ticket Number
-                </Label>
-                <p className="text-sm font-semibold text-foreground">#{ticketNumber}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Current Status
-                </Label>
-                <p className="text-sm font-semibold text-foreground">
-                  {getRepairStatusLabel(currentStatus)}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Customer
-                </Label>
-                <p className="text-sm text-foreground">{customerName}</p>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Device
-                </Label>
-                <p className="text-sm text-foreground">{deviceSummary}</p>
-              </div>
-            </div>
+            <TicketSummaryGrid
+              ticketNumber={ticketNumber}
+              statusLabel={getRepairStatusLabel(currentStatus)}
+              customerName={customerName}
+              deviceSummary={deviceSummary}
+            />
 
             <div className="space-y-2">
               <Label

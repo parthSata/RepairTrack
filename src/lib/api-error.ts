@@ -1,3 +1,9 @@
+export function getApiErrorStatus(err: unknown): number | null {
+  if (!err || typeof err !== 'object' || !('response' in err)) return null
+  const status = (err as { response?: { status?: unknown } }).response?.status
+  return typeof status === 'number' ? status : null
+}
+
 export function getApiErrorMessage(err: unknown, fallback: string): string {
   if (!err || typeof err !== 'object' || !('response' in err)) {
     return fallback

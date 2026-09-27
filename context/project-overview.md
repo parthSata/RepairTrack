@@ -184,8 +184,10 @@ requirement.
 1. **Pre-approval** (`RECEIVED`, `DIAGNOSING`): only `RECEIVED` and
    `DIAGNOSING` may be set manually. `APPROVED` is never set by staff —
    it comes only from the customer approval decision. Request Customer
-   Approval remains DIAGNOSING-only and is the only path into
-   `WAITING_FOR_APPROVAL`.
+   Approval is available only while the status is `DIAGNOSING` and is the
+   only path into `WAITING_FOR_APPROVAL`. The phase is
+   decided by the latest `repair_approvals.status` (`APPROVED` = post-approval),
+   so reopened/restored tickets land in the correct phase.
 2. **Pending approval** (`WAITING_FOR_APPROVAL`): locked until the
    customer responds.
 3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed

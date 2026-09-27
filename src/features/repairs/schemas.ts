@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { repairPricingFieldsSchema } from '@/features/repairs/pricing-schemas'
 
 export const repairPriorityValues = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
 export type RepairPriority = (typeof repairPriorityValues)[number]
@@ -96,11 +97,15 @@ export const updateEstimatedCostSchema = z.object({
 
 export type UpdateEstimatedCostInput = z.infer<typeof updateEstimatedCostSchema>
 
-export const requestCustomerApprovalSchema = z.object({
-  additionalEstimatedCost: z
-    .number()
-    .min(0, { message: 'Additional estimated cost cannot be negative' })
-    .max(1000000, { message: 'Estimated cost cannot exceed ₹1,000,000' }),
+export const approvalDiagnosisSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'Diagnosis is required' })
+  .max(2000, { message: 'Diagnosis cannot exceed 2000 characters' })
+
+/** Request Approval dialog payload: diagnosis + the same pricing fields as the estimate panel. */
+export const requestCustomerApprovalSchema = repairPricingFieldsSchema.extend({
+  diagnosis: approvalDiagnosisSchema,
 })
 
 export type RequestCustomerApprovalInput = z.infer<typeof requestCustomerApprovalSchema>

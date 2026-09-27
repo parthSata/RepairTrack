@@ -34,6 +34,7 @@ export function TrackApprovalSummaryCard({
 }: TrackApprovalSummaryCardProps) {
   const isPending = approval.status === 'PENDING'
   const isApproved = approval.status === 'APPROVED'
+  const isRejected = approval.status === 'REJECTED'
   const decisionTimestamp = formatDecisionTimestamp(approval.decidedAt)
 
   return (
@@ -55,7 +56,7 @@ export function TrackApprovalSummaryCard({
           </p>
           <p className="mt-1 text-sm leading-relaxed text-amber-50/95">
             {isPending
-              ? 'Our technician inspected your device. Please review the diagnosis and estimate before the shop continues.'
+              ? 'Our technician inspected your device. Review the diagnosis here and the repair charges below.'
               : isApproved
                 ? `You approved this repair${decisionTimestamp ? ` on ${decisionTimestamp}` : ''}.`
                 : `You declined this repair${decisionTimestamp ? ` on ${decisionTimestamp}` : ''}.`}
@@ -66,9 +67,7 @@ export function TrackApprovalSummaryCard({
           <ApprovalEstimateBreakdown
             variant="prominent"
             diagnosis={approval.diagnosis}
-            initialEstimateRupees={approval.initialEstimate}
-            additionalCostRupees={approval.additionalCost}
-            revisedTotalRupees={approval.revisedTotal}
+            showCosts={false}
           />
 
           {isPending ? (
@@ -91,29 +90,14 @@ export function TrackApprovalSummaryCard({
                 estimate in read-only mode.
               </div>
             )
-          ) : (
-            <div
-              className={`rounded-xl border p-4 text-sm ${
-                isApproved
-                  ? 'border-emerald-300 bg-emerald-50/70 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-100'
-                  : 'border-rose-300 bg-rose-50/70 text-rose-900 dark:border-rose-800 dark:bg-rose-950/20 dark:text-rose-100'
-              }`}
-            >
-              <p className="font-semibold">
-                {isApproved ? 'Repair approved' : 'Repair not approved'}
-              </p>
-              <p className="mt-1">
-                {decisionTimestamp ? `Decision recorded on ${decisionTimestamp}.` : 'Decision recorded.'}
-              </p>
-              {!isApproved && approval.rejectionReason ? (
+          ) : isRejected ? (
+            <div className="rounded-xl border border-rose-300 bg-rose-50/70 p-4 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950/20 dark:text-rose-100">
+              <p className="font-semibold">Repair not approved</p>
+              {approval.rejectionReason ? (
                 <p className="mt-2 text-sm">Reason: {approval.rejectionReason}</p>
               ) : null}
             </div>
-          )}
-
-          <p className="text-center text-xs text-muted-foreground">
-            All amounts are shown in Indian Rupees (Rs).
-          </p>
+          ) : null}
         </CardContent>
       </Card>
     </section>

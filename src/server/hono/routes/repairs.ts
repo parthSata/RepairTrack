@@ -17,6 +17,7 @@ import {
   updateEstimatedCost,
   updateExpectedCompletionDate,
   updateRepairEstimatePricing,
+  updateRepairFinalTotal,
   updateRepairStatus,
 } from '@/server/services/repair.service'
 import {
@@ -31,6 +32,7 @@ import {
   addRepairPartSchema,
   createRepairSchema,
   reopenRepairSchema,
+  requestCustomerApprovalSchema,
   updateEstimatedCostSchema,
   updateExpectedCompletionDateSchema,
   updateRepairPartSchema,
@@ -153,23 +155,18 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/request-approval',
-    zValidator(
-      'json',
-      z.object({
-        additionalEstimatedCost: z.number().min(0).max(1_000_000),
-      }),
-    ),
+    zValidator('json', requestCustomerApprovalSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
       const id = c.req.param('id')
-      const { additionalEstimatedCost } = c.req.valid('json')
+      const body = c.req.valid('json')
 
       const repair = await requestCustomerApproval({
         shopId,
         userRole,
         userId,
         id,
-        additionalEstimatedCostRupees: additionalEstimatedCost,
+        ...body,
       })
       return c.json(repair)
     },
@@ -266,6 +263,24 @@ export const repairsRouter = new Hono()
       const body = c.req.valid('json')
 
       const updated = await updateRepairEstimatePricing({
+        shopId,
+        userRole,
+        userId,
+        id,
+        ...body,
+      })
+      return c.json(updated)
+    },
+  )
+  .patch(
+    '/:id/final-total',
+    zValidator('json', repairPricingFieldsSchema),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const id = c.req.param('id')
+      const body = c.req.valid('json')
+
+      const updated = await updateRepairFinalTotal({
         shopId,
         userRole,
         userId,
