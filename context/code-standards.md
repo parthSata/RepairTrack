@@ -393,6 +393,7 @@ Also confirm:
 - No broken imports
 - No unnecessary dependencies
 - No unrelated files modified
+- Changed code meets the §26 quality bar
 
 ---
 
@@ -419,3 +420,27 @@ smallest thing that works.
   logic in services, not UI.
 - Don't refactor code you were not asked to change.
 - If a task can be done in 50 lines or 300, do the 50.
+
+---
+
+# 26. Quality Bar for Every Change
+
+Every change must leave the code it touches better, not just working.
+
+- **Quality:** clear names, no magic numbers or strings (named constants),
+  explicit return types on exported functions, no `any`, no dead code.
+- **Reusability:** search first (§19). Reuse existing helpers, types and
+  components; extract a shared helper on the third repetition (§25), and
+  put it in the owning layer (`src/lib`, `src/features/<x>`, `src/server/...`).
+- **Low complexity:** small single-purpose functions, early returns over
+  nested `if`s, max ~3 levels of nesting, no clever one-liners. Components
+  stay under ~150 lines; split when they grow past it.
+- **Error handling:** fail fast on invalid state. Server code throws
+  `HTTPException` with the correct status (400/403/404/409) and a
+  user-safe message; never swallow errors or return silent `null` for
+  "not found" in a mutation path. Client code surfaces errors via
+  `getApiErrorMessage` + toast or `FieldError`; every mutation has an
+  error path. Database / unknown errors are never shown raw (§16).
+- **Scope guard:** improve only code inside the task's files. Problems
+  spotted elsewhere are reported (or added to Known Issues), not fixed —
+  §22 and §25 still apply.

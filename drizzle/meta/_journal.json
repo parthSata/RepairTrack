@@ -162,6 +162,13 @@
       "when": 1790405430355,
       "tag": "0022_vengeful_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790564292252,
+      "tag": "0023_fine_franklin_richards",
+      "breakpoints": true
     }
   ]
 }
