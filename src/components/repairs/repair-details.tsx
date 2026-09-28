@@ -62,10 +62,11 @@ import { TechnicianCombobox } from './technician-combobox'
 import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
 import { EstimatePricingPanel } from './estimate-pricing-panel'
-import { getPricingPanelMode } from '@/features/repairs/pricing-rules'
+import { RepairInvoiceAction } from './repair-invoice-action'
+import { getPricingPanelMode, PRICING_MESSAGES } from '@/features/repairs/pricing-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
-import { useRepair, useTechnicians } from '@/features/repairs/queries'
+import { getIssuedInvoice, useRepair, useTechnicians } from '@/features/repairs/queries'
 import {
   useAddRepairNote,
   useReassignTechnician,
@@ -159,11 +160,13 @@ export function RepairDetails({ id }: { id: string }) {
   const canEditExpectedDate = canEditDiagnosisAndNotes
   const todayDateMin = formatDateInputValue()
   const approvalStatus = repair.approval?.status ?? null
+  const hasIssuedInvoice = getIssuedInvoice(repair) != null
   const pricingPanelMode = getPricingPanelMode({
     userRole,
     status: repair.status,
     approvalStatus,
     hasEstimate: repair.estimatedTotal != null,
+    hasIssuedInvoice,
   })
   const deviceSummary = [repair.device.brand, repair.device.model].filter(Boolean).join(' ')
   const savedPricing = {
@@ -305,6 +308,7 @@ export function RepairDetails({ id }: { id: string }) {
                 savedPricing={savedPricing}
                 estimatedTotal={repair.estimatedTotal ?? null}
                 intakeEstimatedCost={repair.estimatedCost}
+                hasIssuedInvoice={hasIssuedInvoice}
                 onRequested={() => refetch()}
               />
             </div>
@@ -614,6 +618,7 @@ export function RepairDetails({ id }: { id: string }) {
         repairId={id}
         parts={repair.parts ?? []}
         canEdit={canRecordParts}
+        lockedReason={hasIssuedInvoice ? PRICING_MESSAGES.invoiceIssued : null}
       />
 
       {pricingPanelMode !== 'hidden' ? (
@@ -626,8 +631,16 @@ export function RepairDetails({ id }: { id: string }) {
           {...savedPricing}
           estimatedTotal={repair.estimatedTotal ?? null}
           finalTotal={repair.finalTotal ?? null}
+          isInvoiced={hasIssuedInvoice}
         />
       ) : null}
+
+      <RepairInvoiceAction
+        repairId={id}
+        userRole={userRole}
+        finalTotal={repair.finalTotal ?? null}
+        invoices={repair.invoices ?? []}
+      />
 
       {/* Repair Notes Section (Append-only) */}
       <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">

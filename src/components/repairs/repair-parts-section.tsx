@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Boxes, Plus, Trash2 } from 'lucide-react'
+import { Boxes, Lock, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Part } from '@/features/inventory/queries'
 import { useAddRepairPart, useRemoveRepairPart } from '@/features/repairs/mutations'
@@ -18,9 +18,17 @@ interface RepairPartsSectionProps {
   repairId: string
   parts: RepairPartLine[]
   canEdit: boolean
+  /** When set, parts are frozen (e.g. an invoice is issued) and this explains why. */
+  lockedReason?: string | null
 }
 
-export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSectionProps) {
+export function RepairPartsSection({
+  repairId,
+  parts,
+  canEdit,
+  lockedReason = null,
+}: RepairPartsSectionProps) {
+  const isEditable = canEdit && !lockedReason
   const [selectedPart, setSelectedPart] = React.useState<Part | null>(null)
   const [quantity, setQuantity] = React.useState('1')
   const [qtyError, setQtyError] = React.useState<string | undefined>()
@@ -68,7 +76,14 @@ export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSect
           <h3 className="text-base font-semibold tracking-tight text-foreground">Parts used</h3>
         </div>
 
-        {canEdit ? (
+        {canEdit && lockedReason ? (
+          <p className="flex items-start gap-1.5 rounded-xl border border-border/70 bg-muted/15 p-3 text-xs text-muted-foreground">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>{lockedReason}</span>
+          </p>
+        ) : null}
+
+        {isEditable ? (
           <form
             onSubmit={handleAdd}
             className="space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3"
@@ -133,7 +148,7 @@ export function RepairPartsSection({ repairId, parts, canEdit }: RepairPartsSect
                     Qty {line.quantity} · {formatRupees(line.unitSellingPrice)} each
                   </p>
                 </div>
-                {canEdit ? (
+                {isEditable ? (
                   <Button
                     type="button"
                     variant="ghost"

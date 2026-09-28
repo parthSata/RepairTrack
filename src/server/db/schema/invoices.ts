@@ -1,8 +1,10 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex } from 'drizzle-orm/pg-core'
+import { relations, sql } from 'drizzle-orm'
 import { shops, users } from './users'
 import { customers } from './customers'
 import { repairs } from './repairs'
+
+export const invoiceStatusEnum = pgEnum('invoice_status', ['ISSUED', 'CANCELLED'])
 
 export const invoices = pgTable(
   'invoices',
@@ -13,25 +15,32 @@ export const invoices = pgTable(
       .references(() => shops.id, { onDelete: 'cascade' }),
     repairId: text('repair_id')
       .notNull()
-      .unique()
       .references(() => repairs.id, { onDelete: 'restrict' }),
     customerId: text('customer_id')
       .notNull()
       .references(() => customers.id, { onDelete: 'restrict' }),
     invoiceNumber: text('invoice_number').notNull(),
+    status: invoiceStatusEnum('status').default('ISSUED').notNull(),
     laborCharges: integer('labor_charges').default(0).notNull(),
     partsCharges: integer('parts_charges').default(0).notNull(),
     additionalCharges: integer('additional_charges').default(0).notNull(),
     taxPercent: integer('tax_percent').default(0).notNull(),
     taxAmount: integer('tax_amount').default(0).notNull(),
     total: integer('total').default(0).notNull(),
+    cancellationReason: text('cancellation_reason'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelledBy: text('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('invoices_shop_id_idx').on(table.shopId),
+    index('invoices_repair_id_idx').on(table.repairId),
     uniqueIndex('invoices_shop_id_invoice_number_uidx').on(table.shopId, table.invoiceNumber),
+    uniqueIndex('invoices_one_issued_per_repair_uidx')
+      .on(table.repairId)
+      .where(sql`${table.status} = 'ISSUED'`),
   ],
 )
 
@@ -60,6 +69,7 @@ export const invoicesRelations = relations(invoices, ({ one, many }) => ({
   repair: one(repairs, { fields: [invoices.repairId], references: [repairs.id] }),
   customer: one(customers, { fields: [invoices.customerId], references: [customers.id] }),
   creator: one(users, { fields: [invoices.createdBy], references: [users.id] }),
+  canceller: one(users, { fields: [invoices.cancelledBy], references: [users.id] }),
   items: many(invoiceItems),
 }))
 

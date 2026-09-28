@@ -453,6 +453,18 @@ Users can:
 - View invoice status
 - Record payment information
 
+### Invoice lock and cancel & reissue
+
+- An invoice is generated only from a confirmed final bill and is a snapshot of it.
+- Invoice statuses: **Issued** and **Cancelled**. At most one Issued invoice per repair.
+- While a repair has an Issued invoice, its charges and parts are locked (no estimate edits,
+  Finalize Bill, approval requests, or part changes). Server returns 409 with the reason.
+- To change the bill, OWNER/STAFF use **Cancel Invoice** (reason required). The cancelled invoice
+  stays on record, and its number is never reused. Then Finalize Bill → **Generate New Invoice**
+  (next number).
+- Reopened repair: the Issued invoice stays valid if nothing changes. If new work is billed,
+  cancel the invoice, finalize the bill again and generate a new invoice.
+
 ---
 
 ## Payment Management

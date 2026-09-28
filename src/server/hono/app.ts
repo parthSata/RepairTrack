@@ -10,6 +10,7 @@ import { staffRouter } from '@/server/hono/routes/staff'
 import { invitationsRouter } from '@/server/hono/routes/invitations'
 import { trackRouter } from '@/server/hono/routes/track'
 import { inventoryRouter } from '@/server/hono/routes/inventory'
+import { invoicesRouter } from '@/server/hono/routes/invoices'
 
 export const app = new Hono()
 	.get('/api/health', (context) => context.json({ status: 'ok' }))
@@ -24,6 +25,7 @@ export const app = new Hono()
 	.route('/api/staff', staffRouter)
 	.route('/api/invitations', invitationsRouter)
 	.route('/api/inventory', inventoryRouter)
+	.route('/api/invoices', invoicesRouter)
 
 
 

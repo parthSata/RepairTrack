@@ -22,3 +22,4 @@ if (process.env.NODE_ENV !== 'production') {
 export const db = drizzle(connection, { schema })
 
 export type TxClient = Parameters<Parameters<typeof db.transaction>[0]>[0]
+export type DbClient = typeof db | TxClient

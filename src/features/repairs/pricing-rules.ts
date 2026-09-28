@@ -37,6 +37,8 @@ export const PRICING_MESSAGES = {
     'The customer already approved this estimate. Use Finalize Bill to change charges.',
   technicianAfterApproval:
     'The customer already approved this estimate. Staff or owner can change it now.',
+  invoiceIssued:
+    'An invoice has been issued for this repair. Cancel the invoice to change charges or parts.',
 } as const
 
 const CLOSED_STATUSES = new Set(['COMPLETED', 'CANCELLED'])
@@ -59,14 +61,16 @@ export function getPricingPanelMode({
   status,
   approvalStatus,
   hasEstimate,
+  hasIssuedInvoice = false,
 }: {
   userRole: string
   status: string
   approvalStatus: ApprovalStatus | null | undefined
   hasEstimate: boolean
+  hasIssuedInvoice?: boolean
 }): PricingPanelMode {
   if (isShopManager(userRole)) {
-    if (status === 'COMPLETED') return hasEstimate ? 'view' : 'hidden'
+    if (status === 'COMPLETED' || hasIssuedInvoice) return hasEstimate ? 'view' : 'hidden'
     return approvalStatus === 'APPROVED' ? 'finalize' : 'editEstimate'
   }
   return hasEstimate ? 'view' : 'hidden'
@@ -77,14 +81,17 @@ export function getEstimateEditViolation({
   userRole,
   status,
   approvalStatus,
+  hasIssuedInvoice = false,
 }: {
   userRole: string
   status: string
   approvalStatus: ApprovalStatus | null | undefined
+  hasIssuedInvoice?: boolean
 }): PricingRuleViolation | null {
   if (userRole === 'TECHNICIAN') return forbidden(PRICING_MESSAGES.technicianUseApproval)
   if (!isShopManager(userRole)) return forbidden(PRICING_MESSAGES.estimateForbidden)
   if (status === 'COMPLETED') return conflict(PRICING_MESSAGES.completedLocked)
+  if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
   if (approvalStatus === 'APPROVED') return conflict(PRICING_MESSAGES.estimateApproved)
   return null
 }
@@ -94,13 +101,16 @@ export function getFinalizeBillViolation({
   userRole,
   status,
   approvalStatus,
+  hasIssuedInvoice = false,
 }: {
   userRole: string
   status: string
   approvalStatus: ApprovalStatus | null | undefined
+  hasIssuedInvoice?: boolean
 }): PricingRuleViolation | null {
   if (!isShopManager(userRole)) return forbidden(PRICING_MESSAGES.finalizeForbidden)
   if (status === 'COMPLETED') return conflict(PRICING_MESSAGES.completedLocked)
+  if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
   if (approvalStatus !== 'APPROVED') return conflict(PRICING_MESSAGES.finalizeNeedsApproval)
   return null
 }
@@ -116,12 +126,14 @@ export function getSendApprovalViolation({
   assignedTechnicianId,
   status,
   approvalStatus,
+  hasIssuedInvoice = false,
 }: {
   userRole: string
   userId: string | null | undefined
   assignedTechnicianId: string | null | undefined
   status: string
   approvalStatus: ApprovalStatus | null | undefined
+  hasIssuedInvoice?: boolean
 }): PricingRuleViolation | null {
   if (userRole === 'OWNER') return forbidden(PRICING_MESSAGES.approvalOwnerForbidden)
   if (userRole === 'TECHNICIAN' && assignedTechnicianId !== userId) {
@@ -131,6 +143,7 @@ export function getSendApprovalViolation({
     return forbidden(PRICING_MESSAGES.approvalForbidden)
   }
   if (CLOSED_STATUSES.has(status)) return conflict(PRICING_MESSAGES.approvalClosed)
+  if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
   if (approvalStatus === 'PENDING') return conflict(PRICING_MESSAGES.approvalPending)
   if (userRole === 'TECHNICIAN' && approvalStatus === 'APPROVED') {
     return conflict(PRICING_MESSAGES.technicianAfterApproval)
