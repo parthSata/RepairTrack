@@ -20,6 +20,7 @@ export function useCreateInvoice(repairId: string) {
     },
     onSuccess: (invoice) => {
       void queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      void queryClient.invalidateQueries({ queryKey: invoiceKeys.lists() })
       toast.success(`Invoice ${invoice.invoiceNumber} generated`, {
         action: {
           label: 'View invoice',
@@ -57,6 +58,7 @@ export function useCancelInvoice(invoiceId: string) {
     onSuccess: (invoice) => {
       void queryClient.invalidateQueries({ queryKey: invoiceKeys.detail(invoiceId) })
       void queryClient.invalidateQueries({ queryKey: repairKeys.detail(invoice.repairId) })
+      void queryClient.invalidateQueries({ queryKey: invoiceKeys.lists() })
       toast.success(`Invoice ${invoice.invoiceNumber} cancelled`)
     },
     onError: (error) => {
