@@ -1,10 +1,11 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import { db } from '@/server/db'
+import { db, type DbClient } from '@/server/db'
 import { inventory } from '@/server/db/schema/inventory'
 import { repairParts } from '@/server/db/schema/repair-parts'
 import { repairs } from '@/server/db/schema/repairs'
 import { applyStockDelta } from '@/server/services/inventory.service'
+import { assertNoIssuedInvoice } from '@/server/services/invoice-lock.helpers'
 
 async function assertCanRecordParts({
   shopId,
@@ -31,30 +32,31 @@ async function assertCanRecordParts({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (userRole === 'OWNER' || userRole === 'STAFF') {
-    return repair
+  const isShopManager = userRole === 'OWNER' || userRole === 'STAFF'
+  if (!isShopManager && userRole !== 'TECHNICIAN') {
+    throw new HTTPException(403, { message: 'Not authorized to record parts used' })
   }
 
-  if (userRole === 'TECHNICIAN') {
-    if (repair.assignedTechnicianId !== userId) {
-      throw new HTTPException(403, {
-        message: 'Forbidden: Technicians can only record parts on repairs assigned to them.',
-      })
-    }
-    return repair
+  if (userRole === 'TECHNICIAN' && repair.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Technicians can only record parts on repairs assigned to them.',
+    })
   }
 
-  throw new HTTPException(403, { message: 'Not authorized to record parts used' })
+  await assertNoIssuedInvoice({ shopId, repairId })
+  return repair
 }
 
 export async function listRepairParts({
+  client = db,
   shopId,
   repairId,
 }: {
+  client?: DbClient
   shopId: string
   repairId: string
 }) {
-  return db
+  return client
     .select({
       id: repairParts.id,
       shopId: repairParts.shopId,

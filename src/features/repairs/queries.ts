@@ -3,6 +3,7 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import type { RepairFilterInput, RepairPriority } from './schemas'
+import type { InvoiceStatus } from '@/features/invoices/schemas'
 
 export interface TechnicianUser {
   id: string
@@ -127,6 +128,17 @@ export interface Repair {
   } | null
   photos?: RepairPhotosPayload
   parts?: RepairPartLine[]
+  invoices?: RepairInvoiceSummary[]
+}
+
+export interface RepairInvoiceSummary {
+  id: string
+  invoiceNumber: string
+  status: InvoiceStatus
+}
+
+export function getIssuedInvoice(repair: Pick<Repair, 'invoices'>): RepairInvoiceSummary | null {
+  return repair.invoices?.find((invoice) => invoice.status === 'ISSUED') ?? null
 }
 
 export interface RepairPartLine {

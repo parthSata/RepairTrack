@@ -3,7 +3,11 @@
 import * as React from 'react'
 import { Calculator } from 'lucide-react'
 import type { RepairPartLine } from '@/features/repairs/queries'
-import type { ApprovalStatus, PricingPanelMode } from '@/features/repairs/pricing-rules'
+import {
+  PRICING_MESSAGES,
+  type ApprovalStatus,
+  type PricingPanelMode,
+} from '@/features/repairs/pricing-rules'
 import { differsFromEstimate } from '@/features/repairs/pricing-calc'
 import { useConfirmFinalTotal, useUpdateEstimate } from '@/features/repairs/pricing-mutations'
 import { usePricingForm } from '@/features/repairs/use-pricing-form'
@@ -25,6 +29,7 @@ type EstimatePricingPanelProps = {
   taxPercent: number
   estimatedTotal: number | null
   finalTotal: number | null
+  isInvoiced?: boolean
 }
 
 function getPricingState(isFinalized: boolean, approvalStatus: ApprovalStatus | null): PricingState | null {
@@ -34,13 +39,15 @@ function getPricingState(isFinalized: boolean, approvalStatus: ApprovalStatus | 
   return null
 }
 
-function getSubtitle({ mode, status, isEditing, isFinalized, approvalStatus }: {
+function getSubtitle({ mode, status, isEditing, isFinalized, isInvoiced, approvalStatus }: {
   mode: EstimatePricingPanelProps['mode']
   status: string
   isEditing: boolean
   isFinalized: boolean
+  isInvoiced: boolean
   approvalStatus: ApprovalStatus | null
 }): string {
+  if (isInvoiced) return PRICING_MESSAGES.invoiceIssued
   if (mode === 'view') {
     return status === 'COMPLETED'
       ? 'Pricing is locked on completed repairs.'
@@ -68,6 +75,7 @@ export function EstimatePricingPanel({
   taxPercent,
   estimatedTotal,
   finalTotal,
+  isInvoiced = false,
 }: EstimatePricingPanelProps) {
   const pricing = usePricingForm({ parts, saved: { laborCharges, additionalCharges, taxPercent } })
   const saveMutation = useUpdateEstimate(repairId)
@@ -120,7 +128,7 @@ export function EstimatePricingPanel({
                 {pricingState ? <PricingStateBadge state={pricingState} /> : null}
               </div>
               <p className="text-xs text-muted-foreground">
-                {getSubtitle({ mode, status, isEditing, isFinalized, approvalStatus })}
+                {getSubtitle({ mode, status, isEditing, isFinalized, isInvoiced, approvalStatus })}
               </p>
             </div>
           </div>

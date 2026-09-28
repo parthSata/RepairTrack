@@ -25,6 +25,7 @@ type RequestApprovalControlProps = {
   estimatedTotal: number | null
   /** Rough cost in paise captured on the New Repair form (`repairs.estimated_cost`). */
   intakeEstimatedCost: number | null
+  hasIssuedInvoice?: boolean
   onRequested?: () => void
 }
 
@@ -62,6 +63,7 @@ export function RequestApprovalControl({
   savedPricing,
   estimatedTotal,
   intakeEstimatedCost,
+  hasIssuedInvoice = false,
   onRequested,
 }: RequestApprovalControlProps) {
   const { data: session } = useSession()
@@ -74,6 +76,7 @@ export function RequestApprovalControl({
     assignedTechnicianId,
     status: currentStatus,
     approvalStatus: approval?.status,
+    hasIssuedInvoice,
   })
 
   // 403 = this user never sends estimates; hide the control entirely.

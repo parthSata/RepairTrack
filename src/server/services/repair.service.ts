@@ -5,6 +5,7 @@ import { customers } from '@/server/db/schema/customers'
 import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/schema/repairs'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
+import { invoices } from '@/server/db/schema/invoices'
 import { users } from '@/server/db/schema/users'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/server/services/repair-assignment.helpers'
 import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
+import { hasIssuedInvoice } from '@/server/services/invoice-lock.helpers'
 import {
   calculateRepairTotal,
   sumPartsCharges,
@@ -404,7 +406,7 @@ export async function getRepairById({
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -517,6 +519,15 @@ export async function getRepairById({
       .limit(1),
     getRepairPhotosForDetail({ shopId, userRole, userId, repairId: id }),
     listRepairParts({ shopId, repairId: id }),
+    db
+      .select({
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+        status: invoices.status,
+      })
+      .from(invoices)
+      .where(and(eq(invoices.repairId, id), eq(invoices.shopId, shopId)))
+      .orderBy(desc(invoices.createdAt)),
   ])
 
   const creator = creatorResult[0] || null
@@ -590,6 +601,7 @@ export async function getRepairById({
     approval,
     photos: photosPayload,
     parts,
+    invoices: invoiceResult,
     currentAssignment: currentAssignment
       ? {
           id: currentAssignment.id,
@@ -755,7 +767,10 @@ export async function requestCustomerApproval({
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
   const existing = assertRepairFound(row)
 
-  const latestApproval = await getLatestApproval(id)
+  const [latestApproval, invoiced] = await Promise.all([
+    getLatestApproval(id),
+    hasIssuedInvoice({ shopId, repairId: id }),
+  ])
   throwIfViolation(
     getSendApprovalViolation({
       userRole,
@@ -763,6 +778,7 @@ export async function requestCustomerApproval({
       assignedTechnicianId: existing.assignedTechnicianId,
       status: existing.status,
       approvalStatus: latestApproval?.status,
+      hasIssuedInvoice: invoiced,
     }),
   )
 
@@ -1166,7 +1182,11 @@ async function getRepairPricingContext({ shopId, id }: { shopId: string; id: str
     .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
   const repair = assertRepairFound(row)
-  return { ...repair, latestApproval: await getLatestApproval(id) }
+  const [latestApproval, invoiced] = await Promise.all([
+    getLatestApproval(id),
+    hasIssuedInvoice({ shopId, repairId: id }),
+  ])
+  return { ...repair, latestApproval, hasIssuedInvoice: invoiced }
 }
 
 async function resolveRepairPricingTotal({
@@ -1221,6 +1241,7 @@ export async function updateRepairEstimatePricing({
       userRole,
       status: existing.status,
       approvalStatus: existing.latestApproval?.status,
+      hasIssuedInvoice: existing.hasIssuedInvoice,
     }),
   )
 
@@ -1284,6 +1305,7 @@ export async function updateRepairFinalTotal({
       userRole,
       status: existing.status,
       approvalStatus: existing.latestApproval?.status,
+      hasIssuedInvoice: existing.hasIssuedInvoice,
     }),
   )
 
