@@ -10,6 +10,9 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
   }
 
   const data = (err as { response?: { data?: unknown } }).response?.data
+  if (typeof data === 'string') {
+    return data.trim().length > 0 && data.length <= 300 ? data : fallback
+  }
   if (!data || typeof data !== 'object') {
     return fallback
   }
@@ -27,4 +30,13 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
   }
 
   return fallback
+}
+
+const MAX_QUERY_RETRIES = 2
+
+/** TanStack Query `retry`: 4xx will not succeed on retry, so fail fast; retry network errors and 5xx. */
+export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
+  const status = getApiErrorStatus(error)
+  if (status !== null && status >= 400 && status < 500) return false
+  return failureCount < MAX_QUERY_RETRIES
 }

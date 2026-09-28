@@ -15,6 +15,7 @@ import {
 } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 import { DataTablePagination } from './data-table-pagination'
 
 interface DataTableProps<TData, TValue> {
@@ -29,6 +30,48 @@ interface DataTableProps<TData, TValue> {
   onPageChange?: (page: number) => void
   onPageSizeChange?: (pageSize: number) => void
   onSortingChangeManual?: (sortBy: string, sortOrder: 'asc' | 'desc') => void
+  /** When set, rows render as cards below `md` and the table shows from `md` up. */
+  renderMobileCard?: (row: TData) => React.ReactNode
+}
+
+function MobileCardList<TData>({
+  rows,
+  isLoading,
+  skeletonCount,
+  emptyState,
+  renderCard,
+}: {
+  rows: { id: string; original: TData }[]
+  isLoading: boolean
+  skeletonCount: number
+  emptyState?: React.ReactNode
+  renderCard: (row: TData) => React.ReactNode
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3" aria-busy="true">
+        {Array.from({ length: Math.min(skeletonCount, 5) }).map((_, index) => (
+          <Skeleton key={`skeleton-card-${index}`} className="h-28 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card py-10 text-center">
+        {emptyState ?? <p className="text-sm text-muted-foreground">No records found.</p>}
+      </div>
+    )
+  }
+
+  return (
+    <ul className="space-y-3">
+      {rows.map((row) => (
+        <li key={row.id}>{renderCard(row.original)}</li>
+      ))}
+    </ul>
+  )
 }
 
 export function DataTable<TData, TValue>({
@@ -43,6 +86,7 @@ export function DataTable<TData, TValue>({
   onPageChange,
   onPageSizeChange,
   onSortingChangeManual,
+  renderMobileCard,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
@@ -86,7 +130,23 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-border bg-card shadow-xs overflow-hidden">
+      {renderMobileCard ? (
+        <div className="md:hidden">
+          <MobileCardList
+            rows={table.getRowModel().rows}
+            isLoading={isLoading}
+            skeletonCount={pageSize || 5}
+            emptyState={emptyState}
+            renderCard={renderMobileCard}
+          />
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          'rounded-lg border border-border bg-card shadow-xs overflow-hidden',
+          renderMobileCard && 'hidden md:block',
+        )}
+      >
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

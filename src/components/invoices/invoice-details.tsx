@@ -9,10 +9,10 @@ import {
   InvoiceStatusBadge,
 } from '@/components/invoices/invoice-status'
 import { PricingBreakdownRows } from '@/components/repairs/pricing-breakdown-rows'
+import { QueryErrorState } from '@/components/ui/query-error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { useInvoice, type Invoice, type InvoiceItem } from '@/features/invoices/queries'
-import { getApiErrorMessage } from '@/lib/api-error'
 import { formatRupees } from '@/lib/format-money'
 
 function InvoiceItemRow({ item }: { item: InvoiceItem }) {
@@ -62,12 +62,13 @@ export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
 
   if (isError || !invoice) {
     return (
-      <div className="mx-auto w-full max-w-3xl rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-center text-sm text-destructive">
-        {getApiErrorMessage(error, 'Failed to load invoice.')}{' '}
-        <button type="button" onClick={() => refetch()} className="font-medium underline">
-          Retry
-        </button>
-      </div>
+      <QueryErrorState
+        className="mx-auto w-full max-w-3xl"
+        error={error}
+        fallback="Failed to load invoice."
+        forbiddenMessage="You don't have access to invoices."
+        onRetry={() => void refetch()}
+      />
     )
   }
 

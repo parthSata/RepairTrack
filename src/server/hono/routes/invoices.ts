@@ -5,12 +5,15 @@ import {
   cancelInvoiceSchema,
   createInvoiceSchema,
   INVOICE_MESSAGES,
+  invoiceFilterSchema,
 } from '@/features/invoices/schemas'
 import { auth } from '@/server/auth'
+import { validationHook } from '@/server/hono/validation'
 import {
   cancelInvoice,
   createInvoiceFromRepair,
   getInvoiceById,
+  listInvoices,
 } from '@/server/services/invoice.service'
 
 const INVOICE_ROLES = ['OWNER', 'STAFF']
@@ -30,20 +33,18 @@ async function requireInvoiceAccess(request: Request) {
   return { shopId, userId: session.user.id }
 }
 
-invoicesRouter.post(
-  '/',
-  zValidator('json', createInvoiceSchema, (result, c) => {
-    if (!result.success) {
-      return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
-    }
-  }),
-  async (c) => {
-    const { shopId, userId } = await requireInvoiceAccess(c.req.raw)
-    const { repairId } = c.req.valid('json')
-    const invoice = await createInvoiceFromRepair({ shopId, repairId, createdBy: userId })
-    return c.json(invoice, 201)
-  },
-)
+invoicesRouter.get('/', zValidator('query', invoiceFilterSchema, validationHook), async (c) => {
+  const { shopId } = await requireInvoiceAccess(c.req.raw)
+  const result = await listInvoices({ ...c.req.valid('query'), shopId })
+  return c.json(result)
+})
+
+invoicesRouter.post('/', zValidator('json', createInvoiceSchema, validationHook), async (c) => {
+  const { shopId, userId } = await requireInvoiceAccess(c.req.raw)
+  const { repairId } = c.req.valid('json')
+  const invoice = await createInvoiceFromRepair({ shopId, repairId, createdBy: userId })
+  return c.json(invoice, 201)
+})
 
 invoicesRouter.get('/:id', async (c) => {
   const { shopId } = await requireInvoiceAccess(c.req.raw)
@@ -53,12 +54,7 @@ invoicesRouter.get('/:id', async (c) => {
 
 invoicesRouter.post(
   '/:id/cancel',
-  zValidator('json', cancelInvoiceSchema, (result, c) => {
-    if (!result.success) {
-      const message = result.error.issues[0]?.message ?? 'Validation failed'
-      return c.json({ error: { message, code: 'VALIDATION_ERROR' } }, 400)
-    }
-  }),
+  zValidator('json', cancelInvoiceSchema, validationHook),
   async (c) => {
     const { shopId, userId } = await requireInvoiceAccess(c.req.raw)
     const { reason } = c.req.valid('json')

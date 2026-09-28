@@ -37,6 +37,7 @@ export const invoices = pgTable(
   (table) => [
     index('invoices_shop_id_idx').on(table.shopId),
     index('invoices_repair_id_idx').on(table.repairId),
+    index('invoices_shop_id_created_at_idx').on(table.shopId, table.createdAt),
     uniqueIndex('invoices_shop_id_invoice_number_uidx').on(table.shopId, table.invoiceNumber),
     uniqueIndex('invoices_one_issued_per_repair_uidx')
       .on(table.repairId)

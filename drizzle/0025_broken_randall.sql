@@ -1,0 +1,1 @@
+CREATE INDEX "invoices_shop_id_created_at_idx" ON "invoices" USING btree ("shop_id","created_at");

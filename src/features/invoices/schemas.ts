@@ -1,4 +1,15 @@
 import { z } from 'zod'
+import { paginationQuerySchema } from '@/lib/pagination'
+
+export const INVOICE_SORT_FIELDS = ['createdAt', 'invoiceNumber', 'total'] as const
+export type InvoiceSortField = (typeof INVOICE_SORT_FIELDS)[number]
+
+export const invoiceFilterSchema = paginationQuerySchema.extend({
+  search: z.string().trim().max(100, { message: 'Search cannot exceed 100 characters' }).optional(),
+  sortBy: z.enum(INVOICE_SORT_FIELDS).default('createdAt'),
+})
+
+export type InvoiceFilterInput = z.infer<typeof invoiceFilterSchema>
 
 export const createInvoiceSchema = z.object({
   repairId: z.string().trim().min(1, { message: 'Repair is required' }),

@@ -11,8 +11,11 @@ import { invitationsRouter } from '@/server/hono/routes/invitations'
 import { trackRouter } from '@/server/hono/routes/track'
 import { inventoryRouter } from '@/server/hono/routes/inventory'
 import { invoicesRouter } from '@/server/hono/routes/invoices'
+import { handleApiError, handleApiNotFound } from '@/server/hono/error-handler'
 
 export const app = new Hono()
+	.onError(handleApiError)
+	.notFound(handleApiNotFound)
 	.get('/api/health', (context) => context.json({ status: 'ok' }))
 	.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
 	.route('/api/email-check', emailCheckRouter)
