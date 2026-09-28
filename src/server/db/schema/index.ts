@@ -7,4 +7,5 @@ export * from './staff-invitations'
 export * from './inventory'
 export * from './stock-movements'
 export * from './repair-parts'
+export * from './invoices'
 
