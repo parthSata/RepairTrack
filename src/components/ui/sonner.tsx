@@ -6,6 +6,7 @@ export function Toaster() {
   return (
     <SonnerToaster
       position="top-right"
+      className="print:hidden"
       toastOptions={{
         style: {
           background: 'var(--card)',

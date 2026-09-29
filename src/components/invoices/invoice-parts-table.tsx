@@ -8,12 +8,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
+import { invoiceLineTotal } from '@/features/invoices/format'
 import type { InvoiceItem } from '@/features/invoices/queries'
 import { formatRupees } from '@/lib/format-money'
-
-function lineTotal(item: InvoiceItem): number {
-  return item.quantity * item.unitPrice
-}
 
 export function InvoicePartsTable({ items }: { items: InvoiceItem[] }) {
   if (items.length === 0) {
@@ -28,7 +25,7 @@ export function InvoicePartsTable({ items }: { items: InvoiceItem[] }) {
 
   return (
     <>
-      <div className="hidden sm:block">
+      <div className="hidden sm:block print:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -40,14 +37,14 @@ export function InvoicePartsTable({ items }: { items: InvoiceItem[] }) {
           </TableHeader>
           <TableBody>
             {items.map((item) => (
-              <TableRow key={item.id}>
+              <TableRow key={item.id} className="print:break-inside-avoid">
                 <TableCell className="font-medium">{item.partName}</TableCell>
                 <TableCell className="text-right tabular-nums">{item.quantity}</TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatRupees(item.unitPrice)}
                 </TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">
-                  {formatRupees(lineTotal(item))}
+                  {formatRupees(invoiceLineTotal(item))}
                 </TableCell>
               </TableRow>
             ))}
@@ -55,7 +52,7 @@ export function InvoicePartsTable({ items }: { items: InvoiceItem[] }) {
         </Table>
       </div>
 
-      <ul className="divide-y divide-border sm:hidden">
+      <ul className="divide-y divide-border sm:hidden print:hidden">
         {items.map((item) => (
           <li key={item.id} className="flex items-start justify-between gap-3 py-3 text-sm">
             <div className="min-w-0">
@@ -65,7 +62,7 @@ export function InvoicePartsTable({ items }: { items: InvoiceItem[] }) {
               </p>
             </div>
             <p className="shrink-0 font-semibold tabular-nums text-foreground">
-              {formatRupees(lineTotal(item))}
+              {formatRupees(invoiceLineTotal(item))}
             </p>
           </li>
         ))}
