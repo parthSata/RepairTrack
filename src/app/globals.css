@@ -85,6 +85,18 @@ input[type="number"] {
   opacity: 0;
 }
 
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    background: #fff;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

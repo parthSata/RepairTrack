@@ -6,7 +6,7 @@ import { formatDate } from '@/lib/format-date'
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex justify-between gap-4 sm:justify-end">
+    <div className="flex justify-between gap-4 sm:justify-end print:justify-end">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="font-medium text-foreground">{children}</dd>
     </div>
@@ -17,7 +17,7 @@ export function InvoiceHeader({ invoice }: { invoice: Invoice }) {
   const { shop } = invoice
 
   return (
-    <header className="flex flex-col gap-6 border-b border-border pb-6 sm:flex-row sm:justify-between">
+    <header className="flex flex-col gap-6 border-b border-border pb-6 sm:flex-row sm:justify-between print:flex-row print:justify-between">
       <div className="min-w-0 space-y-1">
         <p className="text-lg font-bold text-foreground">{shop.name}</p>
         {shop.address ? (
@@ -28,8 +28,8 @@ export function InvoiceHeader({ invoice }: { invoice: Invoice }) {
         {shop.phone ? <p className="text-sm text-muted-foreground">{shop.phone}</p> : null}
       </div>
 
-      <div className="space-y-2 sm:text-right">
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+      <div className="space-y-2 sm:text-right print:text-right">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end print:justify-end">
           <h1 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Invoice
           </h1>

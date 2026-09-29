@@ -9,7 +9,10 @@ import { customerRows, deviceRows, InvoiceParty } from '@/components/invoices/in
 import { InvoicePartsTable } from '@/components/invoices/invoice-parts-table'
 import { InvoiceCancelledBanner } from '@/components/invoices/invoice-status'
 import { InvoiceSummary } from '@/components/invoices/invoice-summary'
+import { DownloadPdfButton } from '@/components/ui/download-pdf-button'
+import { PrintButton } from '@/components/ui/print-button'
 import { QueryErrorState } from '@/components/ui/query-error-state'
+import { invoiceFileTitle } from '@/features/invoices/format'
 import { useInvoice } from '@/features/invoices/queries'
 
 const INVOICES_HREF = '/invoices'
@@ -45,33 +48,47 @@ export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
     )
   }
 
+  const fileTitle = invoiceFileTitle(invoice)
+  const loadInvoicePdf = async () => {
+    const { InvoicePdfDocument } = await import('@/components/invoices/invoice-pdf-document')
+    return <InvoicePdfDocument invoice={invoice} />
+  }
+
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto w-full max-w-3xl space-y-4 print:max-w-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <BackToInvoicesLink />
-        {invoice.status === 'ISSUED' ? (
-          <CancelInvoiceDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <DownloadPdfButton fileTitle={fileTitle} loadDocument={loadInvoicePdf} />
+          <PrintButton fileTitle={fileTitle} />
+          {invoice.status === 'ISSUED' ? (
+            <CancelInvoiceDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
+          ) : null}
+        </div>
       </div>
 
-      {invoice.status === 'CANCELLED' ? <InvoiceCancelledBanner invoice={invoice} /> : null}
+      {invoice.status === 'CANCELLED' ? (
+        <div className="print:hidden">
+          <InvoiceCancelledBanner invoice={invoice} />
+        </div>
+      ) : null}
 
-      <article className="space-y-6 rounded-xl border border-border bg-card p-4 shadow-xs sm:p-8">
+      <article className="space-y-6 rounded-xl border border-border bg-card p-4 shadow-xs sm:p-8 print:rounded-none print:border-0 print:p-0 print:shadow-none">
         <InvoiceHeader invoice={invoice} />
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 print:grid-cols-2">
           <InvoiceParty title="Customer" rows={customerRows(invoice)} />
           <InvoiceParty title="Device" rows={deviceRows(invoice)} />
         </div>
 
-        <section className="space-y-2">
+        <section className="space-y-2 print:break-inside-avoid">
           <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Parts
           </h2>
           <InvoicePartsTable items={invoice.items} />
         </section>
 
-        <div className="border-t border-border pt-4 sm:ml-auto sm:max-w-xs">
+        <div className="border-t border-border pt-4 sm:ml-auto sm:max-w-xs print:ml-auto print:max-w-xs print:break-inside-avoid">
           <InvoiceSummary invoice={invoice} />
         </div>
       </article>
