@@ -28,10 +28,21 @@ export interface Invoice {
   cancelledByName: string | null
   createdAt: string
   ticketNumber: string
+  shop: {
+    name: string
+    address: string | null
+    phone: string | null
+  }
   customer: {
     id: string
     name: string
     phone: string
+    email: string | null
+  }
+  device: {
+    brand: string
+    model: string | null
+    serialNumber: string | null
   }
   items: InvoiceItem[]
 }

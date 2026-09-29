@@ -1,7 +1,7 @@
 import { formatRupees } from '@/lib/format-money'
 import type { CalculateRepairTotalResult } from '@/features/repairs/pricing-calc'
 
-function PricingRow({
+export function AmountRow({
   label,
   valuePaise,
   emphasize,
@@ -45,15 +45,15 @@ export function PricingBreakdownRows({
 }: PricingBreakdownRowsProps) {
   return (
     <div className="space-y-2 rounded-xl border border-border/70 bg-muted/15 px-3.5 py-3">
-      <PricingRow label="Labor charges" valuePaise={laborCharges} />
-      <PricingRow label="Parts charges" valuePaise={partsCharges} />
-      <PricingRow label="Additional charges" valuePaise={additionalCharges} />
+      <AmountRow label="Labor charges" valuePaise={laborCharges} />
+      <AmountRow label="Parts charges" valuePaise={partsCharges} />
+      <AmountRow label="Additional charges" valuePaise={additionalCharges} />
       {totals ? (
         <>
-          <PricingRow label="Taxable value" valuePaise={totals.taxableValue} />
-          <PricingRow label={`Tax (${taxPercent}%)`} valuePaise={totals.taxAmount} />
+          <AmountRow label="Taxable value" valuePaise={totals.taxableValue} />
+          <AmountRow label={`Tax (${taxPercent}%)`} valuePaise={totals.taxAmount} />
           <div className="border-t border-border/70 pt-2">
-            <PricingRow label={totalLabel} valuePaise={totals.total} emphasize />
+            <AmountRow label={totalLabel} valuePaise={totals.total} emphasize />
           </div>
         </>
       ) : (

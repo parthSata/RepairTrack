@@ -1,0 +1,19 @@
+type DateStyle = 'short' | 'medium' | 'long'
+
+const formatters = new Map<DateStyle, Intl.DateTimeFormat>()
+
+function getFormatter(style: DateStyle): Intl.DateTimeFormat {
+  let formatter = formatters.get(style)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-IN', { dateStyle: style })
+    formatters.set(style, formatter)
+  }
+  return formatter
+}
+
+/** Formats an ISO date for display (en-IN); returns the input unchanged when it is not a valid date. */
+export function formatDate(iso: string, style: DateStyle = 'medium'): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return getFormatter(style).format(date)
+}

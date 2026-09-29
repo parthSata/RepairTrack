@@ -7,6 +7,7 @@ import {
   INVOICE_MESSAGES,
   invoiceFilterSchema,
 } from '@/features/invoices/schemas'
+import { idParamSchema } from '@/lib/validation'
 import { auth } from '@/server/auth'
 import { validationHook } from '@/server/hono/validation'
 import {
@@ -46,21 +47,22 @@ invoicesRouter.post('/', zValidator('json', createInvoiceSchema, validationHook)
   return c.json(invoice, 201)
 })
 
-invoicesRouter.get('/:id', async (c) => {
+invoicesRouter.get('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireInvoiceAccess(c.req.raw)
-  const invoice = await getInvoiceById({ shopId, id: c.req.param('id') })
+  const invoice = await getInvoiceById({ shopId, id: c.req.valid('param').id })
   return c.json(invoice)
 })
 
 invoicesRouter.post(
   '/:id/cancel',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', cancelInvoiceSchema, validationHook),
   async (c) => {
     const { shopId, userId } = await requireInvoiceAccess(c.req.raw)
     const { reason } = c.req.valid('json')
     const invoice = await cancelInvoice({
       shopId,
-      id: c.req.param('id'),
+      id: c.req.valid('param').id,
       reason,
       cancelledBy: userId,
     })

@@ -3,12 +3,7 @@ import { Ban } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import type { Invoice } from '@/features/invoices/queries'
 import { INVOICE_STATUS_LABELS, type InvoiceStatus } from '@/features/invoices/schemas'
-
-export function formatInvoiceDate(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium' }).format(date)
-}
+import { formatDate } from '@/lib/format-date'
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
   return (
@@ -20,7 +15,7 @@ export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
 
 export function InvoiceCancelledBanner({ invoice }: { invoice: Invoice }) {
   const cancelledBy = invoice.cancelledByName ?? 'a team member'
-  const cancelledOn = invoice.cancelledAt ? ` on ${formatInvoiceDate(invoice.cancelledAt)}` : ''
+  const cancelledOn = invoice.cancelledAt ? ` on ${formatDate(invoice.cancelledAt)}` : ''
 
   return (
     <div
@@ -33,7 +28,7 @@ export function InvoiceCancelledBanner({ invoice }: { invoice: Invoice }) {
         {cancelledOn}.
       </p>
       {invoice.cancellationReason ? (
-        <p className="break-words">Reason: {invoice.cancellationReason}</p>
+        <p className="wrap-break-word">Reason: {invoice.cancellationReason}</p>
       ) : null}
       <p>
         It is kept for your records only.{' '}
