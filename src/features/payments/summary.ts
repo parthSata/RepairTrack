@@ -7,6 +7,30 @@ export interface PaymentSummary {
   status: PaymentStatus
 }
 
+/** The confirmed bill wins; before finalizing, the estimate is the bill. Null = nothing to bill yet. */
+export function getBillTotal({
+  finalTotal,
+  estimatedTotal,
+}: {
+  finalTotal: number | null
+  estimatedTotal: number | null
+}): number | null {
+  return finalTotal ?? estimatedTotal ?? null
+}
+
+/** A null bill total has no cap (advance before any estimate). */
+export function exceedsBill({
+  billTotal,
+  totalPaid,
+  amount,
+}: {
+  billTotal: number | null
+  totalPaid: number
+  amount: number
+}): boolean {
+  return billTotal != null && totalPaid + amount > billTotal
+}
+
 /** All amounts are integer paise. */
 export function getPaymentSummary({
   billTotal,

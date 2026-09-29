@@ -1,6 +1,5 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import {
   cancelInvoiceSchema,
   createInvoiceSchema,
@@ -8,7 +7,7 @@ import {
   invoiceFilterSchema,
 } from '@/features/invoices/schemas'
 import { idParamSchema } from '@/lib/validation'
-import { auth } from '@/server/auth'
+import { requireRole } from '@/server/hono/session'
 import { validationHook } from '@/server/hono/validation'
 import {
   cancelInvoice,
@@ -17,22 +16,10 @@ import {
   listInvoices,
 } from '@/server/services/invoice.service'
 
-const INVOICE_ROLES = ['OWNER', 'STAFF']
-
 const invoicesRouter = new Hono()
 
-async function requireInvoiceAccess(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-
-  const role = session.user.role ?? 'OWNER'
-  const shopId = session.user.shopId
-  if (!INVOICE_ROLES.includes(role) || !shopId) {
-    throw new HTTPException(403, { message: INVOICE_MESSAGES.forbidden })
-  }
-
-  return { shopId, userId: session.user.id }
-}
+const requireInvoiceAccess = (request: Request) =>
+  requireRole(request, ['OWNER', 'STAFF'], INVOICE_MESSAGES.forbidden)
 
 invoicesRouter.get('/', zValidator('query', invoiceFilterSchema, validationHook), async (c) => {
   const { shopId } = await requireInvoiceAccess(c.req.raw)

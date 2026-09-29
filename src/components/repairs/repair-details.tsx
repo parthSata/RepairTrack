@@ -63,6 +63,7 @@ import { AssignmentOnHoldCard } from './assignment-on-hold-card'
 import { RepairPartsSection } from './repair-parts-section'
 import { EstimatePricingPanel } from './estimate-pricing-panel'
 import { RepairInvoiceAction } from './repair-invoice-action'
+import { RepairPaymentAction } from './repair-payment-action'
 import { getPricingPanelMode, PRICING_MESSAGES } from '@/features/repairs/pricing-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
@@ -640,6 +641,15 @@ export function RepairDetails({ id }: { id: string }) {
         userRole={userRole}
         finalTotal={repair.finalTotal ?? null}
         invoices={repair.invoices ?? []}
+      />
+
+      <RepairPaymentAction
+        repairId={id}
+        userRole={userRole}
+        status={repair.status}
+        finalTotal={repair.finalTotal ?? null}
+        estimatedTotal={repair.estimatedTotal ?? null}
+        totalPaid={repair.totalPaid ?? 0}
       />
 
       {/* Repair Notes Section (Append-only) */}
