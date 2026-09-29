@@ -5,7 +5,7 @@ import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Eye, Receipt } from 'lucide-react'
 import { InvoiceListCard } from '@/components/invoices/invoice-list-card'
-import { formatInvoiceDate, InvoiceStatusBadge } from '@/components/invoices/invoice-status'
+import { InvoiceStatusBadge } from '@/components/invoices/invoice-status'
 import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
@@ -17,6 +17,7 @@ import {
   type InvoiceFilterInput,
   type InvoiceSortField,
 } from '@/features/invoices/schemas'
+import { formatDate } from '@/lib/format-date'
 import { formatDeviceLabel } from '@/lib/format-device'
 import { formatRupees } from '@/lib/format-money'
 import { DEFAULT_PAGE_SIZE } from '@/lib/pagination'
@@ -70,7 +71,7 @@ const columns: ColumnDef<InvoiceListItem>[] = [
     header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
     cell: ({ row }) => (
       <span className="whitespace-nowrap text-sm text-muted-foreground">
-        {formatInvoiceDate(row.original.createdAt)}
+        {formatDate(row.original.createdAt)}
       </span>
     ),
   },

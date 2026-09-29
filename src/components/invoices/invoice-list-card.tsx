@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
-import { formatInvoiceDate, InvoiceStatusBadge } from '@/components/invoices/invoice-status'
+import { InvoiceStatusBadge } from '@/components/invoices/invoice-status'
 import { invoiceHref, type InvoiceListItem } from '@/features/invoices/queries'
+import { formatDate } from '@/lib/format-date'
 import { formatDeviceLabel } from '@/lib/format-device'
 import { formatRupees } from '@/lib/format-money'
 
@@ -28,7 +29,7 @@ export function InvoiceListCard({ invoice }: { invoice: InvoiceListItem }) {
         <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-sm">
-        <span className="text-muted-foreground">{formatInvoiceDate(invoice.createdAt)}</span>
+        <span className="text-muted-foreground">{formatDate(invoice.createdAt)}</span>
         <span className="font-semibold tabular-nums text-foreground">
           {formatRupees(invoice.total)}
         </span>

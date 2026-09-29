@@ -5,6 +5,7 @@ export const INVOICE_SORT_FIELDS = ['createdAt', 'invoiceNumber', 'total'] as co
 export type InvoiceSortField = (typeof INVOICE_SORT_FIELDS)[number]
 
 export const invoiceFilterSchema = paginationQuerySchema.extend({
+  customerId: z.string().trim().min(1).max(100, { message: 'Invalid customer id' }).optional(),
   search: z.string().trim().max(100, { message: 'Search cannot exceed 100 characters' }).optional(),
   sortBy: z.enum(INVOICE_SORT_FIELDS).default('createdAt'),
 })

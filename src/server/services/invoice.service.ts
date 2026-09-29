@@ -140,24 +140,37 @@ const INVOICE_SORT_COLUMNS = {
   total: invoices.total,
 } satisfies Record<InvoiceSortField, unknown>
 
+function buildInvoiceListWhere({
+  shopId,
+  customerId,
+  search,
+}: Pick<InvoiceFilterInput, 'customerId' | 'search'> & { shopId: string }): SQL | undefined {
+  const conditions: SQL[] = [eq(invoices.shopId, shopId)]
+  if (customerId) conditions.push(eq(invoices.customerId, customerId))
+
+  const pattern = toContainsPattern(search)
+  if (pattern) {
+    const searchCondition = or(
+      ilike(invoices.invoiceNumber, pattern),
+      ilike(customers.name, pattern),
+      ilike(customers.phone, pattern),
+    )
+    if (searchCondition) conditions.push(searchCondition)
+  }
+
+  return and(...conditions)
+}
+
 export async function listInvoices({
   shopId,
+  customerId,
   search,
   page,
   limit,
   sortBy,
   sortOrder,
 }: InvoiceFilterInput & { shopId: string }) {
-  const pattern = toContainsPattern(search)
-  const shopScope = eq(invoices.shopId, shopId)
-  const searchCondition: SQL | undefined = pattern
-    ? or(
-        ilike(invoices.invoiceNumber, pattern),
-        ilike(customers.name, pattern),
-        ilike(customers.phone, pattern),
-      )
-    : undefined
-  const whereClause = searchCondition ? and(shopScope, searchCondition) : shopScope
+  const whereClause = buildInvoiceListWhere({ shopId, customerId, search })
 
   const sortColumn = INVOICE_SORT_COLUMNS[sortBy]
   const direction = sortOrder === 'asc' ? asc : desc
@@ -229,15 +242,28 @@ export async function getInvoiceById({ shopId, id }: { shopId: string; id: strin
       cancelledBy: invoices.cancelledBy,
       createdAt: invoices.createdAt,
       ticketNumber: repairs.ticketNumber,
+      shop: {
+        name: shops.name,
+        address: shops.address,
+        phone: shops.phone,
+      },
       customer: {
         id: customers.id,
         name: customers.name,
         phone: customers.phone,
+        email: customers.email,
+      },
+      device: {
+        brand: devices.brand,
+        model: devices.model,
+        serialNumber: devices.serialNumber,
       },
     })
     .from(invoices)
+    .innerJoin(shops, eq(shops.id, invoices.shopId))
     .innerJoin(repairs, eq(repairs.id, invoices.repairId))
     .innerJoin(customers, eq(customers.id, invoices.customerId))
+    .innerJoin(devices, eq(devices.id, repairs.deviceId))
     .where(and(eq(invoices.id, id), eq(invoices.shopId, shopId)))
     .limit(1)
 

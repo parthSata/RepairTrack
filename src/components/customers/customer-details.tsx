@@ -13,6 +13,7 @@ import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CustomerForm } from './customer-form'
 import { CustomerDeleteDialog } from './customer-delete-dialog'
+import { CustomerInvoices } from './customer-invoices'
 import { CustomerRepairHistory } from './customer-repair-history'
 
 interface CustomerDetailsProps {
@@ -162,6 +163,12 @@ export function CustomerDetails({ id }: CustomerDetailsProps) {
         </div>
 
         <CustomerRepairHistory customerId={customer.id} />
+      </div>
+
+      {/* Invoices Section */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-bold tracking-tight text-foreground">Invoices</h2>
+        <CustomerInvoices customerId={customer.id} />
       </div>
 
       {/* Edit Dialog */}
