@@ -183,6 +183,13 @@
       "when": 1790603713413,
       "tag": "0025_broken_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790685735363,
+      "tag": "0026_furry_blade",
+      "breakpoints": true
     }
   ]
 }
