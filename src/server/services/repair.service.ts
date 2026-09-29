@@ -27,6 +27,8 @@ import {
 import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
 import { hasIssuedInvoice } from '@/server/services/invoice-lock.helpers'
+import { getTotalPaid } from '@/server/services/payment.service'
+import { PAYMENT_MESSAGES } from '@/features/payments/schemas'
 import {
   calculateRepairTotal,
   sumPartsCharges,
@@ -406,7 +408,7 @@ export async function getRepairById({
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -528,6 +530,7 @@ export async function getRepairById({
       .from(invoices)
       .where(and(eq(invoices.repairId, id), eq(invoices.shopId, shopId)))
       .orderBy(desc(invoices.createdAt)),
+    getTotalPaid({ shopId, repairId: id }),
   ])
 
   const creator = creatorResult[0] || null
@@ -602,6 +605,7 @@ export async function getRepairById({
     photos: photosPayload,
     parts,
     invoices: invoiceResult,
+    totalPaid,
     currentAssignment: currentAssignment
       ? {
           id: currentAssignment.id,
@@ -1317,17 +1321,28 @@ export async function updateRepairFinalTotal({
     taxPercent,
   })
 
-  await db
-    .update(repairs)
-    .set({
-      laborCharges,
-      additionalCharges,
-      taxPercent,
-      finalTotal: total,
-      finalCost: total,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+  const repairScope = and(eq(repairs.id, id), eq(repairs.shopId, shopId))
+
+  // Same row lock as recordPayment, so a payment can't land between the check and the update.
+  await db.transaction(async (tx) => {
+    await tx.select({ id: repairs.id }).from(repairs).where(repairScope).for('update')
+
+    if (total < (await getTotalPaid({ client: tx, shopId, repairId: id }))) {
+      throw new HTTPException(409, { message: PAYMENT_MESSAGES.finalBelowPaid })
+    }
+
+    await tx
+      .update(repairs)
+      .set({
+        laborCharges,
+        additionalCharges,
+        taxPercent,
+        finalTotal: total,
+        finalCost: total,
+        updatedAt: new Date(),
+      })
+      .where(repairScope)
+  })
 
   return getRepairById({ shopId, userRole, userId, id })
 }
