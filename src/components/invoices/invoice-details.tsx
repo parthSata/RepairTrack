@@ -7,9 +7,9 @@ import { InvoiceDetailsSkeleton } from '@/components/invoices/invoice-details-sk
 import { InvoiceHeader } from '@/components/invoices/invoice-header'
 import { customerRows, deviceRows, InvoiceParty } from '@/components/invoices/invoice-party'
 import { InvoicePartsTable } from '@/components/invoices/invoice-parts-table'
+import { InvoicePayments } from '@/components/invoices/invoice-payments'
 import { InvoiceCancelledBanner } from '@/components/invoices/invoice-status'
 import { InvoiceSummary } from '@/components/invoices/invoice-summary'
-import { DownloadPdfButton } from '@/components/ui/download-pdf-button'
 import { PrintButton } from '@/components/ui/print-button'
 import { QueryErrorState } from '@/components/ui/query-error-state'
 import { invoiceFileTitle } from '@/features/invoices/format'
@@ -49,17 +49,12 @@ export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
   }
 
   const fileTitle = invoiceFileTitle(invoice)
-  const loadInvoicePdf = async () => {
-    const { InvoicePdfDocument } = await import('@/components/invoices/invoice-pdf-document')
-    return <InvoicePdfDocument invoice={invoice} />
-  }
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 print:max-w-none">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <BackToInvoicesLink />
         <div className="flex flex-wrap items-center gap-2">
-          <DownloadPdfButton fileTitle={fileTitle} loadDocument={loadInvoicePdf} />
           <PrintButton fileTitle={fileTitle} />
           {invoice.status === 'ISSUED' ? (
             <CancelInvoiceDialog invoiceId={invoice.id} invoiceNumber={invoice.invoiceNumber} />
@@ -91,6 +86,8 @@ export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
         <div className="border-t border-border pt-4 sm:ml-auto sm:max-w-xs print:ml-auto print:max-w-xs print:break-inside-avoid">
           <InvoiceSummary invoice={invoice} />
         </div>
+
+        <InvoicePayments repairId={invoice.repairId} invoiceTotal={invoice.total} />
       </article>
     </div>
   )

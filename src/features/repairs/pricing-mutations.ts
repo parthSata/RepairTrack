@@ -7,6 +7,7 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/lib/api-error'
 import type { RepairPricingFieldsInput } from '@/features/repairs/pricing-schemas'
 import type { RequestCustomerApprovalInput } from '@/features/repairs/schemas'
 import { repairKeys, type Repair } from '@/features/repairs/queries'
+import { paymentKeys } from '@/features/payments/queries'
 
 type RepairPricingMutationConfig = {
   repairId: string
@@ -32,12 +33,15 @@ function useRepairPricingMutation<TInput>({
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      // Estimate, final total and approval all change the bill the payment summary is measured against.
+      void queryClient.invalidateQueries({ queryKey: paymentKeys.byRepair(repairId) })
       toast.success(successMessage)
     },
     onError: (error) => {
       // A 409 means the ticket changed underneath us (e.g. customer just approved) — refetch.
       if (getApiErrorStatus(error) === 409) {
         void queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+        void queryClient.invalidateQueries({ queryKey: paymentKeys.byRepair(repairId) })
       }
       toast.error(getApiErrorMessage(error, errorFallback))
     },

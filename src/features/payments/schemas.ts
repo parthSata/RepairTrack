@@ -37,6 +37,18 @@ export const recordPaymentSchema = z.object({
 
 export type RecordPaymentInput = z.infer<typeof recordPaymentSchema>
 
+export const repairPaymentsQuerySchema = z.object({
+  repairId: z.string().trim().min(1, { message: 'Repair is required' }).max(100, { message: 'Invalid repair id' }),
+})
+
+export type PaymentType = 'ADVANCE' | 'PAYMENT'
+
+export const PAYMENT_STATUS_LABELS = {
+  UNPAID: 'Unpaid',
+  PARTIAL: 'Partial',
+  PAID: 'Paid',
+} as const
+
 export const PAYMENT_MESSAGES = {
   forbidden: 'Not authorized to record payments',
   repairNotFound: 'Repair ticket not found',

@@ -129,8 +129,6 @@ export interface Repair {
   photos?: RepairPhotosPayload
   parts?: RepairPartLine[]
   invoices?: RepairInvoiceSummary[]
-  /** Sum of recorded payments, in paise. */
-  totalPaid?: number
 }
 
 export interface RepairInvoiceSummary {

@@ -408,7 +408,7 @@ export async function getRepairById({
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -530,7 +530,6 @@ export async function getRepairById({
       .from(invoices)
       .where(and(eq(invoices.repairId, id), eq(invoices.shopId, shopId)))
       .orderBy(desc(invoices.createdAt)),
-    getTotalPaid({ shopId, repairId: id }),
   ])
 
   const creator = creatorResult[0] || null
@@ -605,7 +604,6 @@ export async function getRepairById({
     photos: photosPayload,
     parts,
     invoices: invoiceResult,
-    totalPaid,
     currentAssignment: currentAssignment
       ? {
           id: currentAssignment.id,
