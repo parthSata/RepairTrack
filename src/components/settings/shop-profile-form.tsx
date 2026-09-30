@@ -10,7 +10,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { shopProfileSchema, type ShopProfile, type ShopProfileResponse } from '@/features/shop/schemas'
+import { getApiErrorMessage } from '@/lib/api-error'
+import { getUpiPayeeName, shopProfileSchema, type ShopProfile, type ShopProfileResponse } from '@/features/shop/schemas'
 import { useShopProfile } from '@/features/shop/queries'
 import { useUpdateShopProfile } from '@/features/shop/mutations'
 import { ShopLogoUploader } from './shop-logo-uploader'
@@ -54,6 +55,7 @@ function ShopProfileEditor({ profile }: { profile: ShopProfileResponse }) {
     defaultValues: profile,
   })
   const hours = useWatch({ control, name: 'businessHours' })
+  const shopName = useWatch({ control, name: 'shopName' })
 
   async function onSubmit(values: ShopProfile) {
     setSaved(false)
@@ -135,8 +137,33 @@ function ShopProfileEditor({ profile }: { profile: ShopProfileResponse }) {
             <FieldError message={errors.businessInfo?.message} />
           </div>
         </section>
+        <section className="space-y-5">
+          <div className="border-b border-border pb-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">UPI payments</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Customers scan a QR code to pay this UPI ID. You still confirm and record each payment.
+            </p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="upiId">UPI ID <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input id="upiId" placeholder="shopname@okaxis" autoComplete="off" spellCheck={false} {...register('upiId')} />
+              <FieldError message={errors.upiId?.message} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="upiPayeeName">Payee name <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Input id="upiPayeeName" maxLength={50} placeholder={getUpiPayeeName({ shopName })} {...register('upiPayeeName')} />
+              <p className="text-xs text-muted-foreground">Shown when customers pay. Leave blank to use your shop name.</p>
+              <FieldError message={errors.upiPayeeName?.message} />
+            </div>
+          </div>
+        </section>
         <ShopHoursEditor hours={hours} setValue={setValue} errors={errors.businessHours} />
-        {updateShop.isError && <Alert>We could not save your shop profile. Check your connection and try again.</Alert>}
+        {updateShop.isError && (
+          <Alert>
+            {getApiErrorMessage(updateShop.error, 'We could not save your shop profile. Check your connection and try again.')}
+          </Alert>
+        )}
         <div className="flex items-center justify-end gap-4 border-t border-border pt-5">
           <span aria-live="polite" className="text-sm text-success">
             {saved && <><Check className="mr-1 inline h-4 w-4" />Changes saved</>}

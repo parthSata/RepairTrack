@@ -12,6 +12,8 @@ export const shops = pgTable('shops', {
   businessInfo: text('business_info'),
   businessHours: text('business_hours'),
   logoKey: text('logo_key'),
+  upiId: text('upi_id'),
+  upiPayeeName: text('upi_payee_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

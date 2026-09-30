@@ -26,6 +26,8 @@ const addressSchema = z
   .max(500, 'Address must be 500 characters or fewer')
   .refine((value) => value.split(/\s+/).filter(Boolean).length >= 6, 'Address must contain at least 6 words')
 
+export const UPI_ID_REGEX = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/
+
 export const shopProfileSchema = z.object({
   shopName: z.string({ error: 'Shop name is required' }).trim().min(2).max(100),
   phone: phoneSchema,
@@ -34,7 +36,18 @@ export const shopProfileSchema = z.object({
   businessInfo: z.string().trim().max(1000).optional(),
   businessHours: businessHoursSchema,
   logoUrl: z.string().trim().max(500).optional(),
+  upiId: z
+    .string()
+    .trim()
+    .refine((value) => value === '' || UPI_ID_REGEX.test(value), 'Enter a valid UPI ID, e.g. shopname@okaxis')
+    .optional(),
+  upiPayeeName: z.string().trim().max(50, 'Payee name must be 50 characters or fewer').optional(),
 })
+
+/** A blank payee name falls back to the shop name, so it follows later renames. */
+export function getUpiPayeeName(shop: { upiPayeeName?: string | null; shopName: string }) {
+  return shop.upiPayeeName?.trim() || shop.shopName
+}
 
 export const logoUploadSchema = z.object({
   contentType: z.enum(['image/jpeg', 'image/png', 'image/webp']),

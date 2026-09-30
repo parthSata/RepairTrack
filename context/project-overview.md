@@ -475,6 +475,7 @@ Users can:
 - View payment history
 - Track pending payments
 - Track completed payments
+- Shop UPI ID for QR payments; manual confirmation, no gateway
 
 Payment integration should only be introduced when explicitly
 required by the product roadmap.
@@ -576,6 +577,7 @@ Settings may include:
 
 - User profile
 - Shop information
+- Shop UPI ID for QR payments; manual confirmation, no gateway
 - Staff management (see "Staff Management" below)
 - Email & Notifications / Owner Gmail Connection (see above, Sprint 3)
 - Application preferences

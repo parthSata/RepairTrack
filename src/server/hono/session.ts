@@ -18,5 +18,5 @@ export async function requireRole(
     throw new HTTPException(403, { message: forbiddenMessage })
   }
 
-  return { shopId, userId: session.user.id, role }
+  return { shopId, userId: session.user.id, email: session.user.email, role }
 }
