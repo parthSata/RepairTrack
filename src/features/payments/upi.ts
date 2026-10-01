@@ -16,7 +16,6 @@ export function buildUpiLink({ upiId, payeeName, amountPaise, ticketNumber }: Up
   const query = Object.entries(params)
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join('&')
-  console.log("🚀 ~ buildUpiLink ~ query:", query)
   return `upi://pay?${query}`
 }
 

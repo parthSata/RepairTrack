@@ -12,8 +12,10 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod | 'CARD' | 'BANK_TRANSF
 
 export const REFERENCE_PLACEHOLDERS: Record<PaymentMethod, string> = {
   CASH: '',
-  UPI: 'UPI Transaction ID / UTR (e.g. 4289XXXXXXXX)',
+  UPI: '12-digit UTR number',
 }
+
+export const UPI_UTR_REGEX = /^\d{12}$/
 
 /** ₹1 crore keeps the paise value well inside a Postgres integer. */
 const MAX_PAYMENT_RUPEES = 10_000_000
@@ -34,12 +36,15 @@ export const recordPaymentSchema = z
     note: z.string().trim().max(500, { message: 'Note cannot exceed 500 characters' }).optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.method === 'UPI' && (!data.reference || data.reference.trim().length === 0)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['reference'],
-        message: 'UPI Transaction ID / UTR is required as proof of payment',
-      })
+    if (data.method === 'UPI') {
+      const ref = data.reference?.trim()
+      if (!ref || !UPI_UTR_REGEX.test(ref)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['reference'],
+          message: 'Enter the 12-digit UTR from your bank app',
+        })
+      }
     }
   })
 
@@ -64,6 +69,8 @@ export const PAYMENT_MESSAGES = {
   billNotFinalized: 'Bill must be finalized before recording payment.',
   fullPaymentRequired: 'Only full payment of the remaining balance is allowed.',
   exceedsBalance: 'Amount is more than the balance due',
-  upiReferenceRequired: 'UPI Transaction ID / UTR is required as proof of payment.',
+  upiReferenceRequired: 'Enter the 12-digit UTR from your bank app',
+  upiUtrRequired: 'Enter the 12-digit UTR from your bank app',
+  utrDuplicate: 'This UTR is already recorded',
   finalBelowPaid: 'Final total cannot be less than the amount already paid.',
 } as const

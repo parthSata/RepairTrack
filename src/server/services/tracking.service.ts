@@ -8,7 +8,7 @@ import {
   calculateRepairTotal,
   sumPartsCharges,
 } from '@/features/repairs/pricing-calc'
-import { getBillTotal, getPaymentSummary } from '@/features/payments/summary'
+import { getPaymentSummary } from '@/features/payments/summary'
 import { getTotalPaid } from '@/server/services/payment.service'
 import { getUpiPayeeName } from '@/features/shop/schemas'
 import { db } from '@/server/db'
@@ -217,11 +217,8 @@ async function loadPublicRepairData(repairId: string) {
     return null
   }
 
-  const billTotal = getBillTotal({
-    finalTotal: row.finalTotal,
-    estimatedTotal: row.estimatedTotal,
-  })
-  const shouldIncludePayment = billTotal != null && row.status !== 'CANCELLED'
+  const isFinalized = row.finalTotal != null
+  const shouldIncludePayment = isFinalized && row.status !== 'CANCELLED'
 
   const [history, latestApprovalRows, photos, partLines, totalPaid] = await Promise.all([
     db
@@ -260,16 +257,16 @@ async function loadPublicRepairData(repairId: string) {
   ])
 
   let payment: PublicTrackingResponse['payment'] = undefined
-  if (shouldIncludePayment && billTotal != null) {
+  if (shouldIncludePayment && row.finalTotal != null) {
+    const billTotal = row.finalTotal
     const summary = getPaymentSummary({ billTotal, payments: [{ amount: totalPaid }] })
-    const isFinalized = row.finalTotal != null
-    const hasUpi = isFinalized && summary.balance > 0 && Boolean(row.shopUpiId)
+    const hasUpi = summary.balance > 0 && Boolean(row.shopUpiId)
     payment = {
       billTotal,
       totalPaid: summary.totalPaid,
       balance: summary.balance,
       status: summary.status,
-      isFinalized,
+      isFinalized: true,
       ...(hasUpi
         ? {
             upiId: row.shopUpiId!,
