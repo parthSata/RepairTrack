@@ -20,6 +20,7 @@ import { TrackApprovalSummaryCard } from '@/components/tracking/track-approval-s
 import { TrackPickupInfo } from '@/components/tracking/track-pickup-info'
 import { TrackRepairSummary } from '@/components/tracking/track-repair-summary'
 import { TrackPricingSummary } from '@/components/tracking/track-pricing-summary'
+import { TrackPaymentCard } from '@/components/tracking/track-payment-card'
 import { TrackRepairPhotos } from '@/components/tracking/track-repair-photos'
 import { TrackSectionHeader } from '@/components/tracking/track-section-header'
 import { TrackUpdatesList } from '@/components/tracking/track-updates-list'
@@ -152,6 +153,10 @@ export function TrackStatusView({
       />
 
       {pricingSummary && !hasPendingApproval ? pricingSummary : null}
+
+      {data.payment ? (
+        <TrackPaymentCard payment={data.payment} ticketNumber={data.ticketNumber} />
+      ) : null}
 
       {data.photos ? (
         <TrackRepairPhotos beforeUrl={data.photos.beforeUrl} afterUrl={data.photos.afterUrl} />

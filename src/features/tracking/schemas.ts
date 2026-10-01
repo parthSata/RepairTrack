@@ -104,6 +104,17 @@ export const publicTrackingResponseSchema = z.object({
       afterUrl: z.string(),
     })
     .optional(),
+  payment: z
+    .object({
+      billTotal: z.number(),
+      totalPaid: z.number(),
+      balance: z.number(),
+      status: z.enum(['UNPAID', 'PARTIAL', 'PAID']),
+      isFinalized: z.boolean().optional(),
+      upiId: z.string().optional(),
+      payeeName: z.string().optional(),
+    })
+    .optional(),
 })
 
 export type PublicTrackingResponse = z.infer<typeof publicTrackingResponseSchema>
