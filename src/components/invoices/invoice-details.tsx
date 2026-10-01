@@ -29,7 +29,7 @@ function BackToInvoicesLink() {
   )
 }
 
-export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
+export function InvoiceDetails({ invoiceId, userRole }: { invoiceId: string; userRole: string }) {
   const { data: invoice, isPending, isError, error, refetch } = useInvoice(invoiceId)
 
   if (isPending) return <InvoiceDetailsSkeleton />
@@ -87,7 +87,13 @@ export function InvoiceDetails({ invoiceId }: { invoiceId: string }) {
           <InvoiceSummary invoice={invoice} />
         </div>
 
-        <InvoicePayments repairId={invoice.repairId} invoiceTotal={invoice.total} />
+        <InvoicePayments
+          repairId={invoice.repairId}
+          ticketNumber={invoice.ticketNumber}
+          invoiceTotal={invoice.total}
+          invoiceStatus={invoice.status}
+          userRole={userRole}
+        />
       </article>
     </div>
   )

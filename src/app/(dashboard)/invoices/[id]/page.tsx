@@ -24,5 +24,5 @@ export default async function InvoicePage({
 
   const { id } = await params
 
-  return <InvoiceDetails invoiceId={id} />
+  return <InvoiceDetails invoiceId={id} userRole={role} />
 }

@@ -645,6 +645,7 @@ export function RepairDetails({ id }: { id: string }) {
 
       <PaymentSummaryCard
         repairId={id}
+        ticketNumber={repair.ticketNumber}
         userRole={userRole}
         repairStatus={repair.status}
         hasFinalBill={repair.finalTotal != null}

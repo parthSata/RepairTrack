@@ -13,12 +13,19 @@ const PAYMENT_ROLES = new Set(['OWNER', 'STAFF'])
 
 type PaymentSummaryCardProps = {
   repairId: string
+  ticketNumber: string
   userRole: string
   repairStatus: string
   hasFinalBill: boolean
 }
 
-export function PaymentSummaryCard({ repairId, userRole, repairStatus, hasFinalBill }: PaymentSummaryCardProps) {
+export function PaymentSummaryCard({
+  repairId,
+  ticketNumber,
+  userRole,
+  repairStatus,
+  hasFinalBill,
+}: PaymentSummaryCardProps) {
   const [dialogOpen, setDialogOpen] = React.useState(false)
 
   if (!PAYMENT_ROLES.has(userRole)) return null
@@ -37,8 +44,7 @@ export function PaymentSummaryCard({ repairId, userRole, repairStatus, hasFinalB
 
         <RepairPaymentsLoader repairId={repairId}>
           {(data) => {
-            // Nothing left to collect once a bill exists and is covered (includes PAID).
-            const canRecord = data.balance == null || data.balance > 0
+            const canRecord = hasFinalBill && data.balance != null && data.balance > 0
 
             return (
               <div className="space-y-4">
@@ -50,24 +56,26 @@ export function PaymentSummaryCard({ repairId, userRole, repairStatus, hasFinalB
                     balance={data.balance}
                     status={data.status}
                   />
-                  {data.billTotal == null ? (
+                  {!hasFinalBill ? (
                     <p className="mt-2 text-xs text-muted-foreground">
-                      No bill yet, so payments are recorded as advances.
+                      Bill not finalized yet. Finalize the bill in the Pricing section to record payment.
                     </p>
                   ) : null}
                 </div>
 
-                {canRecord ? (
-                  <Button
-                    size="sm"
-                    onClick={() => setDialogOpen(true)}
-                    disabled={isCancelled}
-                    className="w-full gap-1.5 sm:w-auto"
-                  >
-                    <IndianRupee className="h-3.5 w-3.5" aria-hidden />
-                    {isCancelled ? 'Repair is cancelled' : 'Record Payment'}
-                  </Button>
-                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  {canRecord ? (
+                    <Button
+                      size="sm"
+                      onClick={() => setDialogOpen(true)}
+                      disabled={isCancelled}
+                      className="w-full gap-1.5 sm:w-auto"
+                    >
+                      <IndianRupee className="h-3.5 w-3.5" aria-hidden />
+                      {isCancelled ? 'Repair is cancelled' : 'Record Payment'}
+                    </Button>
+                  ) : null}
+                </div>
 
                 <section className="space-y-1">
                   <h4 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -78,7 +86,9 @@ export function PaymentSummaryCard({ repairId, userRole, repairStatus, hasFinalB
 
                 <RecordPaymentDialog
                   repairId={repairId}
+                  ticketNumber={ticketNumber}
                   balance={data.balance}
+                  upi={data.upi}
                   open={dialogOpen}
                   onOpenChange={setDialogOpen}
                 />

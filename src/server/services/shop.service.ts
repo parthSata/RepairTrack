@@ -2,7 +2,8 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { shops } from '@/server/db/schema'
 import { logoPublicUrl } from '@/server/storage/cloudinary'
-import type { ShopProfile, ShopProfileResponse } from '@/features/shop/schemas'
+import { getUpiPayeeName, type ShopProfile, type ShopProfileResponse } from '@/features/shop/schemas'
+import type { ShopUpi } from '@/features/payments/upi'
 import { parseBusinessHours, serializeBusinessHours } from '@/features/shop/business-hours'
 
 export async function getShopById(shopId: string) {
@@ -24,6 +25,16 @@ export async function getShopById(shopId: string) {
     .limit(1)
 
   return shop ? { ...shop, businessHours: parseBusinessHours(shop.businessHours) } : null
+}
+
+export async function getShopUpi(shopId: string): Promise<ShopUpi | null> {
+  const [shop] = await db
+    .select({ upiId: shops.upiId, upiPayeeName: shops.upiPayeeName, shopName: shops.name })
+    .from(shops)
+    .where(eq(shops.id, shopId))
+    .limit(1)
+
+  return shop?.upiId ? { upiId: shop.upiId, payeeName: getUpiPayeeName(shop) } : null
 }
 
 type Shop = NonNullable<Awaited<ReturnType<typeof getShopById>>>
