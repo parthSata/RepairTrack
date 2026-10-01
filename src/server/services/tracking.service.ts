@@ -8,6 +8,9 @@ import {
   calculateRepairTotal,
   sumPartsCharges,
 } from '@/features/repairs/pricing-calc'
+import { getBillTotal, getPaymentSummary } from '@/features/payments/summary'
+import { getTotalPaid } from '@/server/services/payment.service'
+import { getUpiPayeeName } from '@/features/shop/schemas'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
@@ -46,6 +49,8 @@ type ShopRow = {
   address: string | null
   phone: string | null
   businessHours: string | null
+  upiId?: string | null
+  upiPayeeName?: string | null
 }
 
 type HistoryRow = {
@@ -128,6 +133,7 @@ export function buildPublicTrackingPayload(
   approval?: ApprovalRow | null,
   photos?: { beforeUrl: string; afterUrl: string } | null,
   partLines: PartChargeRow[] = [],
+  payment?: PublicTrackingResponse['payment'],
 ): PublicTrackingResponse {
   const payload: PublicTrackingResponse = {
     ticketNumber: repair.ticketNumber,
@@ -170,6 +176,10 @@ export function buildPublicTrackingPayload(
     payload.photos = photos
   }
 
+  if (payment) {
+    payload.payment = payment
+  }
+
   return payload
 }
 
@@ -195,6 +205,8 @@ async function loadPublicRepairData(repairId: string) {
       shopAddress: shops.address,
       shopPhone: shops.phone,
       shopBusinessHours: shops.businessHours,
+      shopUpiId: shops.upiId,
+      shopUpiPayeeName: shops.upiPayeeName,
     })
     .from(repairs)
     .innerJoin(devices, eq(devices.id, repairs.deviceId))
@@ -205,7 +217,13 @@ async function loadPublicRepairData(repairId: string) {
     return null
   }
 
-  const [history, latestApprovalRows, photos, partLines] = await Promise.all([
+  const billTotal = getBillTotal({
+    finalTotal: row.finalTotal,
+    estimatedTotal: row.estimatedTotal,
+  })
+  const shouldIncludePayment = billTotal != null && row.status !== 'CANCELLED'
+
+  const [history, latestApprovalRows, photos, partLines, totalPaid] = await Promise.all([
     db
       .select({
         toStatus: repairStatusHistory.toStatus,
@@ -236,7 +254,33 @@ async function loadPublicRepairData(repairId: string) {
       })
       .from(repairParts)
       .where(eq(repairParts.repairId, repairId)),
+    shouldIncludePayment
+      ? getTotalPaid({ shopId: row.shopId, repairId })
+      : Promise.resolve(0),
   ])
+
+  let payment: PublicTrackingResponse['payment'] = undefined
+  if (shouldIncludePayment && billTotal != null) {
+    const summary = getPaymentSummary({ billTotal, payments: [{ amount: totalPaid }] })
+    const isFinalized = row.finalTotal != null
+    const hasUpi = isFinalized && summary.balance > 0 && Boolean(row.shopUpiId)
+    payment = {
+      billTotal,
+      totalPaid: summary.totalPaid,
+      balance: summary.balance,
+      status: summary.status,
+      isFinalized,
+      ...(hasUpi
+        ? {
+            upiId: row.shopUpiId!,
+            payeeName: getUpiPayeeName({
+              upiPayeeName: row.shopUpiPayeeName,
+              shopName: row.shopName ?? '',
+            }),
+          }
+        : {}),
+    }
+  }
 
   return buildPublicTrackingPayload(
     {
@@ -261,11 +305,14 @@ async function loadPublicRepairData(repairId: string) {
       address: row.shopAddress,
       phone: row.shopPhone,
       businessHours: row.shopBusinessHours,
+      upiId: row.shopUpiId,
+      upiPayeeName: row.shopUpiPayeeName,
     },
     history,
     latestApprovalRows[0] ?? null,
     photos,
     partLines,
+    payment,
   )
 }
 
