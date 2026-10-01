@@ -18,8 +18,7 @@ type TrackPaymentCardProps = {
 
 export function TrackPaymentCard({ payment, ticketNumber }: TrackPaymentCardProps) {
   const isPaid = payment.status === 'PAID'
-  const isFinalized = payment.isFinalized ?? true
-  const hasUpi = isFinalized && payment.balance > 0 && Boolean(payment.upiId)
+  const hasUpi = payment.balance > 0 && Boolean(payment.upiId)
   const upiLink = hasUpi
     ? buildUpiLink({
         upiId: payment.upiId!,
@@ -43,9 +42,7 @@ export function TrackPaymentCard({ payment, ticketNumber }: TrackPaymentCardProp
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="font-semibold text-foreground">
-                {isFinalized ? 'Balance due' : 'Balance due (estimate)'}
-              </span>
+              <span className="font-semibold text-foreground">Balance due</span>
               <span className="text-lg font-bold text-foreground">
                 {formatRupees(Math.max(payment.balance, 0))}
               </span>
@@ -60,10 +57,6 @@ export function TrackPaymentCard({ payment, ticketNumber }: TrackPaymentCardProp
                 <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
                 <span>Paid in full</span>
               </div>
-            ) : !isFinalized ? (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Bill not finalized yet. Payment via UPI QR code will be available once the shop confirms the final bill.
-              </p>
             ) : null}
           </div>
 

@@ -128,10 +128,6 @@ function RecordPaymentForm({
       setError('amount', { message: PAYMENT_MESSAGES.fullPaymentRequired })
       return
     }
-    if (values.method === 'UPI' && !values.reference?.trim()) {
-      setError('reference', { message: PAYMENT_MESSAGES.upiReferenceRequired })
-      return
-    }
     recordPayment.mutate(values, { onSuccess: onClose })
   }
 
@@ -211,18 +207,18 @@ function RecordPaymentForm({
 
           <div className="space-y-1.5">
             <Label htmlFor="payment-reference">
-              UPI Transaction ID / UTR <span className="text-destructive">*</span>
+              UTR number <span className="text-destructive">*</span>
             </Label>
             <Input
               id="payment-reference"
               placeholder={REFERENCE_PLACEHOLDERS.UPI}
-              maxLength={100}
+              maxLength={12}
               disabled={isPending}
               aria-invalid={errors.reference ? true : undefined}
               {...register('reference')}
             />
             <p className="text-[11px] text-muted-foreground">
-              Enter the 12-digit UTR or Transaction reference from the customer&apos;s UPI confirmation.
+              Enter the 12-digit UTR from your bank app.
             </p>
             <FieldError message={errors.reference?.message} />
           </div>

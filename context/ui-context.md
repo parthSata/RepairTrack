@@ -375,15 +375,15 @@ Implementation source: `src/features/tracking/status-labels.ts`.
 ## Public Tracking Payment Payload & UI
 
 The public tracking payload includes an optional read-only `payment` block:
-`{ billTotal, totalPaid, balance, status, upiId?, payeeName? }` (amounts in integer paise).
+`{ billTotal, totalPaid, balance, status, isFinalized?, upiId?, payeeName? }` (amounts in integer paise).
 
-- **Inclusion rule**: Included only when a bill total exists (`finalTotal ?? estimatedTotal != null`) and the repair is not `CANCELLED`.
-- **UPI rule**: `upiId` and `payeeName` (shop UPI payee name falling back to shop name) are included only after the bill is finalized (`finalTotal != null`), `balance > 0`, and the shop has a configured `upi_id`.
+- **Inclusion rule**: Included only after the bill is finalized (`finalTotal != null`) and the repair is not `CANCELLED`. Before the bill is finalized, the payment block is omitted and the Payment card is not rendered on the tracking page.
+- **UPI rule**: `upiId` and `payeeName` (shop UPI payee name falling back to shop name) are included when `balance > 0` and the shop has configured a `upi_id`.
 - **Privacy & safety**: No individual payment records, references, staff names, or notes are returned.
 - **UI Presentation (`TrackPaymentCard`)**:
+  - Appears only once the bill is finalized.
   - Displays Paid, Balance due (`Math.max(balance, 0)`), and `PaymentStatusBadge` (`UNPAID`, `PARTIAL`, `PAID`).
-  - When the bill is not yet finalized, displays an informational note ("Bill not finalized yet...") and does not render the QR code.
-  - After finalize bill, when `balance > 0` and `upiId` is configured, reuses `UpiPayCard` for QR display and UPI ID copy.
+  - When `balance > 0` and `upiId` is configured, reuses `UpiPayCard` for QR display and UPI ID copy.
   - When `status === 'PAID'`, displays "Paid in full".
   - Displays a "Pay with UPI app" button (`<a href={upiLink}>`) only on mobile viewports (`sm:hidden`).
   - Fully responsive across mobile (375px+), tablet, and desktop with zero horizontal overflow.

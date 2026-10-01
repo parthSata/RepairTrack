@@ -106,8 +106,27 @@ export async function recordPayment({
     if (amount !== balance) {
       throw new HTTPException(400, { message: PAYMENT_MESSAGES.fullPaymentRequired })
     }
-    if (method === 'UPI' && !reference?.trim()) {
-      throw new HTTPException(400, { message: PAYMENT_MESSAGES.upiReferenceRequired })
+    if (method === 'UPI') {
+      const cleanReference = reference?.trim()
+      if (!cleanReference) {
+        throw new HTTPException(400, { message: PAYMENT_MESSAGES.upiUtrRequired })
+      }
+
+      const [existing] = await tx
+        .select({ id: payments.id })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.shopId, shopId),
+            eq(payments.method, 'UPI'),
+            eq(payments.reference, cleanReference),
+          ),
+        )
+        .limit(1)
+
+      if (existing) {
+        throw new HTTPException(409, { message: 'This UTR is already recorded' })
+      }
     }
 
     const [payment] = await tx
