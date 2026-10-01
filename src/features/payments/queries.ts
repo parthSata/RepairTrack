@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/api-client'
 import { shouldRetryQuery } from '@/lib/api-error'
 import type { PaymentMethod, PaymentType } from './schemas'
 import type { PaymentStatus } from './summary'
+import type { ShopUpi } from './upi'
 
 export interface RepairPayment {
   id: string
@@ -22,6 +23,9 @@ export interface RepairPayments {
   totalPaid: number
   balance: number | null
   status: PaymentStatus | null
+  repairStatus: string
+  /** Null when the shop hasn't set a UPI ID. */
+  upi: ShopUpi | null
 }
 
 export const paymentKeys = {

@@ -5,8 +5,9 @@ import { payments } from '@/server/db/schema/payments'
 import { repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
 import { PAYMENT_MESSAGES, type RecordPaymentInput } from '@/features/payments/schemas'
-import { exceedsBill, getBillTotal, getPaymentSummary } from '@/features/payments/summary'
+import { getBillTotal, getPaymentSummary } from '@/features/payments/summary'
 import { rupeesToPaise } from '@/lib/money'
+import { getShopUpi } from '@/server/services/shop.service'
 
 type RepairScope = { shopId: string; repairId: string }
 
@@ -44,7 +45,7 @@ async function findRepairForPayment(
 
 export async function listRepairPayments({ shopId, repairId }: RepairScope) {
   const repair = await findRepairForPayment(db, { shopId, repairId })
-  const rows = await db
+  const paymentRows = db
     .select({
       id: payments.id,
       amount: payments.amount,
@@ -59,6 +60,7 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
     .leftJoin(users, eq(users.id, payments.receivedBy))
     .where(and(eq(payments.shopId, shopId), eq(payments.repairId, repairId)))
     .orderBy(desc(payments.paidAt), desc(payments.createdAt))
+  const [rows, upi] = await Promise.all([paymentRows, getShopUpi(shopId)])
 
   const billTotal = getBillTotal(repair)
   const summary = getPaymentSummary({ billTotal: billTotal ?? 0, payments: rows })
@@ -70,6 +72,8 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
     totalPaid: summary.totalPaid,
     balance: hasBill ? summary.balance : null,
     status: hasBill ? summary.status : null,
+    repairStatus: repair.status,
+    upi,
   }
 }
 
@@ -88,11 +92,22 @@ export async function recordPayment({
     if (repair.status === 'CANCELLED') {
       throw new HTTPException(409, { message: PAYMENT_MESSAGES.repairCancelled })
     }
+    if (repair.finalTotal == null) {
+      throw new HTTPException(400, { message: PAYMENT_MESSAGES.billNotFinalized })
+    }
 
     const amount = rupeesToPaise(amountRupees)
     const totalPaid = await getTotalPaid({ client: tx, shopId, repairId })
-    if (exceedsBill({ billTotal: getBillTotal(repair), totalPaid, amount })) {
+    const balance = repair.finalTotal - totalPaid
+
+    if (balance <= 0) {
       throw new HTTPException(409, { message: PAYMENT_MESSAGES.exceedsBalance })
+    }
+    if (amount !== balance) {
+      throw new HTTPException(400, { message: PAYMENT_MESSAGES.fullPaymentRequired })
+    }
+    if (method === 'UPI' && !reference?.trim()) {
+      throw new HTTPException(400, { message: PAYMENT_MESSAGES.upiReferenceRequired })
     }
 
     const [payment] = await tx
@@ -104,8 +119,8 @@ export async function recordPayment({
         customerId: repair.customerId,
         amount,
         method,
-        type: repair.finalTotal == null ? 'ADVANCE' : 'PAYMENT',
-        reference: method === 'CASH' ? null : reference || null,
+        type: 'PAYMENT',
+        reference: method === 'CASH' ? null : reference?.trim() || null,
         note: note || null,
         receivedBy: userId,
       })
