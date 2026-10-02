@@ -1,12 +1,20 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, lte, or, sql, count, type SQL } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db, type DbClient } from '@/server/db'
+import { customers } from '@/server/db/schema/customers'
+import { invoices } from '@/server/db/schema/invoices'
 import { payments } from '@/server/db/schema/payments'
 import { repairs } from '@/server/db/schema/repairs'
 import { users } from '@/server/db/schema/users'
-import { PAYMENT_MESSAGES, type RecordPaymentInput } from '@/features/payments/schemas'
+import {
+  PAYMENT_MESSAGES,
+  type PaymentFilterInput,
+  type RecordPaymentInput,
+} from '@/features/payments/schemas'
 import { getBillTotal, getPaymentSummary } from '@/features/payments/summary'
+import { getOffset, toPaginatedResult } from '@/lib/pagination'
 import { rupeesToPaise } from '@/lib/money'
+import { toContainsPattern } from '@/server/lib/sql-search'
 import { getShopUpi } from '@/server/services/shop.service'
 
 type RepairScope = { shopId: string; repairId: string }
@@ -74,6 +82,153 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
     status: hasBill ? summary.status : null,
     repairStatus: repair.status,
     upi,
+  }
+}
+
+function buildPaymentListWhere({
+  shopId,
+  search,
+  method,
+  startDate,
+  endDate,
+}: {
+  shopId: string
+  search?: string
+  method?: PaymentFilterInput['method']
+  startDate?: string
+  endDate?: string
+}): SQL {
+  const conditions: SQL[] = [eq(payments.shopId, shopId)]
+
+  if (method) {
+    conditions.push(eq(payments.method, method as typeof payments.$inferSelect.method))
+  }
+
+  if (startDate) {
+    const start = new Date(startDate)
+    if (!Number.isNaN(start.getTime())) {
+      start.setHours(0, 0, 0, 0)
+      conditions.push(gte(payments.paidAt, start))
+    }
+  }
+
+  if (endDate) {
+    const end = new Date(endDate)
+    if (!Number.isNaN(end.getTime())) {
+      end.setHours(23, 59, 59, 999)
+      conditions.push(lte(payments.paidAt, end))
+    }
+  }
+
+  const pattern = toContainsPattern(search)
+  if (pattern) {
+    const searchCondition = or(
+      ilike(repairs.ticketNumber, pattern),
+      ilike(customers.name, pattern),
+      ilike(customers.phone, pattern),
+    )
+    if (searchCondition) conditions.push(searchCondition)
+  }
+
+  return and(...conditions)!
+}
+
+async function getPaymentTotals(whereClause: SQL) {
+  const [row] = await db
+    .select({
+      total: count(),
+      totalAmount: sql<string>`coalesce(sum(${payments.amount}), 0)`,
+    })
+    .from(payments)
+    .innerJoin(repairs, eq(repairs.id, payments.repairId))
+    .innerJoin(customers, eq(customers.id, payments.customerId))
+    .where(whereClause)
+
+  return {
+    total: Number(row?.total ?? 0),
+    totalAmount: Number(row?.totalAmount ?? 0),
+  }
+}
+
+export async function listPayments({
+  shopId,
+  search,
+  method,
+  startDate,
+  endDate,
+  page,
+  limit,
+  sortOrder,
+}: PaymentFilterInput & { shopId: string }) {
+  const whereClause = buildPaymentListWhere({ shopId, search, method, startDate, endDate })
+  const direction = sortOrder === 'asc' ? asc : desc
+
+  const rows = await db
+    .select({
+      payment: {
+        id: payments.id,
+        amount: payments.amount,
+        method: payments.method,
+        type: payments.type,
+        reference: payments.reference,
+        note: payments.note,
+        paidAt: payments.paidAt,
+      },
+      repair: {
+        id: repairs.id,
+        ticketNumber: repairs.ticketNumber,
+      },
+      customer: {
+        id: customers.id,
+        name: customers.name,
+        phone: customers.phone,
+      },
+      invoice: {
+        id: invoices.id,
+        invoiceNumber: invoices.invoiceNumber,
+      },
+      receivedByName: users.name,
+      matchCount: sql<number>`count(*) over ()`.mapWith(Number),
+      totalAmount: sql<number>`coalesce(sum(${payments.amount}) over (), 0)`.mapWith(Number),
+    })
+    .from(payments)
+    .innerJoin(repairs, eq(repairs.id, payments.repairId))
+    .innerJoin(customers, eq(customers.id, payments.customerId))
+    .leftJoin(users, eq(users.id, payments.receivedBy))
+    .leftJoin(
+      invoices,
+      and(
+        eq(invoices.repairId, payments.repairId),
+        eq(invoices.status, 'ISSUED'),
+      ),
+    )
+    .where(whereClause)
+    .orderBy(direction(payments.paidAt), direction(payments.id))
+    .limit(limit)
+    .offset(getOffset(page, limit))
+
+  const items = rows.map((r) => ({
+    ...r.payment,
+    paidAt: r.payment.paidAt.toISOString(),
+    repair: r.repair,
+    customer: r.customer,
+    invoice: r.invoice?.id ? { id: r.invoice.id, invoiceNumber: r.invoice.invoiceNumber } : null,
+    receivedByName: r.receivedByName,
+  }))
+
+  const firstRow = rows[0]
+  let total = firstRow?.matchCount ?? 0
+  let totalAmount = firstRow?.totalAmount ?? 0
+
+  if (!firstRow && page > 1) {
+    const totals = await getPaymentTotals(whereClause)
+    total = totals.total
+    totalAmount = totals.totalAmount
+  }
+
+  return {
+    ...toPaginatedResult(items, total, page, limit),
+    totalAmount,
   }
 }
 

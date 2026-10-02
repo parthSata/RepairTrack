@@ -54,7 +54,29 @@ export const repairPaymentsQuerySchema = z.object({
   repairId: z.string().trim().min(1, { message: 'Repair is required' }).max(100, { message: 'Invalid repair id' }),
 })
 
+export const PAYMENT_FILTER_METHODS = PAYMENT_METHODS
+export type PaymentFilterMethod = (typeof PAYMENT_FILTER_METHODS)[number]
+
+export const paymentFilterSchema = z
+  .object({
+    repairId: z.string().trim().max(100).optional(),
+    search: z.string().trim().max(100).optional(),
+    method: z.enum(PAYMENT_FILTER_METHODS).optional(),
+    startDate: z.string().trim().max(30).optional(),
+    endDate: z.string().trim().max(30).optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(10),
+    sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  })
+
+export type PaymentFilterInput = z.infer<typeof paymentFilterSchema>
+
 export type PaymentType = 'ADVANCE' | 'PAYMENT'
+
+export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
+  ADVANCE: 'Advance',
+  PAYMENT: 'Payment',
+}
 
 export const PAYMENT_STATUS_LABELS = {
   UNPAID: 'Unpaid',

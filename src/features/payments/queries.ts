@@ -1,7 +1,9 @@
-import { useQuery } from '@tanstack/react-query'
+import * as React from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
 import { shouldRetryQuery } from '@/lib/api-error'
-import type { PaymentMethod, PaymentType } from './schemas'
+import type { PaginatedResponse } from '@/lib/pagination'
+import type { PaymentFilterInput, PaymentMethod, PaymentType } from './schemas'
 import type { PaymentStatus } from './summary'
 import type { ShopUpi } from './upi'
 
@@ -28,8 +30,40 @@ export interface RepairPayments {
   upi: ShopUpi | null
 }
 
+export interface PaymentListItem {
+  id: string
+  amount: number
+  method: PaymentMethod | 'CARD' | 'BANK_TRANSFER'
+  type: PaymentType
+  reference: string | null
+  note: string | null
+  paidAt: string
+  repair: {
+    id: string
+    ticketNumber: string
+  }
+  customer: {
+    id: string
+    name: string
+    phone: string
+  }
+  invoice: {
+    id: string
+    invoiceNumber: string
+  } | null
+  receivedByName: string | null
+}
+
+export interface PaymentListResponse extends PaginatedResponse<PaymentListItem> {
+  totalAmount: number
+}
+
+const LIST_STALE_TIME_MS = 30 * 1000
+
 export const paymentKeys = {
   all: ['payments'] as const,
+  lists: () => [...paymentKeys.all, 'list'] as const,
+  list: (filters: PaymentFilterInput) => [...paymentKeys.lists(), filters] as const,
   byRepair: (repairId: string) => [...paymentKeys.all, 'repair', repairId] as const,
 }
 
@@ -45,3 +79,33 @@ export function useRepairPayments(repairId: string) {
     retry: shouldRetryQuery,
   })
 }
+
+async function fetchPayments(filters: PaymentFilterInput): Promise<PaymentListResponse> {
+  const response = await apiClient.get<PaymentListResponse>('/payments', { params: filters })
+  return response.data
+}
+
+export function usePayments(filters: PaymentFilterInput) {
+  const queryClient = useQueryClient()
+  const query = useQuery<PaymentListResponse>({
+    queryKey: paymentKeys.list(filters),
+    queryFn: () => fetchPayments(filters),
+    staleTime: LIST_STALE_TIME_MS,
+    placeholderData: keepPreviousData,
+    retry: shouldRetryQuery,
+  })
+
+  const totalPages = query.data?.totalPages ?? 0
+  React.useEffect(() => {
+    if (filters.page >= totalPages) return
+    const nextFilters = { ...filters, page: filters.page + 1 }
+    void queryClient.prefetchQuery({
+      queryKey: paymentKeys.list(nextFilters),
+      queryFn: () => fetchPayments(nextFilters),
+      staleTime: LIST_STALE_TIME_MS,
+    })
+  }, [filters, totalPages, queryClient])
+
+  return query
+}
+

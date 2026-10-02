@@ -2,21 +2,31 @@ import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import {
   PAYMENT_MESSAGES,
+  paymentFilterSchema,
   recordPaymentSchema,
-  repairPaymentsQuerySchema,
 } from '@/features/payments/schemas'
 import { requireRole } from '@/server/hono/session'
 import { validationHook } from '@/server/hono/validation'
-import { listRepairPayments, recordPayment } from '@/server/services/payment.service'
+import {
+  listPayments,
+  listRepairPayments,
+  recordPayment,
+} from '@/server/services/payment.service'
 
 const paymentsRouter = new Hono()
 
 const requirePaymentAccess = (request: Request) =>
   requireRole(request, ['OWNER', 'STAFF'], PAYMENT_MESSAGES.forbidden)
 
-paymentsRouter.get('/', zValidator('query', repairPaymentsQuerySchema, validationHook), async (c) => {
+paymentsRouter.get('/', zValidator('query', paymentFilterSchema, validationHook), async (c) => {
   const { shopId } = await requirePaymentAccess(c.req.raw)
-  return c.json(await listRepairPayments({ ...c.req.valid('query'), shopId }))
+  const query = c.req.valid('query')
+
+  if (query.repairId) {
+    return c.json(await listRepairPayments({ shopId, repairId: query.repairId }))
+  }
+
+  return c.json(await listPayments({ ...query, shopId }))
 })
 
 paymentsRouter.post('/', zValidator('json', recordPaymentSchema, validationHook), async (c) => {
