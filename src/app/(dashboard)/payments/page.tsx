@@ -2,11 +2,11 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
-import { PaymentTable } from '@/components/payments/payment-table'
+import { PaymentsTabs } from '@/components/payments/payments-tabs'
 
 export const metadata: Metadata = {
   title: 'Payments | RepairTrack',
-  description: 'Search and review payments and advances recorded by your repair shop.',
+  description: 'Search and review payments, advances, and pending balances across repair tickets.',
 }
 
 export default async function PaymentsPage() {
@@ -23,11 +23,11 @@ export default async function PaymentsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Payments</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Search and review payments, advances, and transaction methods across repair tickets.
+          Search and review payments, advances, and pending balances across repair tickets.
         </p>
       </div>
 
-      <PaymentTable />
+      <PaymentsTabs />
     </div>
   )
 }

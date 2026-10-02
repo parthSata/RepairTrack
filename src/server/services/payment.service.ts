@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, lte, or, sql, count, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, isNotNull, lte, ne, or, sql, count, type SQL } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db, type DbClient } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
@@ -302,4 +302,66 @@ export async function recordPayment({
 
     return payment
   })
+}
+
+export async function getPendingPayments(shopId: string) {
+  const paymentsSubquery = db
+    .select({
+      repairId: payments.repairId,
+      totalPaid: sql<number>`coalesce(sum(${payments.amount}), 0)`.mapWith(Number).as('total_paid'),
+    })
+    .from(payments)
+    .where(eq(payments.shopId, shopId))
+    .groupBy(payments.repairId)
+    .as('payments_summary')
+
+  const billTotalExpr = sql<number>`${repairs.finalTotal}`
+  const totalPaidExpr = sql<number>`coalesce(${paymentsSubquery.totalPaid}, 0)`
+  const balanceExpr = sql<number>`(${billTotalExpr} - ${totalPaidExpr})`
+
+  const [rows, upi] = await Promise.all([
+    db
+      .select({
+        repairId: repairs.id,
+        ticketNumber: repairs.ticketNumber,
+        status: repairs.status,
+        billTotal: billTotalExpr.mapWith(Number),
+        balance: balanceExpr.mapWith(Number),
+        customer: {
+          id: customers.id,
+          name: customers.name,
+          phone: customers.phone,
+        },
+      })
+      .from(repairs)
+      .innerJoin(customers, eq(customers.id, repairs.customerId))
+      .leftJoin(paymentsSubquery, eq(repairs.id, paymentsSubquery.repairId))
+      .where(
+        and(
+          eq(repairs.shopId, shopId),
+          ne(repairs.status, 'CANCELLED'),
+          isNotNull(repairs.finalTotal),
+          sql`${balanceExpr} > 0`,
+        ),
+      )
+      .orderBy(desc(balanceExpr), desc(repairs.createdAt)),
+    getShopUpi(shopId),
+  ])
+
+  const items = rows.map((r) => ({
+    repairId: r.repairId,
+    ticketNumber: r.ticketNumber,
+    customer: r.customer,
+    status: r.status,
+    billTotal: r.billTotal,
+    balance: r.balance,
+  }))
+
+  const totalOutstanding = items.reduce((acc, curr) => acc + curr.balance, 0)
+
+  return {
+    items,
+    totalOutstanding,
+    upi,
+  }
 }

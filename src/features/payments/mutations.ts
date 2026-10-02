@@ -24,7 +24,7 @@ export function useRecordPayment(repairId: string) {
       return response.data
     },
     onSuccess: (payment) => {
-      void queryClient.invalidateQueries({ queryKey: paymentKeys.byRepair(repairId) })
+      void queryClient.invalidateQueries({ queryKey: paymentKeys.all })
       const label = payment.type === 'ADVANCE' ? 'Advance' : 'Payment'
       toast.success(`${label} of ${formatRupees(payment.amount)} recorded`)
     },
@@ -32,7 +32,7 @@ export function useRecordPayment(repairId: string) {
       // 409 = repair cancelled or balance changed — refetch so the status and balance shown are current.
       if (getApiErrorStatus(error) === 409) {
         void queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
-        void queryClient.invalidateQueries({ queryKey: paymentKeys.byRepair(repairId) })
+        void queryClient.invalidateQueries({ queryKey: paymentKeys.all })
       }
       toast.error(getApiErrorMessage(error, 'Failed to record payment'))
     },

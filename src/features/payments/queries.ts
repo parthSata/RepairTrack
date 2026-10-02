@@ -1,3 +1,5 @@
+'use client'
+
 import * as React from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
@@ -58,12 +60,35 @@ export interface PaymentListResponse extends PaginatedResponse<PaymentListItem> 
   totalAmount: number
 }
 
+export interface PendingPaymentItem {
+  repairId: string
+  ticketNumber: string
+  customer: {
+    id: string
+    name: string
+    phone: string
+  }
+  status: string
+  billTotal: number
+  balance: number
+  paid?: number
+  hasFinalBill?: boolean
+  lastPaymentDate?: string | null
+}
+
+export interface PendingPaymentsResponse {
+  items: PendingPaymentItem[]
+  totalOutstanding: number
+  upi: ShopUpi | null
+}
+
 const LIST_STALE_TIME_MS = 30 * 1000
 
 export const paymentKeys = {
   all: ['payments'] as const,
   lists: () => [...paymentKeys.all, 'list'] as const,
   list: (filters: PaymentFilterInput) => [...paymentKeys.lists(), filters] as const,
+  pending: () => [...paymentKeys.all, 'pending'] as const,
   byRepair: (repairId: string) => [...paymentKeys.all, 'repair', repairId] as const,
 }
 
@@ -107,5 +132,17 @@ export function usePayments(filters: PaymentFilterInput) {
   }, [filters, totalPages, queryClient])
 
   return query
+}
+
+export function usePendingPayments() {
+  return useQuery<PendingPaymentsResponse>({
+    queryKey: paymentKeys.pending(),
+    queryFn: async () => {
+      const response = await apiClient.get<PendingPaymentsResponse>('/payments/pending')
+      return response.data
+    },
+    staleTime: LIST_STALE_TIME_MS,
+    retry: shouldRetryQuery,
+  })
 }
 
