@@ -26,8 +26,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  // TECHNICIAN role: restricted from inventory, invoices, and settings
-  if (role === 'TECHNICIAN' && (path.startsWith('/inventory') || path.startsWith('/invoices') || path.startsWith('/settings'))) {
+  // TECHNICIAN role: restricted from inventory, invoices, payments, and settings
+  if (role === 'TECHNICIAN' && (path.startsWith('/inventory') || path.startsWith('/invoices') || path.startsWith('/payments') || path.startsWith('/settings'))) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
@@ -48,6 +48,8 @@ export const config = {
     '/inventory/:path*',
     '/invoices',
     '/invoices/:path*',
+    '/payments',
+    '/payments/:path*',
     '/settings',
     '/settings/:path*',
   ],

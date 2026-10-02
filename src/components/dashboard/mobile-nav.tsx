@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { Boxes, CircleDollarSign, LayoutDashboard, Menu, Settings, Smartphone, Users, Wrench, X } from 'lucide-react'
+import { Boxes, CircleDollarSign, CreditCard, LayoutDashboard, Menu, Settings, Smartphone, Users, Wrench, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export function MobileNav({ role }: { role: string }) {
@@ -19,6 +19,7 @@ export function MobileNav({ role }: { role: string }) {
     ...(!restricted ? [
       { href: '/inventory', label: 'Inventory', icon: Boxes },
       { href: '/invoices', label: 'Invoices', icon: CircleDollarSign },
+      { href: '/payments', label: 'Payments', icon: CreditCard },
       ...(owner ? [{ href: '/settings/shop', label: 'Settings', icon: Settings }] : []),
     ] : []),
   ]
