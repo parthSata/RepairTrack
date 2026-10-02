@@ -8,6 +8,7 @@ import {
 import { requireRole } from '@/server/hono/session'
 import { validationHook } from '@/server/hono/validation'
 import {
+  getPendingPayments,
   listPayments,
   listRepairPayments,
   recordPayment,
@@ -17,6 +18,11 @@ const paymentsRouter = new Hono()
 
 const requirePaymentAccess = (request: Request) =>
   requireRole(request, ['OWNER', 'STAFF'], PAYMENT_MESSAGES.forbidden)
+
+paymentsRouter.get('/pending', async (c) => {
+  const { shopId } = await requirePaymentAccess(c.req.raw)
+  return c.json(await getPendingPayments(shopId))
+})
 
 paymentsRouter.get('/', zValidator('query', paymentFilterSchema, validationHook), async (c) => {
   const { shopId } = await requirePaymentAccess(c.req.raw)

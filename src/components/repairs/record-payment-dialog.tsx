@@ -36,6 +36,7 @@ import { paiseToRupees, rupeesToPaise } from '@/lib/money'
 type RecordPaymentDialogProps = {
   repairId: string
   ticketNumber: string
+  customerName?: string
   balance: number | null
   upi: ShopUpi | null
   open: boolean
@@ -54,6 +55,7 @@ type RecordPaymentFormProps = {
 export function RecordPaymentDialog({
   repairId,
   ticketNumber,
+  customerName,
   balance,
   upi,
   open,
@@ -73,9 +75,8 @@ export function RecordPaymentDialog({
       <DialogHeader>
         <DialogTitle>Record Payment</DialogTitle>
         <DialogDescription>
-          {balance != null
-            ? `Full & final settlement: ${formatRupees(Math.max(balance, 0))}`
-            : 'Finalize the bill first to record payment.'}
+          {customerName ? `${customerName} • Ticket #${ticketNumber}` : `Ticket #${ticketNumber}`}
+          {balance != null ? ` • Settlement: ${formatRupees(Math.max(balance, 0))}` : ''}
         </DialogDescription>
       </DialogHeader>
       <RecordPaymentForm
