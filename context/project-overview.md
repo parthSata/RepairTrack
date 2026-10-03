@@ -310,11 +310,13 @@ Management.
   invitations are delivered as a **copyable invite link** that the
   Owner shares manually (e.g. WhatsApp, SMS, in person). The link
   contains a single-use, expiring invitation token.
-- Once Sprint 3's Owner Gmail Connection is live, an invited-but-not-yet-
-  connected Owner still gets the link flow; a connected Owner instead
-  gets both the link and an automatic invitation email sent from their
-  own Gmail address. The link never stops working — the email is an
-  enhancement, not a replacement.
+- Invitation emails are sent **only** from the Owner's own connected
+  Gmail — never from the RepairTrack platform sender. A connected Owner
+  gets both the link and an automatic invitation email. When Gmail is
+  not connected, Add Staff first shows the Connect Gmail prompt
+  (Connect Gmail / Continue with link only); continuing creates the
+  invite and shows the copyable link, with no email sent. The link never
+  stops working — the email is an enhancement, not a replacement.
 - Accepting an invitation lets the invitee set a password (or use
   Google OAuth) and creates their account with the invited role,
   scoped to the inviting Owner's shop. Invited accounts cannot self-
@@ -500,7 +502,8 @@ owner's own connected Gmail account — see "Owner Email Connection"
 below. This is approved for Sprint 3. Do not add a separate
 transactional email provider (SendGrid, Resend, Postmark, etc.) or a
 shared RepairTrack-owned sender address — every shop sends from its own
-owner's Gmail.
+owner's Gmail. The one exception is account-verification email, which
+comes from the platform sender (`architecture-context.md` §14).
 
 Bulk/marketing email and automated drip campaigns remain out of scope
 (see §9).
@@ -526,16 +529,27 @@ address.
   Email") but never sees or handles the Owner's Gmail credentials or
   tokens — the request is proxied through RepairTrack's server using
   the stored, encrypted OAuth token for that shop.
-- If a shop's Owner has not connected Gmail, customer-facing email
-  sending is simply unavailable for that shop; in-app notifications
-  and the Sprint 1 invite-link flow are unaffected.
-- Approved trigger events: repair needs approval, repair approved,
-  ready for pickup, repair delayed. Repair received is optional. Do
-  not add a new trigger event without approval — avoid emailing
+- If a shop's Owner has not connected Gmail, shop emails are not sent
+  and RepairTrack never falls back to the platform sender. Every action
+  that would send a shop email (staff invite, repair updates, invoice
+  generated, payment received) first shows the same Connect Gmail
+  prompt. In-app notifications and the invite-link flow are unaffected.
+- The RepairTrack platform sender only sends verification and
+  authentication emails (Owner registration, staff/technician account
+  verification, reactivated-staff verification, future password reset).
+- Approved trigger events:
+  - Repair received
+  - Diagnosis completed & approval required (one email)
+  - Repair started
+  - Ready for pickup
+  - Repair completed
+  - Invoice generated
+  - Payment received
+
+  Do not add a new trigger event without approval — avoid emailing
   customers on every minor field change.
-- Reusable, editable email templates: Repair Received, Repair Approval
-  Required, Repair Approved, Repair Delayed, Ready for Pickup, Payment
-  Receipt. The Owner can preview a template and send a test email to
+- Reusable, editable email templates, one per approved trigger event
+  above. The Owner can preview a template and send a test email to
   themselves before it goes live.
 
 ---
@@ -629,7 +643,8 @@ The following are NOT part of the current product scope:
 - Unapproved integrations
 - A shared/global RepairTrack-operated Gmail sending account — see
   "Owner Gmail Connection" above; every shop must use its own Owner's
-  connected Gmail
+  connected Gmail (only exception: account-verification emails, see
+  `architecture-context.md` §14)
 
 Do not create UI, routes, APIs, database tables, or components for
 these features.

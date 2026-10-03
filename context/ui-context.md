@@ -173,7 +173,9 @@ Dashboard should provide:
 - Shop Settings
 - Staff Management — list (name, role, status: Active/Invited/Inactive),
   Add Staff form (name, email, role picker), copyable invite link,
-  deactivate/reactivate, role change
+  deactivate/reactivate, role change. When Gmail isn't connected, Add
+  Staff opens on the Connect Gmail prompt (Connect Gmail / Continue with
+  link only) before the form
 - Email & Notifications — Gmail connection status (Not Connected /
   Connected as `owner@email.com`), Connect/Disconnect actions, email
   template preview, "Send Test Email" (Sprint 3; OWNER-only screen —
@@ -284,6 +286,13 @@ can be reused. The Staff status indicator (Active/Invited/Inactive)
 and the Gmail connection status indicator should both reuse the
 existing Badge component — do not invent a second badge style for
 either.
+
+`ConnectGmailPrompt` (`src/components/email/connect-gmail-prompt.tsx`)
+is the single "connect your Gmail" prompt. Every action that would send
+a shop email (staff invite, repair updates, invoice generated, payment
+received) shows it first when the shop's Gmail isn't connected — reuse
+it with a feature-specific description and continue action; do not
+build a second prompt.
 
 Primitives come from shadcn/ui in `src/components/ui`. Do not hand-write
 a Button, Input, Dialog, or Table — compose from the existing set and
