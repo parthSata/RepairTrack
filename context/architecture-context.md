@@ -208,7 +208,8 @@ Do NOT introduce:
 - A fourth internal role (`MANAGER`) at the data-model level — see
   `project-overview.md` §6b
 - A shared/global RepairTrack-operated Gmail account — every shop
-  sends through its own Owner's connected Gmail (§14)
+  sends through its own Owner's connected Gmail (§14; the only
+  exception is account-verification email, see §14 Rules)
 
 `Gmail API` was previously excluded; it is now approved and in-scope
 **only** for the Owner Gmail Connection feature described in §14 — do
@@ -280,7 +281,7 @@ src/server/db/              Drizzle schema + migrations (the only place Drizzle/
 src/server/services/        Business logic services (the only place that talks to the db)
 src/server/auth/            Better Auth server config (auth.ts)
 src/server/storage/         Cloudinary client & signed upload helpers (cloudinary.ts)
-src/server/email/           Gmail OAuth client, email templates, send service (Sprint 3)
+src/server/email/           Email building blocks: escape-html.ts, layout.ts, raw-message.ts
 src/features/<x>/           Feature queries.ts, mutations.ts, schemas.ts, types.ts, components/
 src/components/ui/          shadcn primitives — do not hand-write a Button/Input/Dialog
 src/components/             Global / shared layout components
@@ -610,6 +611,32 @@ Email sent "from" the Owner's own connected address
 
 Rules:
 
+- **Exception:** The .env platform sender is permitted only for
+  account-verification emails. Shop-level operational emails must use
+  the shop owner's connected Gmail account.
+  - "Account-verification emails" means verification and authentication
+    emails only: Owner registration, staff/technician signup after
+    accepting an invite (Better Auth `signUpEmail`), reactivated-staff
+    verification, and future auth emails such as password reset.
+  - Staff/technician invitations, repair updates, invoice and payment
+    emails are shop emails: Owner's Gmail only. When it isn't connected,
+    the UI shows `ConnectGmailPrompt` before the action instead of
+    sending.
+- One Google Cloud OAuth app (`GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET`)
+  serves every sender; a sender is that app plus one mailbox's refresh
+  token. `gmail.service.ts` `sendEmail(sender, message)` takes the
+  sender (`GmailSender = { name, email, refreshToken }`) as a parameter
+  and never hard-codes one. The `.env` sender is private to
+  `gmail.service.ts` and reachable only through
+  `sendAccountVerificationEmail`.
+- `sendEmail` returns `{ sent: true }` or
+  `{ sent: false, reason: 'not_configured' | 'invalid_grant' | 'send_failed' }`
+  and never throws; `invalid_grant` means the shop must reconnect.
+- Email building blocks live in `src/server/email/`: `escape-html.ts`
+  (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
+  shell every template uses) and `raw-message.ts` (`buildRawEmail`:
+  CR/LF stripped from headers, RFC 2047 From name and Subject, base64
+  HTML body wrapped at 76 characters, base64url output).
 - One `gmail_connections` row per shop; disconnecting deletes/nulls the
   stored token rather than merely flagging it "disconnected" (don't
   keep sendable tokens around for a disconnected account).
@@ -617,9 +644,9 @@ Rules:
   triggers a template send; they never receive the token, client ID,
   client secret, or a Gmail API response containing credentials.
 - If a shop has no `gmail_connections` row (or it's disconnected), the
-  send endpoint returns a clear "email not connected" result — it must
-  not silently fail or fall back to any shared/global sender (see the
-  exclusion in §2).
+  send endpoint returns a clear "email not connected" result and the
+  Owner is asked to connect Gmail — it must not silently fail or fall
+  back to the `.env` platform sender (see the exclusion in §2).
 - Do not request broader Gmail scopes (e.g. full mailbox read/modify)
   than `gmail.send` — this keeps the OAuth consent screen narrow and
   trustworthy for shop owners connecting a personal Gmail account.

@@ -4,7 +4,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { HTTPException } from 'hono/http-exception'
 import { auth } from '@/server/auth'
 import { db } from '@/server/db'
-import { accounts, shops, staffInvitations, users } from '@/server/db/schema'
+import { accounts, staffInvitations, users } from '@/server/db/schema'
 import { devices, repairs } from '@/server/db/schema/repairs'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import type {
@@ -14,8 +14,7 @@ import type {
   InviteStaffInput,
   UnifiedStaffMember,
 } from '@/features/staff/schemas'
-import { sendEmail } from '@/server/services/gmail.service'
-import { buildStaffInvitationEmailHtml, buildVerificationEmailHtml } from '@/server/services/email-templates'
+import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
 import {
   NON_TERMINAL_REPAIR_STATUSES,
   syncAssignmentOnReassign,
@@ -291,13 +290,6 @@ export async function inviteStaff(shopId: string, invitedBy: string, input: Invi
       .where(eq(staffInvitations.id, pendingInvite.id))
   }
 
-  const shop = await db.query.shops.findFirst({
-    where: eq(shops.id, shopId),
-  })
-
-  const shopName = shop?.name ?? 'RepairTrack Shop'
-  const inviterName = inviter?.name ?? 'Shop Owner'
-
   const token = crypto.randomUUID()
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
 
@@ -311,28 +303,6 @@ export async function inviteStaff(shopId: string, invitedBy: string, input: Invi
     invitedBy,
     expiresAt,
   })
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const inviteUrl = `${appUrl}/invite/${token}`
-
-  try {
-    const html = buildStaffInvitationEmailHtml({
-      inviterName,
-      shopName,
-      role: input.role,
-      inviteUrl,
-    })
-    const emailResult = await sendEmail({
-      to: targetEmail,
-      subject: `You've been invited to join ${shopName} on RepairTrack`,
-      html,
-    })
-    if (!emailResult.sent) {
-      console.warn('Staff invitation email not sent (Gmail API not configured)')
-    }
-  } catch (emailErr) {
-    console.warn('Failed to send staff invitation email:', emailErr)
-  }
 
   return {
     token,
@@ -612,20 +582,7 @@ export async function getInvitationByToken(token: string): Promise<InvitationDet
 async function sendReactivationVerificationEmail(email: string, name: string) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
   const url = `${appUrl}/verify-email?email=${encodeURIComponent(email)}`
-
-  try {
-    const html = buildVerificationEmailHtml({ name, url })
-    const result = await sendEmail({
-      to: email,
-      subject: 'Verify your RepairTrack email',
-      html,
-    })
-    if (!result.sent) {
-      console.warn('Verification email not sent (Gmail API not connected)')
-    }
-  } catch (err) {
-    console.warn('Failed to send verification email for reactivated user:', err)
-  }
+  await sendAccountVerificationEmail({ to: email, name, url })
 }
 
 async function reactivateInactiveStaffUser(

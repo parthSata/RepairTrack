@@ -4,8 +4,7 @@ import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { db } from '@/server/db'
 import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
-import { sendEmail } from '@/server/services/gmail.service'
-import { buildVerificationEmailHtml } from '@/server/services/email-templates'
+import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
 
 function readShopName(body: unknown, userName?: string): string {
   const nameStr = userName || 'Owner'
@@ -126,17 +125,7 @@ export const auth = betterAuth({
         return
       }
 
-      try {
-        const html = buildVerificationEmailHtml({ name: user.name, url })
-        const result = await sendEmail({
-          to: user.email,
-          subject: 'Verify your RepairTrack email',
-          html,
-        })
-        if (!result.sent) console.warn('Verification email not sent (Gmail API not connected)')
-      } catch (err) {
-        console.warn('Failed to send verification email:', err)
-      }
+      await sendAccountVerificationEmail({ to: user.email, name: user.name, url })
     },
   },
   socialProviders: {
