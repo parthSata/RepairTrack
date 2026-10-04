@@ -37,6 +37,7 @@ async function main() {
         shopName: 'Café Repairs & Co',
         role: 'TECHNICIAN',
         inviteUrl: `${appUrl}/invite/verify-email-script`,
+        expiresIn: '10 minutes',
       }),
     }),
   )

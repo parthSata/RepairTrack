@@ -292,8 +292,9 @@ both:
 - **Google OAuth Login** = "use Google to sign in to RepairTrack."
   Configured through Better Auth. Every role can use it.
 - **Gmail API OAuth** = "allow RepairTrack to send email through my
-  Gmail." A separate, narrower consent (`gmail.send` scope only),
-  requested only from Settings, only by the OWNER.
+  Gmail." A separate, narrower consent (`gmail.send` plus `openid email`
+  to read the connected address), requested only from Settings, only by
+  the OWNER.
 Do not conflate the two flows or reuse one token for the other purpose.
  
 ---
@@ -517,11 +518,15 @@ emails are sent from the shop's real identity, not a shared RepairTrack
 address.
  
 - Settings → Email & Notifications shows connection status
-  (`Not Connected` / `Connected: <email>`) with Connect/Disconnect
-  actions.
+  (`Not connected` / `Connected: <email>` / `Reconnect needed`) with
+  Connect (Reconnect), Disconnect and Send test email actions.
 - Connecting opens a Google OAuth consent screen scoped to
-  `gmail.send` only (see "Google OAuth Login vs. Gmail Sending" above).
-  RepairTrack never requests full mailbox read access.
+  `gmail.send` plus `openid email` (only to read which address was
+  connected; see "Google OAuth Login vs. Gmail Sending" above).
+  RepairTrack never requests mailbox read access.
+- When Google rejects the stored token (`invalid_grant`, e.g. the Owner
+  revoked access), the connection becomes `Reconnect needed` and no shop
+  email is sent until the Owner reconnects.
 - Each shop's Gmail connection is independent — Shop A's owner
   connects `ownerA@gmail.com`, Shop B's owner connects
   `ownerB@gmail.com`. There is no shared/global sending account.

@@ -290,12 +290,15 @@ Do not commit commented-out code, debug logging, or `.env` files.
 
 # 14. Gmail API (Owner Email Sending — Sprint 3)
 
-- Libraries: `googleapis` (the Gmail client) + `google-auth-library`
-  (`OAuth2Client` for the authorization-code exchange and refresh).
-  These are the only approved email-related packages — see the
-  exclusion list in `architecture-context.md` §2.
-- Request the narrowest scope: `https://www.googleapis.com/auth/gmail.send`
-  only. Never `gmail.modify` or `gmail.readonly`.
+- Library: `googleapis` only — the Gmail client and `google.auth.OAuth2`
+  for the authorization-code exchange, id-token check, refresh and
+  revoke (`createGmailOAuthClient()` in `gmail.service.ts`). It is the
+  only approved email-related package — see the exclusion list in
+  `architecture-context.md` §2.
+- Request the narrowest scopes: `https://www.googleapis.com/auth/gmail.send`
+  plus `openid email` (to read the connected address from the id token).
+  Never `gmail.modify` or `gmail.readonly`. The callback rejects a grant
+  where the Owner unticked `gmail.send`.
 - OAuth2Client setup uses its own client id/secret/redirect URI (env
   vars distinct from Better Auth's), per §8 above.
 - Store only the refresh token (encrypted) in `gmail_connections`; mint
@@ -305,8 +308,9 @@ Do not commit commented-out code, debug logging, or `.env` files.
 - Compose the outgoing message as a raw base64url-encoded MIME message
   and send with `gmail.users.messages.send({ userId: 'me', requestBody: { raw } })`.
 - If a send fails because the refresh token was revoked (Google returns
-  `invalid_grant`), mark that shop's `gmail_connections` row as
-  disconnected and surface "reconnect Gmail" in Settings — don't retry
+  `invalid_grant`), set that shop's `gmail_connections.status` to
+  `NEEDS_RECONNECT` (done by `sendShopEmail`) and surface "Reconnect
+  needed" in Settings — don't retry
   silently in a loop.
 - Never log the refresh token, access token, or raw message body long-
   term (`code-standards.md` §17 already forbids logging OAuth secrets;

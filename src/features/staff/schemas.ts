@@ -33,10 +33,14 @@ export interface InvitationDetails {
   expiresAt: string
 }
 
+/** Whether the invitation email went out from the Owner's Gmail; the link works either way. */
+export type InviteEmailStatus = 'sent' | 'not_connected' | 'reconnect_needed' | 'failed'
+
 export interface InviteStaffResponse {
   token: string
   inviteLink: string
   expiresAt: string
+  emailStatus: InviteEmailStatus
 }
 
 export const setStaffStatusSchema = z.object({

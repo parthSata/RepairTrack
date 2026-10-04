@@ -1,6 +1,7 @@
 'use client'
 
 import { Mail } from 'lucide-react'
+import { ConnectGmailButton } from '@/components/email/connect-gmail-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -27,18 +28,11 @@ export function ConnectGmailPrompt({ description, continueLabel, onContinue }: C
         <Badge variant="warning">Gmail not connected</Badge>
       </div>
 
-      <p id="connect-gmail-hint" className="mt-3 text-xs leading-5 text-muted-foreground">
-        Connecting Gmail is coming soon. Shop emails will then be sent from your own address.
-      </p>
-
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onContinue}>
           {continueLabel}
         </Button>
-        <Button type="button" disabled aria-describedby="connect-gmail-hint" className="gap-2">
-          <Mail className="h-4 w-4" />
-          Connect Gmail
-        </Button>
+        <ConnectGmailButton />
       </DialogFooter>
     </>
   )

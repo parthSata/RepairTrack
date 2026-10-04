@@ -12,6 +12,7 @@ import { trackRouter } from '@/server/hono/routes/track'
 import { inventoryRouter } from '@/server/hono/routes/inventory'
 import { invoicesRouter } from '@/server/hono/routes/invoices'
 import { paymentsRouter } from '@/server/hono/routes/payments'
+import { gmailRouter } from '@/server/hono/routes/gmail'
 import { handleApiError, handleApiNotFound } from '@/server/hono/error-handler'
 
 export const app = new Hono()
@@ -31,6 +32,7 @@ export const app = new Hono()
 	.route('/api/inventory', inventoryRouter)
 	.route('/api/invoices', invoicesRouter)
 	.route('/api/payments', paymentsRouter)
+	.route('/api/settings/gmail', gmailRouter)
 
 
 

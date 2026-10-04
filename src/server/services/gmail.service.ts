@@ -11,17 +11,25 @@ export type SendEmailResult =
   | { sent: true }
   | { sent: false; reason: 'not_configured' | 'invalid_grant' | 'send_failed' }
 
+export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
+export const GMAIL_SCOPES = [GMAIL_SEND_SCOPE, 'openid', 'email']
+
+/** One OAuth app serves every sender. `null` when the Gmail env vars are missing. */
+export function createGmailOAuthClient() {
+  const clientId = process.env.GMAIL_CLIENT_ID
+  const clientSecret = process.env.GMAIL_CLIENT_SECRET
+  if (!clientId || !clientSecret) return null
+  return new google.auth.OAuth2(clientId, clientSecret, process.env.GMAIL_REDIRECT_URI)
+}
+
 function isInvalidGrant(err: unknown) {
   const data = (err as { response?: { data?: { error?: unknown } } })?.response?.data
   return data?.error === 'invalid_grant' || (err instanceof Error && err.message.includes('invalid_grant'))
 }
 
 export async function sendEmail(sender: GmailSender, message: EmailMessage): Promise<SendEmailResult> {
-  const clientId = process.env.GMAIL_CLIENT_ID
-  const clientSecret = process.env.GMAIL_CLIENT_SECRET
-  if (!clientId || !clientSecret) return { sent: false, reason: 'not_configured' }
-
-  const auth = new google.auth.OAuth2(clientId, clientSecret)
+  const auth = createGmailOAuthClient()
+  if (!auth) return { sent: false, reason: 'not_configured' }
   auth.setCredentials({ refresh_token: sender.refreshToken })
 
   try {

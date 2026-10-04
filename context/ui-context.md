@@ -176,10 +176,14 @@ Dashboard should provide:
   deactivate/reactivate, role change. When Gmail isn't connected, Add
   Staff opens on the Connect Gmail prompt (Connect Gmail / Continue with
   link only) before the form
-- Email & Notifications — Gmail connection status (Not Connected /
-  Connected as `owner@email.com`), Connect/Disconnect actions, email
-  template preview, "Send Test Email" (Sprint 3; OWNER-only screen —
-  do not show Connect/Disconnect to STAFF or TECHNICIAN)
+- Email & Notifications (`/settings/email`, reached through the
+  Settings tabs `SettingsTabs` next to Shop Profile — no sidebar item) — Gmail connection status
+  Badge (Not connected / Connected: `owner@email.com` / Reconnect
+  needed), Connect (Reconnect) / Disconnect (with confirm) / "Send test
+  email" actions, email template preview (Sprint 3; OWNER-only screen —
+  do not show Connect/Disconnect to STAFF or TECHNICIAN). The Connect
+  button is the shared `ConnectGmailButton`. Add Staff skips the
+  Connect Gmail prompt once Gmail is connected
 
 ---
 
