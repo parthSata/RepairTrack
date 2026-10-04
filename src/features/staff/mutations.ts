@@ -11,6 +11,7 @@ import type {
   StaffAssignmentItem,
 } from './schemas'
 import { repairKeys } from '@/features/repairs/queries'
+import { gmailConnectionKey } from '@/features/gmail/queries'
 
 export function useInviteStaff() {
   const queryClient = useQueryClient()
@@ -20,8 +21,11 @@ export function useInviteStaff() {
       const response = await apiClient.post<InviteStaffResponse>('staff/invite', payload)
       return response.data
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: staffKeys.all })
+      if (result.emailStatus === 'reconnect_needed') {
+        void queryClient.invalidateQueries({ queryKey: gmailConnectionKey })
+      }
     },
   })
 }

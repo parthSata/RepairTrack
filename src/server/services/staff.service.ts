@@ -11,16 +11,31 @@ import type {
   AcceptInvitationInput,
   ChangeStaffRoleInput,
   InvitationDetails,
+  InviteEmailStatus,
   InviteStaffInput,
+  InviteStaffResponse,
   UnifiedStaffMember,
 } from '@/features/staff/schemas'
+import { buildStaffInvitationEmailHtml } from '@/server/services/email-templates'
+import { sendShopEmail, type SendShopEmailResult } from '@/server/services/gmail-connection.service'
 import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
 import {
   NON_TERMINAL_REPAIR_STATUSES,
   syncAssignmentOnReassign,
 } from '@/server/services/repair-assignment.helpers'
 
-const INVITE_TTL_MS = 10 * 60 * 1000
+const INVITE_TTL_MINUTES = 10
+const INVITE_TTL_MS = INVITE_TTL_MINUTES * 60 * 1000
+
+function getAppUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+}
+
+function toInviteEmailStatus(result: SendShopEmailResult): InviteEmailStatus {
+  if (result.sent) return 'sent'
+  if (result.reason === 'not_connected') return 'not_connected'
+  return result.reason === 'invalid_grant' ? 'reconnect_needed' : 'failed'
+}
 
 async function getAssignmentCountsByTechnicianStatus(
   shopId: string,
@@ -254,7 +269,11 @@ function buildInvitationDetails(
   }
 }
 
-export async function inviteStaff(shopId: string, invitedBy: string, input: InviteStaffInput) {
+export async function inviteStaff(
+  shopId: string,
+  invitedBy: string,
+  input: InviteStaffInput,
+): Promise<InviteStaffResponse> {
   const targetEmail = input.email.trim().toLowerCase()
 
   const inviter = await db.query.users.findFirst({
@@ -304,10 +323,24 @@ export async function inviteStaff(shopId: string, invitedBy: string, input: Invi
     expiresAt,
   })
 
+  const inviteLink = `/invite/${token}`
+  const emailResult = await sendShopEmail(shopId, (sender) => ({
+    to: targetEmail,
+    subject: `You've been invited to join ${sender.name} on RepairTrack`,
+    html: buildStaffInvitationEmailHtml({
+      inviterName: inviter?.name ?? sender.name,
+      shopName: sender.name,
+      role: input.role,
+      inviteUrl: `${getAppUrl()}${inviteLink}`,
+      expiresIn: `${INVITE_TTL_MINUTES} minutes`,
+    }),
+  }))
+
   return {
     token,
-    inviteLink: `/invite/${token}`,
+    inviteLink,
     expiresAt: expiresAt.toISOString(),
+    emailStatus: toInviteEmailStatus(emailResult),
   }
 }
 
@@ -580,8 +613,7 @@ export async function getInvitationByToken(token: string): Promise<InvitationDet
 }
 
 async function sendReactivationVerificationEmail(email: string, name: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
-  const url = `${appUrl}/verify-email?email=${encodeURIComponent(email)}`
+  const url = `${getAppUrl()}/verify-email?email=${encodeURIComponent(email)}`
   await sendAccountVerificationEmail({ to: email, name, url })
 }
 

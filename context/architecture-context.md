@@ -179,8 +179,9 @@ Use Zod for validating external input where appropriate.
 
 ## Transactional Email (Sprint 3 — Owner Gmail Connection)
 
-- `googleapis` (Gmail API client) + `google-auth-library` (OAuth2
-  token exchange/refresh)
+- `googleapis` only: the Gmail API client and `google.auth.OAuth2`
+  (token exchange, id-token check, refresh, revoke). Don't add
+  `google-auth-library` separately.
 
 This is a **pre-approved exception** to §2 below and to the "ask before
 adding a dependency" rule in `code-standards.md` §20 — it is required
@@ -390,7 +391,8 @@ REST paths use plural nouns: `GET /repairs`, `POST /repairs`,
 in URLs. The Gmail connect/disconnect actions under
 `/api/settings/gmail` are the one accepted exception (OAuth flows are
 inherently action-shaped: `/api/settings/gmail/connect`,
-`/api/settings/gmail/callback`, `/api/settings/gmail/disconnect`).
+`/api/settings/gmail/callback`, `/api/settings/gmail/disconnect`,
+`/api/settings/gmail/test`).
 
 Do not create APIs for features that are not part of the approved
 product scope.
@@ -407,9 +409,10 @@ Core entities may include:
 - shops
 - staff_invitations (Sprint 1: token, email, invited role, invited_by,
   status [`pending` | `accepted` | `expired` | `revoked`], expires_at)
-- gmail_connections (Sprint 3: one row per shop — `shop_id` FK,
-  connected Google account email, encrypted refresh token, `connected`
-  boolean, `connected_at`). Do not put the refresh token directly on
+- gmail_connections (Sprint 3: one row per shop — unique `shop_id` FK,
+  connected Google account `email`, `refresh_token_encrypted`,
+  `status` [`CONNECTED` | `NEEDS_RECONNECT`], `connected_at`). No row
+  means not connected. Do not put the refresh token directly on
   `shops` — keep credential storage isolated in its own table so it can
   be access-controlled and rotated independently.
 - customers
@@ -430,8 +433,9 @@ Conventions:
 - Enums (repair status, payment status, role, invitation status) as pg
   enums, matching the status list in `project-overview.md` exactly.
 - Money stored as `integer` paise — never float. Format only in the UI.
-- OAuth refresh tokens (`gmail_connections.refresh_token`) are stored
-  encrypted at rest (application-level encryption, not plaintext) and
+- OAuth refresh tokens (`gmail_connections.refresh_token_encrypted`) are
+  stored encrypted at rest (AES-256-GCM via `src/server/crypto/encrypt.ts`
+  with `GMAIL_TOKEN_ENCRYPTION_KEY`, never plaintext) and
   are never returned by any API response — see `code-standards.md` §14
   and §17.
 
@@ -515,7 +519,8 @@ inventory.service.ts
 invoice.service.ts
 payment.service.ts
 staff.service.ts        (Sprint 1: invite, accept, list, deactivate, role change)
-gmail.service.ts        (Sprint 3: connect, disconnect, refresh, send)
+gmail.service.ts        (Sprint 3: OAuth client, send with a given sender)
+gmail-connection.service.ts (Sprint 3: connect, disconnect, status, shop sender, sendShopEmail)
 ```
 
 Services contain reusable business operations and are the only place
@@ -597,14 +602,18 @@ Per `project-overview.md` § Owner Gmail Connection.
 ```text
 Owner clicks "Connect Gmail" (Settings → Email & Notifications)
   ↓
-Google OAuth consent, scope = gmail.send only
+GET /api/settings/gmail/connect: random state in a signed httpOnly
+cookie, redirect to Google (scope = gmail.send openid email,
+access_type=offline, prompt=consent)
   ↓
-Authorization code → server exchanges for access + refresh token
+GET /api/settings/gmail/callback: state must match the cookie →
+getToken(code) → email from the verified id token
   ↓
 Refresh token stored encrypted in gmail_connections (shop-scoped)
   ↓
-gmail.service.ts uses the stored refresh token to mint short-lived
-access tokens and call the Gmail API's users.messages.send
+sendShopEmail(shopId, buildMessage) → getShopGmailSender decrypts it →
+gmail.service.ts mints a short-lived access token and calls the Gmail
+API's users.messages.send
   ↓
 Email sent "from" the Owner's own connected address
 ```
@@ -637,9 +646,15 @@ Rules:
   shell every template uses) and `raw-message.ts` (`buildRawEmail`:
   CR/LF stripped from headers, RFC 2047 From name and Subject, base64
   HTML body wrapped at 76 characters, base64url output).
-- One `gmail_connections` row per shop; disconnecting deletes/nulls the
-  stored token rather than merely flagging it "disconnected" (don't
-  keep sendable tokens around for a disconnected account).
+- One `gmail_connections` row per shop; disconnecting revokes the token
+  at Google (best effort) and deletes the row rather than merely
+  flagging it "disconnected" (don't keep sendable tokens around for a
+  disconnected account).
+- Every shop email goes through `sendShopEmail` in
+  `gmail-connection.service.ts`. It returns `not_connected` when there
+  is no usable sender, and on `invalid_grant` it sets the row's status
+  to `NEEDS_RECONNECT` (Settings then shows "Reconnect needed").
+  `getShopGmailSender` returns `null` for `NEEDS_RECONNECT` rows.
 - `STAFF` can call an endpoint like `POST /api/notifications/send` that
   triggers a template send; they never receive the token, client ID,
   client secret, or a Gmail API response containing credentials.
@@ -648,7 +663,8 @@ Rules:
   Owner is asked to connect Gmail — it must not silently fail or fall
   back to the `.env` platform sender (see the exclusion in §2).
 - Do not request broader Gmail scopes (e.g. full mailbox read/modify)
-  than `gmail.send` — this keeps the OAuth consent screen narrow and
+  than `gmail.send` (plus `openid email` to identify the connected
+  address) — this keeps the OAuth consent screen narrow and
   trustworthy for shop owners connecting a personal Gmail account.
 
 ---

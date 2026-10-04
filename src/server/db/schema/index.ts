@@ -9,4 +9,5 @@ export * from './stock-movements'
 export * from './repair-parts'
 export * from './invoices'
 export * from './payments'
+export * from './gmail-connections'
 

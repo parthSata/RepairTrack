@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
 import { getShopById, toShopProfileResponse } from '@/server/services/shop.service'
+import { SettingsTabs } from '@/components/settings/settings-tabs'
 import { ShopProfileForm } from '@/components/settings/shop-profile-form'
 
 export default async function ShopProfilePage() {
@@ -12,5 +13,5 @@ export default async function ShopProfilePage() {
   const shop = session.user.shopId ? await getShopById(session.user.shopId) : null
   const initialData = shop ? toShopProfileResponse(shop, session.user.email) : null
 
-  return <div className="mx-auto max-w-7xl space-y-8"><header className="border-b border-border pb-7"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Settings</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Shop Profile</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Manage the details your team and customers use to identify your shop.</p></header><ShopProfileForm initialData={initialData} /></div>
+  return <div className="mx-auto max-w-7xl space-y-8"><header className="border-b border-border pb-7"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Settings</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Shop Profile</h1><p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Manage the details your team and customers use to identify your shop.</p></header><SettingsTabs /><ShopProfileForm initialData={initialData} /></div>
 }

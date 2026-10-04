@@ -46,6 +46,17 @@ export function buildVerificationEmailHtml({ name, url }: { name: string; url: s
   })
 }
 
+export function buildGmailTestEmailHtml({ shopName, senderEmail }: { shopName: string; senderEmail: string }) {
+  return renderEmailLayout({
+    shopName,
+    title: 'Gmail connection test',
+    bodyHtml: `
+              ${heading('Your Gmail is connected')}
+              <p style="margin:0 0 20px 0;color:#475569;">This test email was sent from <strong>${escapeHtml(senderEmail)}</strong> through RepairTrack. Repair updates, invoices and payment emails for <strong>${escapeHtml(shopName)}</strong> will come from this address.</p>
+              ${closingNote('No action is needed. You can delete this email.')}`,
+  })
+}
+
 const ROLE_DISPLAY = {
   TECHNICIAN: { title: 'Technician', color: '#7c3aed' },
   STAFF: { title: 'Staff Member', color: '#2563eb' },
@@ -65,17 +76,19 @@ export function buildStaffInvitationEmailHtml({
   shopName,
   role,
   inviteUrl,
+  expiresIn,
 }: {
   inviterName: string
   shopName: string
   role: 'STAFF' | 'TECHNICIAN'
   inviteUrl: string
+  expiresIn: string
 }) {
   const safeShopName = escapeHtml(shopName)
   const roleDisplay = ROLE_DISPLAY[role]
 
   return renderEmailLayout({
-    shopName: PLATFORM_NAME,
+    shopName,
     title: `You've been invited to join ${shopName}`,
     bodyHtml: `
               ${heading('Team Invitation')}
@@ -83,7 +96,7 @@ export function buildStaffInvitationEmailHtml({
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:20px 0;">
                 ${detailRow('Shop:', safeShopName, 'font-size:14px;font-weight:600;color:#0f172a;')}
                 ${detailRow('Role:', roleDisplay.title, `font-size:13px;font-weight:600;color:${roleDisplay.color};`)}
-                ${detailRow('Expires in:', '7 Days', 'font-size:13px;font-weight:500;color:#64748b;', true)}
+                ${detailRow('Expires in:', escapeHtml(expiresIn), 'font-size:13px;font-weight:500;color:#64748b;', true)}
               </table>
               ${ctaButton('Accept Invitation', inviteUrl)}
               ${linkFallback('Or copy and paste this link into your browser:', inviteUrl)}

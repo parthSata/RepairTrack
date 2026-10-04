@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, Copy, Link2, LoaderCircle, UserPlus } from 'lucide-react'
+import { Check, Copy, Link2, LoaderCircle, Send, UserPlus } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ConnectGmailPrompt } from '@/components/email/connect-gmail-prompt'
@@ -14,19 +14,42 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useGmailConnection } from '@/features/gmail/queries'
 import { useInviteStaff } from '@/features/staff/mutations'
-import { inviteStaffSchema, type InviteStaffInput } from '@/features/staff/schemas'
+import { inviteStaffSchema, type InviteEmailStatus, type InviteStaffInput } from '@/features/staff/schemas'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { cn } from '@/lib/utils'
+
+const INVITE_RESULT_UI: Record<InviteEmailStatus, { title: string; message: string }> = {
+  sent: {
+    title: 'Invitation Sent',
+    message: 'The invitation was emailed from your Gmail. You can also share this link with them directly.',
+  },
+  not_connected: {
+    title: 'Invitation Link Created',
+    message: 'No email was sent. Share this link with your team member. They can use it to set up their account and join your shop.',
+  },
+  reconnect_needed: {
+    title: 'Invitation Link Created',
+    message: 'Your Gmail needs reconnecting (Settings → Email & Notifications), so no email was sent. Share this link instead.',
+  },
+  failed: {
+    title: 'Invitation Link Created',
+    message: 'The invitation email could not be sent. Share this link with your team member instead.',
+  },
+}
 
 export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [open, setOpen] = useState(false)
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
+  const [emailStatus, setEmailStatus] = useState<InviteEmailStatus>('not_connected')
   const [copied, setCopied] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const [showGmailPrompt, setShowGmailPrompt] = useState(true)
+  const [skippedGmailPrompt, setSkippedGmailPrompt] = useState(false)
 
   const inviteMutation = useInviteStaff()
+  const isGmailConnected = useGmailConnection().data?.status === 'CONNECTED'
+  const showGmailPrompt = !isGmailConnected && !skippedGmailPrompt
 
   const {
     register,
@@ -53,7 +76,7 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
         setGeneratedLink(null)
         setCopied(false)
         setErrorMsg(null)
-        setShowGmailPrompt(true)
+        setSkippedGmailPrompt(false)
       }, 200)
     }
   }
@@ -62,8 +85,8 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
     setErrorMsg(null)
     try {
       const result = await inviteMutation.mutateAsync(values)
-      const fullUrl = `${window.location.origin}${result.inviteLink}`
-      setGeneratedLink(fullUrl)
+      setEmailStatus(result.emailStatus)
+      setGeneratedLink(`${window.location.origin}${result.inviteLink}`)
     } catch (err: unknown) {
       setErrorMsg(getApiErrorMessage(err, 'Failed to generate staff invitation link. Please try again.'))
     }
@@ -96,7 +119,7 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
           <ConnectGmailPrompt
             description="Your Gmail isn't connected, so invitations can't be emailed from your shop address. You can still share an invite link."
             continueLabel="Continue with link only"
-            onContinue={() => setShowGmailPrompt(false)}
+            onContinue={() => setSkippedGmailPrompt(true)}
           />
         ) : (
           <>
@@ -106,7 +129,9 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
                 Add Team Member
               </DialogTitle>
               <DialogDescription className="text-sm leading-5 text-muted-foreground">
-                Invite a staff member or technician to join your shop workspace.
+                {isGmailConnected
+                  ? "Invite a staff member or technician. They'll get an email from your Gmail with a link to join."
+                  : 'Invite a staff member or technician to join your shop workspace.'}
               </DialogDescription>
             </DialogHeader>
 
@@ -121,12 +146,9 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    Invitation Link Created
+                    {INVITE_RESULT_UI[emailStatus].title}
                   </div>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    Gmail isn&apos;t connected, so no email was sent. Share this link with your team member. They can use
-                    it to set up their account and join your shop.
-                  </p>
+                  <p className="text-xs leading-5 text-muted-foreground">{INVITE_RESULT_UI[emailStatus].message}</p>
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                       <Input
@@ -242,12 +264,12 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
                     {inviteMutation.isPending ? (
                       <>
                         <LoaderCircle className="h-4 w-4 animate-spin" />
-                        Generating...
+                        {isGmailConnected ? 'Sending...' : 'Generating...'}
                       </>
                     ) : (
                       <>
-                        <Link2 className="h-4 w-4" />
-                        Generate Invite Link
+                        {isGmailConnected ? <Send className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+                        {isGmailConnected ? 'Send Invitation' : 'Generate Invite Link'}
                       </>
                     )}
                   </Button>
