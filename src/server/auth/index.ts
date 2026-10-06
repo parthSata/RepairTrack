@@ -4,6 +4,12 @@ import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { db } from '@/server/db'
 import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
+import {
+  assertInviteSessionUser,
+  getOAuthInviteToken,
+  markInvitationAccepted,
+  requirePendingInvitation,
+} from '@/server/auth/invite-oauth'
 import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
 
 function readShopName(body: unknown, userName?: string): string {
@@ -57,6 +63,13 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user, context) => {
+          const inviteToken = await getOAuthInviteToken()
+          if (inviteToken) {
+            const invitation = await requirePendingInvitation(inviteToken, user.email)
+            // Google has verified this address and it matches the invitation, so no verification email.
+            return { data: { ...user, role: invitation.role, shopId: invitation.shopId } }
+          }
+
           const hasShopId = typeof user.shopId === 'string' && user.shopId.trim().length > 0
           const shopId = hasShopId ? (user.shopId as string) : crypto.randomUUID()
 
@@ -75,6 +88,10 @@ export const auth = betterAuth({
               emailVerified: false,
             },
           }
+        },
+        after: async () => {
+          const inviteToken = await getOAuthInviteToken()
+          if (inviteToken) await markInvitationAccepted(inviteToken)
         },
       },
     },
@@ -111,6 +128,9 @@ export const auth = betterAuth({
                 message: 'Your account has been deactivated. Contact the owner for activation.',
               })
             }
+
+            const inviteToken = await getOAuthInviteToken()
+            if (inviteToken && dbUser) await assertInviteSessionUser(inviteToken, dbUser)
           }
         },
       },
@@ -125,7 +145,13 @@ export const auth = betterAuth({
         return
       }
 
-      await sendAccountVerificationEmail({ to: user.email, name: user.name, url })
+      // Throwing makes the resend endpoint report the failure; sign-up/sign-in only log it.
+      const result = await sendAccountVerificationEmail({ to: user.email, name: user.name, url })
+      if (!result.sent) {
+        throw new APIError('SERVICE_UNAVAILABLE', {
+          message: 'We could not send the verification email. Please try again later.',
+        })
+      }
     },
   },
   socialProviders: {

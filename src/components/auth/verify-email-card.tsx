@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
+const MAX_RESENDS = 2
 
 export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   const router = useRouter()
@@ -21,13 +22,8 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   )
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [verificationEmail] = useState(emailParam)
-  const [resendCount, setResendCount] = useState(() => {
-    if (typeof window === 'undefined' || !emailParam) return 0
-    const storedCount = localStorage.getItem(`resend_count_${emailParam}`)
-    const storedExpiry = localStorage.getItem(`resend_cooldown_${emailParam}`)
-    if (storedExpiry && Date.now() < parseInt(storedExpiry, 10)) return 2
-    return storedCount ? parseInt(storedCount, 10) : 0
-  })
+  // Starts at 0 on server and client alike; the stored count is restored after hydration.
+  const [resendCount, setResendCount] = useState(0)
   const [isResending, setIsResending] = useState(false)
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null)
 
@@ -63,26 +59,28 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
     const cooldownKey = `resend_cooldown_${verificationEmail}`
     const countKey = `resend_count_${verificationEmail}`
 
-    const storedExpiry = localStorage.getItem(cooldownKey)
-    if (storedExpiry) {
-      const expiryTime = parseInt(storedExpiry, 10)
-      if (Date.now() < expiryTime) {
-        updateCooldownText(expiryTime)
+    const expiryTime = Number(localStorage.getItem(cooldownKey))
+    const inCooldown = Date.now() < expiryTime
+    if (expiryTime && !inCooldown) {
+      localStorage.removeItem(cooldownKey)
+      localStorage.removeItem(countKey)
+    }
 
-        const interval = setInterval(() => {
-          if (!updateCooldownText(expiryTime)) {
-            clearInterval(interval)
-            localStorage.removeItem(cooldownKey)
-            localStorage.removeItem(countKey)
-          }
-        }, 10000)
+    // localStorage doesn't exist during SSR, so the stored count can only be applied after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setResendCount(inCooldown ? MAX_RESENDS : Number(localStorage.getItem(countKey)) || 0)
+    if (!inCooldown) return
 
-        return () => clearInterval(interval)
-      } else {
+    updateCooldownText(expiryTime)
+    const interval = setInterval(() => {
+      if (!updateCooldownText(expiryTime)) {
+        clearInterval(interval)
         localStorage.removeItem(cooldownKey)
         localStorage.removeItem(countKey)
       }
-    }
+    }, 10000)
+
+    return () => clearInterval(interval)
   }, [verificationEmail])
 
   function updateCooldownText(expiryTime: number): boolean {
@@ -99,7 +97,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   }
 
   async function resendVerification() {
-    if (!verificationEmail || resendCount >= 2 || isResending || cooldownRemaining) {
+    if (!verificationEmail || resendCount >= MAX_RESENDS || isResending || cooldownRemaining) {
       return
     }
     setErrorMsg(null)
@@ -116,7 +114,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
       setResendCount(nextCount)
       localStorage.setItem(`resend_count_${verificationEmail}`, nextCount.toString())
 
-      if (nextCount >= 2) {
+      if (nextCount >= MAX_RESENDS) {
         const expiryTime = Date.now() + TWO_HOURS_MS
         localStorage.setItem(`resend_cooldown_${verificationEmail}`, expiryTime.toString())
         updateCooldownText(expiryTime)
@@ -201,7 +199,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
             <Button
               type="button"
               variant="outline"
-              disabled={isResending || resendCount >= 2 || Boolean(cooldownRemaining)}
+              disabled={isResending || resendCount >= MAX_RESENDS || Boolean(cooldownRemaining)}
               onClick={() => void resendVerification()}
               className="w-full"
             >
@@ -241,7 +239,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 font-medium text-center">
           Resend limit reached. Try again after 2 hours (remaining: {cooldownRemaining}).
         </div>
-      ) : resendCount < 2 ? (
+      ) : resendCount < MAX_RESENDS ? (
         <Button
           type="button"
           variant="outline"
@@ -249,7 +247,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
           onClick={() => void resendVerification()}
           className="w-full"
         >
-          {isResending ? 'Sending...' : `Resend verification email (${2 - resendCount} remaining)`}
+          {isResending ? 'Sending...' : `Resend verification email (${MAX_RESENDS - resendCount} remaining)`}
         </Button>
       ) : (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 font-medium text-center">

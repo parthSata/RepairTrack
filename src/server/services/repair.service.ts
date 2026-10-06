@@ -7,6 +7,7 @@ import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import { invoices } from '@/server/db/schema/invoices'
 import { shops, users } from '@/server/db/schema/users'
+import { buildApprovalRequiredEmail } from '@/server/email/templates/approval-required'
 import { buildRepairReceivedEmail } from '@/server/email/templates/repair-received'
 import { queueShopEmail } from '@/server/services/email.service'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
@@ -784,8 +785,18 @@ export async function requestCustomerApproval({
       id: repairs.id,
       status: repairs.status,
       assignedTechnicianId: repairs.assignedTechnicianId,
+      ticketNumber: repairs.ticketNumber,
+      trackingToken: repairs.trackingToken,
+      customerName: customers.name,
+      customerEmail: customers.email,
+      deviceBrand: devices.brand,
+      deviceModel: devices.model,
+      shopName: shops.name,
     })
     .from(repairs)
+    .innerJoin(customers, eq(customers.id, repairs.customerId))
+    .innerJoin(devices, eq(devices.id, repairs.deviceId))
+    .innerJoin(shops, eq(shops.id, repairs.shopId))
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
   const existing = assertRepairFound(row)
 
@@ -804,7 +815,7 @@ export async function requestCustomerApproval({
     }),
   )
 
-  const { total } = await resolveRepairPricingTotal({
+  const { partsCharges, taxAmount, total } = await resolveRepairPricingTotal({
     shopId,
     repairId: id,
     laborCharges,
@@ -815,7 +826,7 @@ export async function requestCustomerApproval({
   const now = new Date()
   const diagnosisSnapshot = diagnosis.trim()
 
-  await db.transaction(async (tx) => {
+  const approvalId = await db.transaction(async (tx) => {
     await tx
       .update(repairs)
       .set({
@@ -832,15 +843,18 @@ export async function requestCustomerApproval({
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
 
-    await tx.insert(repairApprovals).values({
-      repairId: id,
-      status: 'PENDING',
-      diagnosisSnapshot,
-      initialEstimatedCost: total,
-      additionalEstimatedCost: 0,
-      requestedBy: userId,
-      requestedAt: now,
-    })
+    const [approval] = await tx
+      .insert(repairApprovals)
+      .values({
+        repairId: id,
+        status: 'PENDING',
+        diagnosisSnapshot,
+        initialEstimatedCost: total,
+        additionalEstimatedCost: 0,
+        requestedBy: userId,
+        requestedAt: now,
+      })
+      .returning({ id: repairApprovals.id })
 
     await tx.insert(repairStatusHistory).values({
       id: crypto.randomUUID(),
@@ -850,11 +864,26 @@ export async function requestCustomerApproval({
       changedBy: userId,
       actorType: 'STAFF',
     })
+
+    return approval.id
   })
 
-  // Sprint 3 (Gmail): send "Repair Approval Required" transactional email via the shop's
-  // connected Gmail account. Do not call sendEmail until feature/send-for-approval (Gmail) merges.
-  // Pattern: staff.service.ts invite flow → buildXxxHtml + sendEmail + console.warn on failure.
+  queueShopEmail({
+    shopId,
+    repairId: id,
+    type: 'APPROVAL_REQUIRED',
+    to: existing.customerEmail,
+    dedupeKey: `APPROVAL_REQUIRED:${approvalId}`,
+    email: buildApprovalRequiredEmail({
+      shopName: existing.shopName,
+      customerName: existing.customerName,
+      ticketNumber: existing.ticketNumber,
+      device: { brand: existing.deviceBrand, model: existing.deviceModel },
+      diagnosis: diagnosisSnapshot,
+      charges: { laborCharges, partsCharges, additionalCharges, taxPercent, taxAmount, total },
+      trackingToken: existing.trackingToken,
+    }),
+  })
 
   return getRepairById({ shopId, userRole, userId, id })
 }
