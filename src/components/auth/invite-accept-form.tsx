@@ -17,11 +17,13 @@ import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 export function InviteAcceptForm({
   token,
   details,
+  googleError = null,
 }: {
   token: string
   details: InvitationDetails
+  googleError?: string | null
 }) {
-  const [formError, setFormError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(googleError)
   const [isGooglePending, setIsGooglePending] = useState(false)
   const [success, setSuccess] = useState(false)
 
@@ -53,7 +55,12 @@ export function InviteAcceptForm({
   async function signInWithGoogle() {
     setFormError(null)
     setIsGooglePending(true)
-    const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+    const result = await authClient.signIn.social({
+      provider: 'google',
+      callbackURL: '/dashboard',
+      errorCallbackURL: `/invite/${encodeURIComponent(token)}`,
+      additionalData: { inviteToken: token },
+    })
     if (result.error) {
       setFormError('Google sign-in is unavailable right now.')
       setIsGooglePending(false)

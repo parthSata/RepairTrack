@@ -24,6 +24,24 @@ export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>
 
 export type InvitationState = 'pending' | 'expired' | 'accepted'
 
+/** Codes returned to `/invite/[token]?error=` when "Continue with Google" is rejected. */
+export const INVITE_GOOGLE_ERRORS = {
+  INVITE_INVALID: 'This invitation is no longer valid. Ask the shop owner to send a new one.',
+  INVITE_EMAIL_MISMATCH:
+    'That Google account does not match the invited email. Continue with Google using the assigned email shown below.',
+  INVITE_ACCOUNT_EXISTS:
+    'This Google account already belongs to another RepairTrack shop. Ask the owner to invite a different email.',
+} as const
+
+export type InviteGoogleErrorCode = keyof typeof INVITE_GOOGLE_ERRORS
+
+export function getInviteGoogleErrorMessage(code: string | undefined): string | null {
+  if (!code) return null
+  return code in INVITE_GOOGLE_ERRORS
+    ? INVITE_GOOGLE_ERRORS[code as InviteGoogleErrorCode]
+    : 'Google sign-in could not be completed. Please try again.'
+}
+
 export interface InvitationDetails {
   state: InvitationState
   name: string

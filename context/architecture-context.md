@@ -595,6 +595,15 @@ internal repair query.
   transaction that also marks the invitation `accepted` and sets the
   new user's `role`/`shop_id` from the invitation record — never from
   client input.
+- Google OAuth acceptance: "Continue with Google" sends the token as
+  OAuth `additionalData` (`inviteToken`), with the invite page as
+  `errorCallbackURL`. `src/server/auth/invite-oauth.ts` re-validates it in
+  Better Auth hooks: `user.create.before` requires a pending, unexpired
+  invitation whose email equals the Google email and takes `role`/`shop_id`
+  from it (otherwise no user or shop is created); `user.create.after`
+  marks it `accepted`; `session.create.before` refuses an existing account
+  whose email or shop doesn't match the invitation. Rejections redirect to
+  `/invite/[token]?error=INVITE_*` (messages in `INVITE_GOOGLE_ERRORS`).
 - Rate-limited per IP, same as §13.
 
 ---
@@ -661,11 +670,14 @@ Rules:
   result (Send test email → `TEST`, staff invitation → `STAFF_INVITATION`). `queueShopEmail` never
   throws; outside a request it only logs "could not be queued", so scripts use
   `sendAndLogShopEmail` or `sendShopEmail`. Event emails use a per-event `dedupeKey`
-  (`REPAIR_RECEIVED:<repairId>`).
+  (`REPAIR_RECEIVED:<repairId>`, `APPROVAL_REQUIRED:<approvalId>` so each
+  approval request emails once and a re-request sends again).
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses), `components.ts` (`heading`, `ctaButton`,
-  `linkFallback`, `closingNote`, `detailRow`, `detailsCard`) and
+  `linkFallback`, `ctaWithFallback`, `closingNote`, `detailRow`,
+  `DETAIL_VALUE_STYLE`, `detailsCard`, `ticketHighlight`, `textBlock`
+  — escapes its text, then keeps line breaks as `<br>`) and
   `raw-message.ts` (`buildRawEmail`: CR/LF stripped from headers, RFC 2047
   From name and Subject, base64 HTML body wrapped at 76 characters,
   base64url output). Event templates live in `src/server/email/templates/`,

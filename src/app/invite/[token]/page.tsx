@@ -3,6 +3,7 @@ import { AlertCircle, Clock } from 'lucide-react'
 import { AuthFormShell } from '@/components/auth/auth-form-shell'
 import { InviteAcceptForm } from '@/components/auth/invite-accept-form'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
+import { getInviteGoogleErrorMessage } from '@/features/staff/schemas'
 import { getInvitationByToken } from '@/server/services/staff.service'
 
 function formatMinutesRemaining(expiresAt: string): number {
@@ -12,10 +13,12 @@ function formatMinutesRemaining(expiresAt: string): number {
 
 export default async function InvitePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>
+  searchParams: Promise<{ error?: string }>
 }) {
-  const { token } = await params
+  const [{ token }, { error }] = await Promise.all([params, searchParams])
   const invitation = await getInvitationByToken(token)
 
   if (!invitation) {
@@ -105,7 +108,7 @@ export default async function InvitePage({
         <Clock className="h-3.5 w-3.5" />
         Link expires in {minutesRemaining} minute{minutesRemaining === 1 ? '' : 's'}
       </p>
-      <InviteAcceptForm token={token} details={invitation} />
+      <InviteAcceptForm token={token} details={invitation} googleError={getInviteGoogleErrorMessage(error)} />
     </AuthFormShell>
   )
 }
