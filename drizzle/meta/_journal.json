@@ -204,6 +204,20 @@
       "when": 1791008939053,
       "tag": "0028_damp_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791095937026,
+      "tag": "0029_closed_star_brand",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791259391623,
+      "tag": "0030_safe_skullbuster",
+      "breakpoints": true
     }
   ]
 }

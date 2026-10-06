@@ -10,4 +10,5 @@ export * from './repair-parts'
 export * from './invoices'
 export * from './payments'
 export * from './gmail-connections'
+export * from './email-logs'
 

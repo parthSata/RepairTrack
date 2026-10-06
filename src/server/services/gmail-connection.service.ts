@@ -1,12 +1,10 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
-import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { GmailConnectionResponse } from '@/features/gmail/schemas'
 import { decrypt, encrypt } from '@/server/crypto/encrypt'
 import { db } from '@/server/db'
 import { gmailConnections, shops } from '@/server/db/schema'
-import { buildGmailTestEmailHtml } from '@/server/services/email-templates'
 import {
   createGmailOAuthClient,
   GMAIL_SCOPES,
@@ -18,14 +16,6 @@ import {
 } from '@/server/services/gmail.service'
 
 export type SendShopEmailResult = SendEmailResult | { sent: false; reason: 'not_connected' }
-type SendShopEmailFailure = Extract<SendShopEmailResult, { sent: false }>['reason']
-
-const TEST_EMAIL_ERRORS: Record<SendShopEmailFailure, [ContentfulStatusCode, string]> = {
-  not_connected: [409, 'Connect Gmail before sending a test email.'],
-  invalid_grant: [409, 'Gmail access was revoked. Reconnect Gmail and try again.'],
-  not_configured: [503, 'Gmail is not configured'],
-  send_failed: [502, 'Gmail could not send the test email'],
-}
 
 function requireOAuthClient() {
   const client = createGmailOAuthClient()
@@ -131,6 +121,7 @@ export async function getShopGmailSender(shopId: string): Promise<GmailSender | 
   const [row] = await db
     .select({
       shopName: shops.name,
+      shopEmail: shops.email,
       email: gmailConnections.email,
       refreshTokenEncrypted: gmailConnections.refreshTokenEncrypted,
       status: gmailConnections.status,
@@ -143,7 +134,12 @@ export async function getShopGmailSender(shopId: string): Promise<GmailSender | 
   if (!row || row.status !== 'CONNECTED') return null
 
   try {
-    return { name: row.shopName, email: row.email, refreshToken: decrypt(row.refreshTokenEncrypted) }
+    return {
+      name: row.shopName,
+      email: row.email,
+      refreshToken: decrypt(row.refreshTokenEncrypted),
+      shopEmail: row.shopEmail,
+    }
   } catch (err) {
     console.warn(`Gmail token for shop ${shopId} could not be decrypted:`, errorMessage(err))
     await markNeedsReconnect(shopId)
@@ -162,16 +158,4 @@ export async function sendShopEmail(
   const result = await sendEmail(sender, buildMessage(sender))
   if (!result.sent && result.reason === 'invalid_grant') await markNeedsReconnect(shopId)
   return result
-}
-
-export async function sendGmailTestEmail(shopId: string, to: string): Promise<void> {
-  const result = await sendShopEmail(shopId, (sender) => ({
-    to,
-    subject: `${sender.name}: Gmail connection test`,
-    html: buildGmailTestEmailHtml({ shopName: sender.name, senderEmail: sender.email }),
-  }))
-  if (result.sent) return
-
-  const [status, message] = TEST_EMAIL_ERRORS[result.reason]
-  throw new HTTPException(status, { message })
 }

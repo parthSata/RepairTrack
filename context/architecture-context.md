@@ -415,6 +415,10 @@ Core entities may include:
   means not connected. Do not put the refresh token directly on
   `shops` — keep credential storage isolated in its own table so it can
   be access-controlled and rotated independently.
+- email_logs (Sprint 3: one row per shop email attempt — `shop_id`,
+  nullable `repair_id`, `type` [`email_type` enum], `recipient`,
+  `subject`, `status` [`SENT` | `FAILED` | `SKIPPED`], `skip_reason`,
+  `error`, `dedupe_key`, `gmail_message_id`). Never stores the HTML body.
 - customers
 - devices
 - repairs
@@ -634,13 +638,24 @@ Rules:
 - One Google Cloud OAuth app (`GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET`)
   serves every sender; a sender is that app plus one mailbox's refresh
   token. `gmail.service.ts` `sendEmail(sender, message)` takes the
-  sender (`GmailSender = { name, email, refreshToken }`) as a parameter
+  sender (`GmailSender = { name, email, refreshToken, shopEmail? }`) as a parameter
   and never hard-codes one. The `.env` sender is private to
   `gmail.service.ts` and reachable only through
   `sendAccountVerificationEmail`.
-- `sendEmail` returns `{ sent: true }` or
-  `{ sent: false, reason: 'not_configured' | 'invalid_grant' | 'send_failed' }`
+- `sendEmail` returns `{ sent: true, messageId }` or
+  `{ sent: false, reason: 'not_configured' | 'invalid_grant' | 'send_failed', error }`
   and never throws; `invalid_grant` means the shop must reconnect.
+- Event-triggered shop emails (repair updates, invoice, payment) go
+  through `queueShopEmail` in `email.service.ts`. It runs after the
+  response via Next's `after()`, so email never delays or fails the
+  action, and records every attempt in `email_logs` as SENT (with the
+  Gmail message id), FAILED (with the error) or SKIPPED
+  (`no_customer_email`, `gmail_not_connected`, `already_sent` when a SENT
+  log with the same `dedupe_key` exists for the shop). Reply-To is the
+  shop's email when set. It wraps `sendAndLogShopEmail`, which sends
+  immediately and returns the outcome — used where the caller needs the
+  result (Send test email → `TEST`, staff invitation → `STAFF_INVITATION`). `queueShopEmail` must be called
+  inside a request; scripts use `sendAndLogShopEmail` or `sendShopEmail`.
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses) and `raw-message.ts` (`buildRawEmail`:

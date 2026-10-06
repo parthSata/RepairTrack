@@ -17,8 +17,9 @@ import type {
   UnifiedStaffMember,
 } from '@/features/staff/schemas'
 import { buildStaffInvitationEmailHtml } from '@/server/services/email-templates'
-import { sendShopEmail, type SendShopEmailResult } from '@/server/services/gmail-connection.service'
+import { sendAndLogShopEmail, type EmailOutcome } from '@/server/services/email.service'
 import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
+import { getShopById } from '@/server/services/shop.service'
 import {
   NON_TERMINAL_REPAIR_STATUSES,
   syncAssignmentOnReassign,
@@ -31,10 +32,10 @@ function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 }
 
-function toInviteEmailStatus(result: SendShopEmailResult): InviteEmailStatus {
-  if (result.sent) return 'sent'
-  if (result.reason === 'not_connected') return 'not_connected'
-  return result.reason === 'invalid_grant' ? 'reconnect_needed' : 'failed'
+function toInviteEmailStatus(outcome: EmailOutcome): InviteEmailStatus {
+  if (outcome.status === 'SENT') return 'sent'
+  if (outcome.status === 'SKIPPED') return 'not_connected'
+  return outcome.reason === 'invalid_grant' ? 'reconnect_needed' : 'failed'
 }
 
 async function getAssignmentCountsByTechnicianStatus(
@@ -312,35 +313,44 @@ export async function inviteStaff(
   const token = crypto.randomUUID()
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
 
-  await db.insert(staffInvitations).values({
-    shopId,
-    email: targetEmail,
-    name: input.name,
-    role: input.role,
-    token,
-    status: 'pending',
-    invitedBy,
-    expiresAt,
-  })
+  const [invitation] = await db
+    .insert(staffInvitations)
+    .values({
+      shopId,
+      email: targetEmail,
+      name: input.name,
+      role: input.role,
+      token,
+      status: 'pending',
+      invitedBy,
+      expiresAt,
+    })
+    .returning({ id: staffInvitations.id })
 
   const inviteLink = `/invite/${token}`
-  const emailResult = await sendShopEmail(shopId, (sender) => ({
+  const shopName = (await getShopById(shopId))?.shopName ?? 'RepairTrack'
+  const emailOutcome = await sendAndLogShopEmail({
+    shopId,
+    type: 'STAFF_INVITATION',
     to: targetEmail,
-    subject: `You've been invited to join ${sender.name} on RepairTrack`,
-    html: buildStaffInvitationEmailHtml({
-      inviterName: inviter?.name ?? sender.name,
-      shopName: sender.name,
-      role: input.role,
-      inviteUrl: `${getAppUrl()}${inviteLink}`,
-      expiresIn: `${INVITE_TTL_MINUTES} minutes`,
-    }),
-  }))
+    dedupeKey: `STAFF_INVITATION:${invitation.id}`,
+    email: {
+      subject: `You've been invited to join ${shopName} on RepairTrack`,
+      html: buildStaffInvitationEmailHtml({
+        inviterName: inviter?.name ?? shopName,
+        shopName,
+        role: input.role,
+        inviteUrl: `${getAppUrl()}${inviteLink}`,
+        expiresIn: `${INVITE_TTL_MINUTES} minutes`,
+      }),
+    },
+  })
 
   return {
     token,
     inviteLink,
     expiresAt: expiresAt.toISOString(),
-    emailStatus: toInviteEmailStatus(emailResult),
+    emailStatus: toInviteEmailStatus(emailOutcome),
   }
 }
 

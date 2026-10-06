@@ -4,12 +4,12 @@ import { Hono, type Context } from 'hono'
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
 import { gmailCallbackQuerySchema, type GmailCallbackResult } from '@/features/gmail/schemas'
 import { requireRole } from '@/server/hono/session'
+import { sendGmailTestEmail } from '@/server/services/email.service'
 import {
   buildGmailAuthUrl,
   connectGmail,
   disconnectGmail,
   getGmailConnection,
-  sendGmailTestEmail,
 } from '@/server/services/gmail-connection.service'
 
 const SETTINGS_PATH = '/settings/email'

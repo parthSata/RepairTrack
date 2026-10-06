@@ -3,13 +3,16 @@ import { google } from 'googleapis'
 import { buildRawEmail } from '@/server/email/raw-message'
 import { buildVerificationEmailHtml } from '@/server/services/email-templates'
 
-export type GmailSender = { name: string; email: string; refreshToken: string }
+/** `shopEmail` is the shop's public contact address, used as Reply-To on customer emails. */
+export type GmailSender = { name: string; email: string; refreshToken: string; shopEmail?: string | null }
 
 export type EmailMessage = { to: string; subject: string; html: string; replyTo?: string }
 
 export type SendEmailResult =
-  | { sent: true }
-  | { sent: false; reason: 'not_configured' | 'invalid_grant' | 'send_failed' }
+  | { sent: true; messageId: string | null }
+  | { sent: false; reason: 'not_configured' | 'invalid_grant' | 'send_failed'; error: string }
+
+const NOT_CONFIGURED_ERROR = 'Gmail is not configured'
 
 export const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
 export const GMAIL_SCOPES = [GMAIL_SEND_SCOPE, 'openid', 'email']
@@ -29,21 +32,22 @@ function isInvalidGrant(err: unknown) {
 
 export async function sendEmail(sender: GmailSender, message: EmailMessage): Promise<SendEmailResult> {
   const auth = createGmailOAuthClient()
-  if (!auth) return { sent: false, reason: 'not_configured' }
+  if (!auth) return { sent: false, reason: 'not_configured', error: NOT_CONFIGURED_ERROR }
   auth.setCredentials({ refresh_token: sender.refreshToken })
 
   try {
-    await google.gmail({ version: 'v1', auth }).users.messages.send({
+    const { data } = await google.gmail({ version: 'v1', auth }).users.messages.send({
       userId: 'me',
       requestBody: {
         raw: buildRawEmail({ fromName: sender.name, fromEmail: sender.email, ...message }),
       },
     })
-    return { sent: true }
+    return { sent: true, messageId: data.id ?? null }
   } catch (err) {
     const reason = isInvalidGrant(err) ? 'invalid_grant' : 'send_failed'
-    console.warn(`Gmail send failed (${reason}) from ${sender.email}:`, err instanceof Error ? err.message : err)
-    return { sent: false, reason }
+    const error = err instanceof Error ? err.message : String(err)
+    console.warn(`Gmail send failed (${reason}) from ${sender.email}:`, error)
+    return { sent: false, reason, error }
   }
 }
 
@@ -67,7 +71,7 @@ export async function sendAccountVerificationEmail({
   const sender = getPlatformSender()
   if (!sender) {
     console.warn('Verification email not sent: platform Gmail sender is not configured')
-    return { sent: false, reason: 'not_configured' }
+    return { sent: false, reason: 'not_configured', error: NOT_CONFIGURED_ERROR }
   }
 
   return sendEmail(sender, {
