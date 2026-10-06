@@ -10,6 +10,9 @@ export type GmailConnectionResponse = {
 }
 
 export const GMAIL_CONNECT_URL = '/api/settings/gmail/connect'
+export const GMAIL_SETTINGS_PATH = '/settings/email'
+/** Lands on Email settings with the Gmail card highlighted. */
+export const GMAIL_SETTINGS_FROM_REPAIR_URL = `${GMAIL_SETTINGS_PATH}?from=repair`
 
 export const GMAIL_STATUS_UI: Record<
   GmailConnectionStatus,

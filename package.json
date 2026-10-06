@@ -13,9 +13,9 @@
     "db:check-migration-url": "bun run scripts/check-migration-url.ts",
     "db:studio": "drizzle-kit studio",
     "seed": "bun run scripts/seed.ts",
-    "verify:approval-schema": "bun run scripts/verify-approval-schema.ts",
-    "verify:request-approval": "bun run scripts/verify-request-approval.ts",
-    "verify:reopen-repair": "bun run scripts/verify-reopen-repair.ts",
+    "verify:approval-schema": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-approval-schema.ts",
+    "verify:request-approval": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-request-approval.ts",
+    "verify:reopen-repair": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-reopen-repair.ts",
     "verify:technician-role-change": "bun run scripts/verify-technician-role-change.ts",
     "verify:repair-photos": "bun run scripts/verify-repair-photos.ts",
     "verify:email": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-email.ts"

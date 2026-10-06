@@ -8,7 +8,7 @@ import { SettingsTabs } from '@/components/settings/settings-tabs'
 export default async function EmailSettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ gmail?: string }>
+  searchParams: Promise<{ gmail?: string; from?: string }>
 }) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) redirect('/login')
@@ -24,7 +24,7 @@ export default async function EmailSettingsPage({
     )
   }
 
-  const [connection, { gmail }] = await Promise.all([
+  const [connection, { gmail, from }] = await Promise.all([
     getGmailConnection(session.user.shopId),
     searchParams,
   ])
@@ -39,7 +39,7 @@ export default async function EmailSettingsPage({
         </p>
       </header>
       <SettingsTabs />
-      <GmailConnectionCard initialData={connection} callbackResult={gmail} />
+      <GmailConnectionCard initialData={connection} callbackResult={gmail} highlight={from === 'repair'} />
     </div>
   )
 }

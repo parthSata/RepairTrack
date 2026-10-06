@@ -45,12 +45,16 @@ import {
   type RepairPriority,
 } from '@/features/repairs/schemas'
 
+import { useSession } from '@/lib/auth-client'
+import { GmailStatusWarning } from '@/components/email/gmail-status-warning'
 import { CustomerForm } from '@/components/customers/customer-form'
 import { DeviceForm } from '@/components/devices/device-form'
 import { DeviceTypeIcon, ConditionBadge } from '@/components/devices/device-table'
 import { TechnicianCombobox } from '@/components/repairs/technician-combobox'
 
 export function NewRepairWorkflow() {
+  const { data: session } = useSession()
+  const isOwner = (session?.user as { role?: string } | undefined)?.role === 'OWNER'
   const [selectedCustomer, setSelectedCustomer] = React.useState<Customer | null>(null)
   const [selectedDevice, setSelectedDevice] = React.useState<Device | null>(null)
 
@@ -222,6 +226,8 @@ export function NewRepairWorkflow() {
                 </div>
               </div>
             </div>
+
+            <GmailStatusWarning canConnect={isOwner} className="text-left" />
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
               <Link href={`/repairs/${createdRepair.id}`} className="w-full sm:w-auto">
