@@ -23,16 +23,18 @@ import { useDisconnectGmail, useSendTestEmail } from '@/features/gmail/mutations
 import { useGmailConnection } from '@/features/gmail/queries'
 import {
   GMAIL_CALLBACK_RESULTS,
+  GMAIL_SETTINGS_PATH,
   GMAIL_STATUS_UI,
   type GmailCallbackResult,
   type GmailConnectionResponse,
 } from '@/features/gmail/schemas'
-
-const SETTINGS_PATH = '/settings/email'
+import { cn } from '@/lib/utils'
 
 type GmailConnectionCardProps = {
   initialData: GmailConnectionResponse
   callbackResult?: string
+  /** Arrived from a "Connect Gmail" warning: draws attention to the card until connected. */
+  highlight?: boolean
 }
 
 function isCallbackResult(value?: string): value is GmailCallbackResult {
@@ -46,7 +48,7 @@ function useCallbackToast(callbackResult?: string) {
     if (!isCallbackResult(callbackResult)) return
     const { type, message } = GMAIL_CALLBACK_RESULTS[callbackResult]
     toast[type](message, { id: 'gmail-callback' })
-    router.replace(SETTINGS_PATH, { scroll: false })
+    router.replace(GMAIL_SETTINGS_PATH, { scroll: false })
   }, [callbackResult, router])
 }
 
@@ -58,7 +60,7 @@ function statusDescription({ status, email }: GmailConnectionResponse) {
   return 'Shop emails are not sent until you connect your Gmail.'
 }
 
-export function GmailConnectionCard({ initialData, callbackResult }: GmailConnectionCardProps) {
+export function GmailConnectionCard({ initialData, callbackResult, highlight = false }: GmailConnectionCardProps) {
   const connection = useGmailConnection(initialData)
   const sendTestEmail = useSendTestEmail()
   useCallbackToast(callbackResult)
@@ -78,7 +80,14 @@ export function GmailConnectionCard({ initialData, callbackResult }: GmailConnec
   const statusUi = GMAIL_STATUS_UI[status]
 
   return (
-    <Card className="max-w-2xl">
+    <Card
+      className={cn(
+        'max-w-2xl transition-shadow duration-200',
+        highlight &&
+          status !== 'CONNECTED' &&
+          'shadow-lg shadow-amber-500/10 ring-2 ring-amber-400/70 ring-offset-2 ring-offset-background page-enter',
+      )}
+    >
       <CardContent className="space-y-5 p-5 sm:p-6">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">

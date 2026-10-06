@@ -2,7 +2,11 @@ import { randomBytes } from 'node:crypto'
 import { zValidator } from '@hono/zod-validator'
 import { Hono, type Context } from 'hono'
 import { deleteCookie, getSignedCookie, setSignedCookie } from 'hono/cookie'
-import { gmailCallbackQuerySchema, type GmailCallbackResult } from '@/features/gmail/schemas'
+import {
+  GMAIL_SETTINGS_PATH,
+  gmailCallbackQuerySchema,
+  type GmailCallbackResult,
+} from '@/features/gmail/schemas'
 import { requireRole } from '@/server/hono/session'
 import { sendGmailTestEmail } from '@/server/services/email.service'
 import {
@@ -12,7 +16,6 @@ import {
   getGmailConnection,
 } from '@/server/services/gmail-connection.service'
 
-const SETTINGS_PATH = '/settings/email'
 const STATE_COOKIE = 'gmail_oauth_state'
 const STATE_COOKIE_OPTIONS = {
   path: '/api/settings/gmail',
@@ -34,7 +37,7 @@ function getStateSecret() {
 }
 
 const redirectToSettings = (c: Context, result: GmailCallbackResult) =>
-  c.redirect(`${SETTINGS_PATH}?gmail=${result}`)
+  c.redirect(`${GMAIL_SETTINGS_PATH}?gmail=${result}`)
 
 /** Browser-navigation routes redirect back to Settings instead of rendering a JSON error. */
 async function redirectOnError(c: Context, action: () => Promise<Response>) {
@@ -46,9 +49,15 @@ async function redirectOnError(c: Context, action: () => Promise<Response>) {
   }
 }
 
+// STAFF read the status for the repair-page warning; the connected address stays owner-only.
 gmailRouter.get('/', async (c) => {
-  const { shopId } = await requireOwner(c.req.raw)
-  return c.json(await getGmailConnection(shopId))
+  const { shopId, role } = await requireRole(
+    c.req.raw,
+    ['OWNER', 'STAFF'],
+    'Only the shop owner or staff can view the Gmail status',
+  )
+  const connection = await getGmailConnection(shopId)
+  return c.json(role === 'OWNER' ? connection : { ...connection, email: null, connectedAt: null })
 })
 
 gmailRouter.get('/connect', (c) =>

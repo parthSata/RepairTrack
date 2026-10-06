@@ -6,7 +6,9 @@ import { devices, repairNotes, repairStatusHistory, repairs } from '@/server/db/
 import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import { invoices } from '@/server/db/schema/invoices'
-import { users } from '@/server/db/schema/users'
+import { shops, users } from '@/server/db/schema/users'
+import { buildRepairReceivedEmail } from '@/server/email/templates/repair-received'
+import { queueShopEmail } from '@/server/services/email.service'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
   normalizeStoredCostToPaise,
@@ -63,8 +65,9 @@ export async function createRepairTicket({
 }) {
   // 1. Verify Customer exists in current shop (403 if cross-shop or missing)
   const [customer] = await db
-    .select({ id: customers.id, shopId: customers.shopId })
+    .select({ id: customers.id, name: customers.name, email: customers.email, shopName: shops.name })
     .from(customers)
+    .innerJoin(shops, eq(shops.id, customers.shopId))
     .where(and(eq(customers.id, data.customerId), eq(customers.shopId, shopId)))
 
   if (!customer) {
@@ -75,7 +78,7 @@ export async function createRepairTicket({
 
   // 2. Verify Device exists in current shop (403 if cross-shop or missing)
   const [device] = await db
-    .select({ id: devices.id, shopId: devices.shopId, customerId: devices.customerId })
+    .select({ customerId: devices.customerId, brand: devices.brand, model: devices.model })
     .from(devices)
     .where(and(eq(devices.id, data.deviceId), eq(devices.shopId, shopId)))
 
@@ -193,6 +196,23 @@ export async function createRepairTicket({
   if (!createdRepair) {
     throw new HTTPException(500, { message: 'Failed to create repair ticket.' })
   }
+
+  queueShopEmail({
+    shopId,
+    repairId: createdRepair.id,
+    type: 'REPAIR_RECEIVED',
+    to: customer.email,
+    dedupeKey: `REPAIR_RECEIVED:${createdRepair.id}`,
+    email: buildRepairReceivedEmail({
+      shopName: customer.shopName,
+      customerName: customer.name,
+      ticketNumber: createdRepair.ticketNumber,
+      device,
+      problemDescription: createdRepair.problemDescription,
+      expectedCompletionDate: createdRepair.expectedCompletionDate,
+      trackingToken: createdRepair.trackingToken,
+    }),
+  })
 
   return createdRepair
 }

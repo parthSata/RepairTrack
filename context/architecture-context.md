@@ -622,6 +622,10 @@ API's users.messages.send
 Email sent "from" the Owner's own connected address
 ```
 
+`GET /api/settings/gmail` (status) is OWNER + STAFF: STAFF get `status`
+only (`email` / `connectedAt` null) for the Create Repair success-screen warning. Every
+other `/api/settings/gmail` route is OWNER only.
+
 Rules:
 
 - **Exception:** The .env platform sender is permitted only for
@@ -654,13 +658,19 @@ Rules:
   log with the same `dedupe_key` exists for the shop). Reply-To is the
   shop's email when set. It wraps `sendAndLogShopEmail`, which sends
   immediately and returns the outcome — used where the caller needs the
-  result (Send test email → `TEST`, staff invitation → `STAFF_INVITATION`). `queueShopEmail` must be called
-  inside a request; scripts use `sendAndLogShopEmail` or `sendShopEmail`.
+  result (Send test email → `TEST`, staff invitation → `STAFF_INVITATION`). `queueShopEmail` never
+  throws; outside a request it only logs "could not be queued", so scripts use
+  `sendAndLogShopEmail` or `sendShopEmail`. Event emails use a per-event `dedupeKey`
+  (`REPAIR_RECEIVED:<repairId>`).
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
-  shell every template uses) and `raw-message.ts` (`buildRawEmail`:
-  CR/LF stripped from headers, RFC 2047 From name and Subject, base64
-  HTML body wrapped at 76 characters, base64url output).
+  shell every template uses), `components.ts` (`heading`, `ctaButton`,
+  `linkFallback`, `closingNote`, `detailRow`, `detailsCard`) and
+  `raw-message.ts` (`buildRawEmail`: CR/LF stripped from headers, RFC 2047
+  From name and Subject, base64 HTML body wrapped at 76 characters,
+  base64url output). Event templates live in `src/server/email/templates/`,
+  one file per event, each exporting `build<Event>Email(data): { subject, html }`
+  and escaping every user-entered value.
 - One `gmail_connections` row per shop; disconnecting revokes the token
   at Google (best effort) and deletes the row rather than merely
   flagging it "disconnected" (don't keep sendable tokens around for a

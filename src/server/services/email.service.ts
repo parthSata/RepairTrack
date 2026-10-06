@@ -109,14 +109,19 @@ export async function sendAndLogShopEmail(input: ShopEmailInput): Promise<EmailO
 
 /**
  * Sends a shop email after the response is returned, so a slow or failing Gmail call never
- * delays or fails the action that triggered it. Must be called inside a request.
+ * delays or fails the action that triggered it. Never throws: outside a request `after()` throws,
+ * and the action has usually already committed by then.
  */
 export function queueShopEmail(input: ShopEmailInput): void {
-  after(() =>
-    sendAndLogShopEmail(input).catch((err) => {
-      console.error(`Email ${input.type} for shop ${input.shopId} failed:`, errorMessage(err))
-    }),
-  )
+  try {
+    after(() =>
+      sendAndLogShopEmail(input).catch((err) => {
+        console.error(`Email ${input.type} for shop ${input.shopId} failed:`, errorMessage(err))
+      }),
+    )
+  } catch (err) {
+    console.error(`Email ${input.type} for shop ${input.shopId} could not be queued:`, errorMessage(err))
+  }
 }
 
 export async function sendGmailTestEmail(shopId: string, to: string): Promise<void> {

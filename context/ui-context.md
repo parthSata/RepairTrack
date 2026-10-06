@@ -110,7 +110,13 @@ Dashboard should provide:
 ## Repairs
 
 - Repair List
-- Create Repair
+- Create Repair — the "Repair Ticket Created" success screen shows a
+  persistent (not dismissible) `GmailStatusWarning` between the ticket
+  summary and the actions while Gmail is Not connected / Reconnect
+  needed: "Gmail isn't connected — Email notifications are unavailable."
+  OWNER gets a Connect (Reconnect) Gmail button to
+  `/settings/email?from=repair`, which highlights the Gmail card; STAFF
+  see "Ask the shop owner to connect Gmail". Hidden while loading or on error
 - Repair Details
 - Edit Repair
 
