@@ -5,7 +5,7 @@ import { customers } from '@/server/db/schema/customers'
 import { invoices } from '@/server/db/schema/invoices'
 import { payments } from '@/server/db/schema/payments'
 import { repairs } from '@/server/db/schema/repairs'
-import { users } from '@/server/db/schema/users'
+import { shops, users } from '@/server/db/schema/users'
 import {
   PAYMENT_MESSAGES,
   type PaymentFilterInput,
@@ -14,7 +14,9 @@ import {
 import { getBillTotal, getPaymentSummary } from '@/features/payments/summary'
 import { getOffset, toPaginatedResult } from '@/lib/pagination'
 import { rupeesToPaise } from '@/lib/money'
+import { buildPaymentReceivedEmail, type PaymentReceivedEmailData } from '@/server/email/templates/payment-received'
 import { toContainsPattern } from '@/server/lib/sql-search'
+import { queueShopEmail } from '@/server/services/email.service'
 import { getShopUpi } from '@/server/services/shop.service'
 
 type RepairScope = { shopId: string; repairId: string }
@@ -230,6 +232,23 @@ export async function listPayments({
   }
 }
 
+async function findPaymentEmailContext(client: DbClient, { shopId, repairId }: RepairScope) {
+  const [context] = await client
+    .select({
+      ticketNumber: repairs.ticketNumber,
+      trackingToken: repairs.trackingToken,
+      customerName: customers.name,
+      customerEmail: customers.email,
+      shopName: shops.name,
+    })
+    .from(repairs)
+    .innerJoin(customers, eq(customers.id, repairs.customerId))
+    .innerJoin(shops, eq(shops.id, repairs.shopId))
+    .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
+  if (!context) throw new HTTPException(404, { message: PAYMENT_MESSAGES.repairNotFound })
+  return context
+}
+
 export async function recordPayment({
   shopId,
   userId,
@@ -239,7 +258,7 @@ export async function recordPayment({
   reference,
   note,
 }: RecordPaymentInput & { shopId: string; userId: string }) {
-  return db.transaction(async (tx) => {
+  const { payment, customerEmail, email } = await db.transaction(async (tx) => {
     // Same row lock as finalizing the bill, so a payment and a new final total can't race.
     const repair = await findRepairForPayment(tx, { shopId, repairId, lock: true })
     if (repair.status === 'CANCELLED') {
@@ -250,7 +269,10 @@ export async function recordPayment({
     }
 
     const amount = rupeesToPaise(amountRupees)
-    const totalPaid = await getTotalPaid({ client: tx, shopId, repairId })
+    const [totalPaid, context] = await Promise.all([
+      getTotalPaid({ client: tx, shopId, repairId }),
+      findPaymentEmailContext(tx, { shopId, repairId }),
+    ])
     const balance = repair.finalTotal - totalPaid
 
     if (balance <= 0) {
@@ -295,10 +317,36 @@ export async function recordPayment({
         note: note || null,
         receivedBy: userId,
       })
-      .returning({ id: payments.id, amount: payments.amount })
+      .returning({
+        id: payments.id,
+        amount: payments.amount,
+        method: payments.method,
+        reference: payments.reference,
+        paidAt: payments.paidAt,
+      })
+    if (!payment) throw new HTTPException(500, { message: 'Failed to record payment.' })
 
-    return payment
+    const email: PaymentReceivedEmailData = {
+      shopName: context.shopName,
+      customerName: context.customerName,
+      ticketNumber: context.ticketNumber,
+      payment,
+      billTotal: repair.finalTotal,
+      totalPaid: totalPaid + payment.amount,
+      trackingToken: context.trackingToken,
+    }
+    return { payment, customerEmail: context.customerEmail, email }
   })
+
+  queueShopEmail({
+    shopId,
+    repairId,
+    type: 'PAYMENT_RECEIVED',
+    to: customerEmail,
+    dedupeKey: `PAYMENT_RECEIVED:${payment.id}`,
+    email: () => buildPaymentReceivedEmail(email),
+  })
+  return { id: payment.id, amount: payment.amount }
 }
 
 export async function getPendingPayments(shopId: string) {
