@@ -676,7 +676,10 @@ Rules:
   one `STATUS_EMAIL_TYPES` map (`IN_REPAIR` → `REPAIR_STARTED`,
   `READY_FOR_PICKUP` → `READY_FOR_PICKUP`, `COMPLETED` → `REPAIR_COMPLETED`)
   with `dedupeKey` `<TYPE>:<repairId>`, so each is sent at most once per repair
-  (a reopened repair does not get them again).
+  (a reopened repair does not get them again). Invoice Generated is queued from
+  `createInvoiceFromRepair` after its transaction commits, with `dedupeKey`
+  `INVOICE_GENERATED:<invoiceId>` (a cancelled-and-reissued invoice has a new id,
+  so it is emailed again). The whole invoice is in the body; no PDF attachment.
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses), `components.ts` (`heading`, `ctaButton`,
@@ -684,7 +687,9 @@ Rules:
   `DETAIL_VALUE_STYLE`, `detailsCard` (optional title), `deviceDetailsCard`
   (Device + optional Expected by), `ticketHighlight`, `greeting`,
   `statusPill` / `amountBand` (amber / blue / green tones), `textBlock`
-  — escapes its text, then keeps line breaks as `<br>`) and
+  — escapes its text, then keeps line breaks as `<br>`; `optionalDetailRows`
+  — drops empty values, escapes the rest; `chargesCard(charges, title)` —
+  Labor / Parts / Additional / GST rows + Total (incl. GST) band) and
   `raw-message.ts` (`buildRawEmail`: CR/LF stripped from headers, RFC 2047
   From name and Subject, base64 HTML body wrapped at 76 characters,
   base64url output). Event templates live in `src/server/email/templates/`,

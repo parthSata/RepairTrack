@@ -4,12 +4,11 @@ import {
   amountBand,
   closingNote,
   ctaWithFallback,
-  DETAIL_VALUE_STYLE,
-  detailRow,
   detailsCard,
   deviceDetailsCard,
   greeting,
   heading,
+  optionalDetailRows,
   statusPill,
   ticketHighlight,
   type EmailDevice,
@@ -29,21 +28,15 @@ export type ReadyForPickupEmailData = {
   trackingToken: string | null
 }
 
-/** Rows with an empty value are dropped; the last remaining row loses its bottom spacing. */
-function cardRows(entries: [label: string, value: string | null | undefined][]) {
-  const filled = entries.filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()))
-  return filled.map(([label, value], index) =>
-    detailRow(label, escapeHtml(value.trim()).replace(/\r?\n/g, '<br>'), DETAIL_VALUE_STYLE, index === filled.length - 1),
-  )
-}
-
 export function buildReadyForPickupEmail(data: ReadyForPickupEmailData): { subject: string; html: string } {
   const safeShopName = escapeHtml(data.shopName)
-  const contactRows = cardRows([
+  const contactRows = optionalDetailRows([
     ['Address:', data.shop.address],
     ['Phone:', data.shop.phone],
   ])
-  const hoursRows = cardRows(formatBusinessHoursRows(data.shop.businessHours).map((row) => [row.label, row.value]))
+  const hoursRows = optionalDetailRows(
+    formatBusinessHoursRows(data.shop.businessHours).map((row) => [row.label, row.value]),
+  )
   const upiId = data.shop.upiId?.trim()
   const balanceBand =
     data.balanceDue > 0
