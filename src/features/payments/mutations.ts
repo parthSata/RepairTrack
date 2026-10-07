@@ -7,12 +7,11 @@ import { getApiErrorMessage, getApiErrorStatus } from '@/lib/api-error'
 import { formatRupees } from '@/lib/format-money'
 import { repairKeys } from '@/features/repairs/queries'
 import { paymentKeys } from './queries'
-import type { PaymentType, RecordPaymentInput } from './schemas'
+import type { RecordPaymentInput } from './schemas'
 
 type RecordedPayment = {
   id: string
   amount: number
-  type: PaymentType
 }
 
 export function useRecordPayment(repairId: string) {
@@ -25,8 +24,9 @@ export function useRecordPayment(repairId: string) {
     },
     onSuccess: (payment) => {
       void queryClient.invalidateQueries({ queryKey: paymentKeys.all })
-      const label = payment.type === 'ADVANCE' ? 'Advance' : 'Payment'
-      toast.success(`${label} of ${formatRupees(payment.amount)} recorded`)
+      // The repair's isPaidInFull flag gates COMPLETED in the status dropdown.
+      void queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      toast.success(`Payment of ${formatRupees(payment.amount)} recorded`)
     },
     onError: (error) => {
       // 409 = repair cancelled or balance changed — refetch so the status and balance shown are current.

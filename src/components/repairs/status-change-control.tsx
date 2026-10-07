@@ -28,8 +28,8 @@ import { useReopenRepair } from '@/features/repairs/mutations'
 import { TicketSummaryGrid } from '@/components/repairs/ticket-summary-grid'
 import {
   getAllowedManualStatusDestinations,
+  getCompletedLockHint,
   getManualStatusTransitionError,
-  isCompletedAwaitingFinalBill,
   isCustomerApproved,
 } from '@/features/repairs/status-transitions'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
@@ -44,6 +44,7 @@ interface StatusChangeControlProps {
   deviceSummary: string
   assignedTechnicianId?: string | null
   finalTotal?: number | null
+  isPaidInFull?: boolean
   approvalStatus?: string | null
   onStatusUpdated?: () => void
 }
@@ -70,6 +71,7 @@ export function StatusChangeControl({
   deviceSummary,
   assignedTechnicianId,
   finalTotal = null,
+  isPaidInFull = false,
   approvalStatus = null,
   onStatusUpdated,
 }: StatusChangeControlProps) {
@@ -106,14 +108,14 @@ export function StatusChangeControl({
   const isManualApprovalTransition =
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
-  const transitionOptions = { finalTotal, approvalStatus }
+  const transitionOptions = { finalTotal, isPaidInFull, approvalStatus }
   const isApproved = isCustomerApproved(approvalStatus)
   const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, transitionOptions)
-  const showCompletedLockedHint = isCompletedAwaitingFinalBill(currentStatus, transitionOptions)
+  const completedLockHint = getCompletedLockHint(currentStatus, transitionOptions)
   const statusOptions = [
     currentStatus,
     ...selectableStatuses,
-    ...(showCompletedLockedHint ? ['COMPLETED'] : []),
+    ...(completedLockHint ? ['COMPLETED'] : []),
   ]
 
   const handleStatusSelect = (newStatus: string) => {
@@ -266,12 +268,11 @@ export function StatusChangeControl({
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((status) => {
-                  const isCompletedLocked =
-                    status === 'COMPLETED' && showCompletedLockedHint
+                  const isCompletedLocked = status === 'COMPLETED' && completedLockHint !== null
                   return (
                     <SelectItem key={status} value={status} disabled={isCompletedLocked}>
                       {isCompletedLocked
-                        ? `${getRepairStatusLabel(status)} (finalize bill first)`
+                        ? `${getRepairStatusLabel(status)} (${completedLockHint})`
                         : getRepairStatusLabel(status)}
                     </SelectItem>
                   )
@@ -287,7 +288,7 @@ export function StatusChangeControl({
                 isUpdating ||
                 selectedStatus === currentStatus ||
                 isManualApprovalTransition ||
-                (selectedStatus === 'COMPLETED' && showCompletedLockedHint)
+                (selectedStatus === 'COMPLETED' && completedLockHint !== null)
               }
               className="h-10 shrink-0 px-4 text-xs font-semibold sm:min-w-34"
             >
@@ -300,6 +301,13 @@ export function StatusChangeControl({
           <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
             <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>Repair statuses unlock after the customer approves the estimate.</span>
+          </p>
+        )}
+
+        {completedLockHint === 'record payment first' && (
+          <p className="page-enter flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] leading-relaxed text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>Completed unlocks once owner or staff record the full payment for the final bill.</span>
           </p>
         )}
 

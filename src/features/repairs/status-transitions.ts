@@ -3,6 +3,8 @@ import {
   isFinalBillConfirmed,
 } from '@/features/repairs/pricing-rules'
 
+export type CompletedLockHint = 'finalize bill first' | 'record payment first'
+
 export const REPAIR_STATUSES = [
   'RECEIVED',
   'DIAGNOSING',
@@ -20,6 +22,8 @@ export type RepairStatus = (typeof REPAIR_STATUSES)[number]
 
 export type StatusTransitionOptions = {
   finalTotal?: number | null
+  /** Payments cover the finalized bill; required (with the final bill) for COMPLETED. */
+  isPaidInFull?: boolean
   /** Latest customer approval status; APPROVED switches the ticket to the post-approval phase. */
   approvalStatus?: string | null
 }
@@ -68,22 +72,31 @@ function baseAllowedDestinations(
   return phaseStatuses.filter((status) => status !== currentStatus)
 }
 
+function completedError(options?: StatusTransitionOptions) {
+  return getCompletedTransitionError({
+    nextStatus: 'COMPLETED',
+    finalTotal: options?.finalTotal,
+    isPaidInFull: options?.isPaidInFull,
+  })
+}
+
 export function getAllowedManualStatusDestinations(
   currentStatus: string,
   options?: StatusTransitionOptions,
 ): readonly RepairStatus[] {
   const base = baseAllowedDestinations(currentStatus, options?.approvalStatus)
-  if (isFinalBillConfirmed(options?.finalTotal)) return base
+  if (!completedError(options)) return base
   return base.filter((status) => status !== 'COMPLETED')
 }
 
-/** True when COMPLETED would be selectable but is blocked until the bill is finalized. */
-export function isCompletedAwaitingFinalBill(
+/** Why COMPLETED is shown but disabled; null when it is selectable or not offered at all. */
+export function getCompletedLockHint(
   currentStatus: string,
   options?: StatusTransitionOptions,
-): boolean {
-  if (isFinalBillConfirmed(options?.finalTotal)) return false
-  return baseAllowedDestinations(currentStatus, options?.approvalStatus).includes('COMPLETED')
+): CompletedLockHint | null {
+  if (!completedError(options)) return null
+  if (!baseAllowedDestinations(currentStatus, options?.approvalStatus).includes('COMPLETED')) return null
+  return isFinalBillConfirmed(options?.finalTotal) ? 'record payment first' : 'finalize bill first'
 }
 
 export function getManualStatusTransitionError(
@@ -98,11 +111,10 @@ export function getManualStatusTransitionError(
   if (!isApproved && !PRE_APPROVAL_STATUSES.includes(next)) return NEEDS_APPROVAL_MESSAGE
   if (isApproved && !POST_APPROVAL_STATUSES.includes(next)) return INTAKE_AFTER_APPROVAL_MESSAGE
 
-  const completedError = getCompletedTransitionError({
-    nextStatus,
-    finalTotal: options?.finalTotal,
-  })
-  if (completedError) return completedError
+  if (nextStatus === 'COMPLETED') {
+    const error = completedError(options)
+    if (error) return error
+  }
 
   const allowed = getAllowedManualStatusDestinations(currentStatus, options)
   if (allowed.includes(next)) return null

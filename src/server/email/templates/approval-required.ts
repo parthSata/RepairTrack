@@ -1,14 +1,16 @@
-import { formatDeviceLabel } from '@/lib/format-device'
 import { formatRupees } from '@/lib/format-money'
 import {
   closingNote,
   ctaWithFallback,
   DETAIL_VALUE_STYLE,
   detailRow,
-  detailsCard,
+  deviceDetailsCard,
+  greeting,
   heading,
+  statusPill,
   textBlock,
   ticketHighlight,
+  type EmailDevice,
 } from '@/server/email/components'
 import { escapeHtml } from '@/server/email/escape-html'
 import { renderEmailLayout } from '@/server/email/layout'
@@ -28,15 +30,13 @@ export type ApprovalRequiredEmailData = {
   shopName: string
   customerName: string
   ticketNumber: string
-  device: { brand: string; model: string | null }
+  device: EmailDevice
   diagnosis: string
   charges: ApprovalCharges
   trackingToken: string | null
 }
 
 const SUBJECT = 'Diagnosis complete — your approval is needed'
-
-const ACTION_PILL = `<p style="margin:0 0 14px 0;"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background-color:#fef3c7;border:1px solid #fde68a;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#b45309;">&#9679; Action needed</span></p>`
 
 function chargesCard(charges: ApprovalCharges) {
   const lines: [string, number][] = [
@@ -79,12 +79,12 @@ export function buildApprovalRequiredEmail(data: ApprovalRequiredEmailData): { s
     shopName: data.shopName,
     title: `Approval needed - Ticket #${data.ticketNumber}`,
     bodyHtml: `
-              ${ACTION_PILL}
+              ${statusPill('Action needed', 'amber')}
               ${heading(SUBJECT)}
-              <p style="margin:0 0 12px 0;">Hi <strong>${escapeHtml(data.customerName)}</strong>,</p>
+              ${greeting(data.customerName)}
               <p style="margin:0;color:#475569;"><strong>${safeShopName}</strong> has finished inspecting your device. Please review the diagnosis and estimate below. We'll start the repair once you approve.</p>
               ${ticketHighlight(data.ticketNumber)}
-              ${detailsCard([detailRow('Device:', escapeHtml(formatDeviceLabel(data.device)), DETAIL_VALUE_STYLE, true)])}
+              ${deviceDetailsCard(data.device)}
               ${textBlock('Diagnosis', data.diagnosis)}
               ${chargesCard(data.charges)}
               ${data.trackingToken ? ctaWithFallback('Review and approve', buildTrackingUrl(data.trackingToken)) : ''}

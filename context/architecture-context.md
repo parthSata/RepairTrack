@@ -671,12 +671,19 @@ Rules:
   throws; outside a request it only logs "could not be queued", so scripts use
   `sendAndLogShopEmail` or `sendShopEmail`. Event emails use a per-event `dedupeKey`
   (`REPAIR_RECEIVED:<repairId>`, `APPROVAL_REQUIRED:<approvalId>` so each
-  approval request emails once and a re-request sends again).
+  approval request emails once and a re-request sends again). Status emails
+  are queued from `updateRepairStatus` after its transaction commits, through
+  one `STATUS_EMAIL_TYPES` map (`IN_REPAIR` → `REPAIR_STARTED`,
+  `READY_FOR_PICKUP` → `READY_FOR_PICKUP`, `COMPLETED` → `REPAIR_COMPLETED`)
+  with `dedupeKey` `<TYPE>:<repairId>`, so each is sent at most once per repair
+  (a reopened repair does not get them again).
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses), `components.ts` (`heading`, `ctaButton`,
   `linkFallback`, `ctaWithFallback`, `closingNote`, `detailRow`,
-  `DETAIL_VALUE_STYLE`, `detailsCard`, `ticketHighlight`, `textBlock`
+  `DETAIL_VALUE_STYLE`, `detailsCard` (optional title), `deviceDetailsCard`
+  (Device + optional Expected by), `ticketHighlight`, `greeting`,
+  `statusPill` / `amountBand` (amber / blue / green tones), `textBlock`
   — escapes its text, then keeps line breaks as `<br>`) and
   `raw-message.ts` (`buildRawEmail`: CR/LF stripped from headers, RFC 2047
   From name and Subject, base64 HTML body wrapped at 76 characters,

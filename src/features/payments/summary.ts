@@ -18,19 +18,6 @@ export function getBillTotal({
   return finalTotal ?? estimatedTotal ?? null
 }
 
-/** A null bill total has no cap (advance before any estimate). */
-export function exceedsBill({
-  billTotal,
-  totalPaid,
-  amount,
-}: {
-  billTotal: number | null
-  totalPaid: number
-  amount: number
-}): boolean {
-  return billTotal != null && totalPaid + amount > billTotal
-}
-
 /** All amounts are integer paise. */
 export function getPaymentSummary({
   billTotal,

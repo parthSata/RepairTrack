@@ -58,7 +58,6 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
       id: payments.id,
       amount: payments.amount,
       method: payments.method,
-      type: payments.type,
       reference: payments.reference,
       note: payments.note,
       paidAt: payments.paidAt,
@@ -169,7 +168,6 @@ export async function listPayments({
         id: payments.id,
         amount: payments.amount,
         method: payments.method,
-        type: payments.type,
         reference: payments.reference,
         note: payments.note,
         paidAt: payments.paidAt,
@@ -293,12 +291,11 @@ export async function recordPayment({
         customerId: repair.customerId,
         amount,
         method,
-        type: 'PAYMENT',
         reference: method === 'CASH' ? null : reference?.trim() || null,
         note: note || null,
         receivedBy: userId,
       })
-      .returning({ id: payments.id, amount: payments.amount, type: payments.type })
+      .returning({ id: payments.id, amount: payments.amount })
 
     return payment
   })

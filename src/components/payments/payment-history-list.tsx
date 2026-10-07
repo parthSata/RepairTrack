@@ -1,5 +1,4 @@
 import { Receipt } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import type { RepairPayment } from '@/features/payments/queries'
 import { PAYMENT_METHOD_LABELS } from '@/features/payments/schemas'
@@ -26,10 +25,7 @@ export function PaymentHistoryList({ payments }: { payments: RepairPayment[] }) 
       {payments.map((payment) => (
         <li key={payment.id} className="space-y-0.5 py-3 text-sm print:break-inside-avoid">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className="flex items-center gap-2 font-semibold tabular-nums text-foreground">
-              {formatRupees(payment.amount)}
-              {payment.type === 'ADVANCE' ? <Badge variant="secondary">Advance</Badge> : null}
-            </p>
+            <p className="font-semibold tabular-nums text-foreground">{formatRupees(payment.amount)}</p>
             <time dateTime={payment.paidAt} className="text-xs text-muted-foreground">
               {formatDate(payment.paidAt)}
             </time>

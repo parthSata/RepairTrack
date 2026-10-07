@@ -71,13 +71,6 @@ export const paymentFilterSchema = z
 
 export type PaymentFilterInput = z.infer<typeof paymentFilterSchema>
 
-export type PaymentType = 'ADVANCE' | 'PAYMENT'
-
-export const PAYMENT_TYPE_LABELS: Record<PaymentType, string> = {
-  ADVANCE: 'Advance',
-  PAYMENT: 'Payment',
-}
-
 export const PAYMENT_STATUS_LABELS = {
   UNPAID: 'Unpaid',
   PARTIAL: 'Partial',

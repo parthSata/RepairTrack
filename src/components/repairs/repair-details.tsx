@@ -292,6 +292,7 @@ export function RepairDetails({ id }: { id: string }) {
                 deviceSummary={deviceSummary}
                 assignedTechnicianId={repair.assignedTechnicianId}
                 finalTotal={repair.finalTotal}
+                isPaidInFull={repair.isPaidInFull}
                 approvalStatus={approvalStatus}
                 onStatusUpdated={() => refetch()}
               />

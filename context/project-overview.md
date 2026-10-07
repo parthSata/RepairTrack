@@ -193,6 +193,9 @@ requirement.
 3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed
    destinations are `APPROVED`, `WAITING_FOR_PARTS`, `IN_REPAIR`,
    `QUALITY_CHECK`, `READY_FOR_PICKUP`, `COMPLETED`, and `CANCELLED`.
+   `COMPLETED` requires a finalized bill (`final_total`) that is paid in
+   full (sum of payments ≥ `final_total`); until then the dropdown shows it
+   disabled with the reason and the API returns 409.
 4. **Closed** (`COMPLETED`, `CANCELLED`): use the reopen action, not
    the status dropdown.
 
@@ -475,7 +478,8 @@ Users can:
 
 Users can:
 
-- Record payments
+- Record payments: one full payment of the remaining balance, only after
+  the bill is finalized. There are no advance or partial payments.
 - View payment history
 - Track pending payments
 - Track completed payments
