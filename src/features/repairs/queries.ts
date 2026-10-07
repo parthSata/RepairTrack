@@ -105,6 +105,8 @@ export interface Repair {
   priority: RepairPriority
   expectedCompletionDate: string | null
   isOverdue?: boolean
+  /** Payments cover the finalized bill (detail endpoint only). */
+  isPaidInFull?: boolean
   assignedTechnicianId: string | null
   createdBy: string | null
   createdAt: string

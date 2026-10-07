@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { apiClient } from '@/lib/api-client'
 import { shouldRetryQuery } from '@/lib/api-error'
 import type { PaginatedResponse } from '@/lib/pagination'
-import type { PaymentFilterInput, PaymentMethod, PaymentType } from './schemas'
+import type { PaymentFilterInput, PaymentMethod } from './schemas'
 import type { PaymentStatus } from './summary'
 import type { ShopUpi } from './upi'
 
@@ -13,7 +13,6 @@ export interface RepairPayment {
   id: string
   amount: number
   method: PaymentMethod
-  type: PaymentType
   reference: string | null
   note: string | null
   paidAt: string
@@ -36,7 +35,6 @@ export interface PaymentListItem {
   id: string
   amount: number
   method: PaymentMethod | 'CARD' | 'BANK_TRANSFER'
-  type: PaymentType
   reference: string | null
   note: string | null
   paidAt: string

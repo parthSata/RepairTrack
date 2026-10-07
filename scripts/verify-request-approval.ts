@@ -463,14 +463,23 @@ async function testFinalizeBillFlow(fixture: Fixture) {
     'Finalize test failed: Finalize Bill must save the edited charges',
   )
   assert(
-    getAllowedManualStatusDestinations('IN_REPAIR', {
+    !getAllowedManualStatusDestinations('IN_REPAIR', {
       finalTotal: finalized.finalTotal,
+      isPaidInFull: false,
       approvalStatus: 'APPROVED',
     }).includes('COMPLETED'),
-    'Finalize test failed: COMPLETED must be selectable once the bill is finalized',
+    'Finalize test failed: COMPLETED must stay locked until the final bill is paid in full',
+  )
+  assert(
+    getAllowedManualStatusDestinations('IN_REPAIR', {
+      finalTotal: finalized.finalTotal,
+      isPaidInFull: true,
+      approvalStatus: 'APPROVED',
+    }).includes('COMPLETED'),
+    'Finalize test failed: COMPLETED must be selectable once the final bill is paid in full',
   )
 
-  console.log('Edge case passed: estimate locks after approval; Finalize Bill saves charges and unlocks COMPLETED')
+  console.log('Edge case passed: estimate locks after approval; Finalize Bill + full payment unlocks COMPLETED')
 }
 
 function testApprovalDialogSource() {

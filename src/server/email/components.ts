@@ -1,3 +1,5 @@
+import { formatDate } from '@/lib/format-date'
+import { formatDeviceLabel } from '@/lib/format-device'
 import { escapeHtml } from '@/server/email/escape-html'
 
 // Building blocks for email bodies. Labels and text arguments are inserted as-is: callers escape
@@ -5,8 +7,47 @@ import { escapeHtml } from '@/server/email/escape-html'
 
 export const DETAIL_VALUE_STYLE = 'font-size:14px;font-weight:600;color:#0f172a;'
 
+const TONES = {
+  amber: { tint: '#fef3c7', wash: '#fffbeb', border: '#fde68a', text: '#b45309', deep: '#92400e' },
+  blue: { tint: '#dbeafe', wash: '#eff6ff', border: '#bfdbfe', text: '#1d4ed8', deep: '#1e3a8a' },
+  green: { tint: '#dcfce7', wash: '#f0fdf4', border: '#bbf7d0', text: '#15803d', deep: '#166534' },
+} as const
+
+export type EmailTone = keyof typeof TONES
+
 export function heading(text: string) {
   return `<h1 style="margin:0 0 16px 0;font-size:22px;font-weight:700;color:#0f172a;letter-spacing:-0.3px;">${text}</h1>`
+}
+
+export function statusPill(label: string, tone: EmailTone) {
+  const { tint, border, text } = TONES[tone]
+  return `<p style="margin:0 0 14px 0;"><span style="display:inline-block;padding:4px 12px;border-radius:999px;background-color:${tint};border:1px solid ${border};font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${text};">&#9679; ${label}</span></p>`
+}
+
+export function greeting(customerName: string) {
+  return `<p style="margin:0 0 12px 0;">Hi <strong>${escapeHtml(customerName)}</strong>,</p>`
+}
+
+/** Tinted label + large amount row, with an optional footnote line under a dashed divider. */
+export function amountBand(label: string, amountText: string, tone: EmailTone, footnoteHtml?: string) {
+  const { wash, border, text, deep } = TONES[tone]
+  const footnote = footnoteHtml
+    ? `<p style="margin:12px 0 0 0;padding-top:12px;border-top:1px dashed ${border};font-size:13px;color:${deep};">${footnoteHtml}</p>`
+    : ''
+  return `
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:${wash};border:1px solid ${border};border-radius:10px;margin:20px 0;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="font-size:14px;font-weight:700;color:${deep};">${label}</td>
+                        <td align="right" style="font-size:22px;font-weight:800;color:${text};">${amountText}</td>
+                      </tr>
+                    </table>
+                    ${footnote}
+                  </td>
+                </tr>
+              </table>`
 }
 
 export function ctaButton(label: string, url: string) {
@@ -70,8 +111,22 @@ export function detailRow(label: string, value: string, valueStyle: string, isLa
                 </tr>`
 }
 
-export function detailsCard(rows: string[]) {
+export function detailsCard(rows: string[], title?: string) {
+  const titleRow = title
+    ? `<tr><td colspan="2" style="padding-bottom:10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#2563eb;">${title}</td></tr>
+                `
+    : ''
   return `<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:20px 0;">
-                ${rows.join('\n                ')}
+                ${titleRow}${rows.join('\n                ')}
               </table>`
+}
+
+export type EmailDevice = { brand: string; model: string | null }
+
+/** Device row, plus "Expected by" only when a completion date is set. */
+export function deviceDetailsCard(device: EmailDevice, expectedCompletionDate?: Date | null) {
+  const expectedBy = expectedCompletionDate ? formatDate(expectedCompletionDate.toISOString(), 'long') : null
+  const rows = [detailRow('Device:', escapeHtml(formatDeviceLabel(device)), DETAIL_VALUE_STYLE, !expectedBy)]
+  if (expectedBy) rows.push(detailRow('Expected by:', escapeHtml(expectedBy), DETAIL_VALUE_STYLE, true))
+  return detailsCard(rows)
 }

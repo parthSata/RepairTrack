@@ -2,7 +2,7 @@
  * Single source of truth for who may change repair pricing, shared by the UI and the API.
  *
  * Flow: the technician sends the estimate from the Request Approval dialog → customer approves →
- * OWNER/STAFF finalize the bill → COMPLETED becomes selectable.
+ * OWNER/STAFF finalize the bill and record the full payment → COMPLETED becomes selectable.
  */
 
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -24,6 +24,8 @@ export const PRICING_MESSAGES = {
   finalizeForbidden: 'Only owners and staff can finalize the bill.',
   finalizeNeedsApproval: 'The customer must approve the estimate before the bill can be finalized.',
   completedNeedsFinalBill: 'Finalize the bill before marking this repair completed.',
+  completedNeedsPayment:
+    'Owner or staff must record the full payment before this repair can be marked completed.',
   approvalOwnerForbidden:
     'Owner cannot send estimates for approval. Staff or the assigned technician handle this.',
   approvalTechnicianNotAssigned:
@@ -163,14 +165,23 @@ export function isFinalBillConfirmed(finalTotal: number | null | undefined): boo
   return finalTotal != null
 }
 
+/** Amounts in integer paise. A ₹0 final bill counts as paid. */
+export function isBillPaidInFull(finalTotal: number | null | undefined, totalPaid: number): boolean {
+  return finalTotal != null && totalPaid >= finalTotal
+}
+
+/** COMPLETED needs a finalized bill that has been paid in full. */
 export function getCompletedTransitionError({
   nextStatus,
   finalTotal,
+  isPaidInFull,
 }: {
   nextStatus: string
   finalTotal: number | null | undefined
+  isPaidInFull: boolean | undefined
 }): string | null {
   if (nextStatus !== 'COMPLETED') return null
-  if (isFinalBillConfirmed(finalTotal)) return null
-  return PRICING_MESSAGES.completedNeedsFinalBill
+  if (!isFinalBillConfirmed(finalTotal)) return PRICING_MESSAGES.completedNeedsFinalBill
+  if (!isPaidInFull) return PRICING_MESSAGES.completedNeedsPayment
+  return null
 }

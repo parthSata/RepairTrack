@@ -7,8 +7,12 @@ import { repairApprovals } from '@/server/db/schema/repair-approvals'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import { invoices } from '@/server/db/schema/invoices'
 import { shops, users } from '@/server/db/schema/users'
+import type { EmailType } from '@/server/db/schema'
 import { buildApprovalRequiredEmail } from '@/server/email/templates/approval-required'
+import { buildReadyForPickupEmail } from '@/server/email/templates/ready-for-pickup'
+import { buildRepairCompletedEmail } from '@/server/email/templates/repair-completed'
 import { buildRepairReceivedEmail } from '@/server/email/templates/repair-received'
+import { buildRepairStartedEmail } from '@/server/email/templates/repair-started'
 import { queueShopEmail } from '@/server/services/email.service'
 import type { CreateRepairInput } from '@/features/repairs/schemas'
 import {
@@ -38,6 +42,7 @@ import {
 } from '@/server/services/repair-pricing.service'
 import {
   getCompletedTransitionError,
+  isBillPaidInFull,
   getEstimateEditViolation,
   getFinalizeBillViolation,
   getSendApprovalViolation,
@@ -429,7 +434,7 @@ export async function getRepairById({
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -551,6 +556,7 @@ export async function getRepairById({
       .from(invoices)
       .where(and(eq(invoices.repairId, id), eq(invoices.shopId, shopId)))
       .orderBy(desc(invoices.createdAt)),
+    repair.finalTotal != null ? getTotalPaid({ shopId, repairId: id }) : Promise.resolve(0),
   ])
 
   const creator = creatorResult[0] || null
@@ -617,6 +623,8 @@ export async function getRepairById({
       repair.expectedCompletionDate,
       resolvedStatus,
     ),
+    // A flag, not the amount: technicians need it for the COMPLETED gate but can't read payments.
+    isPaidInFull: isBillPaidInFull(repair.finalTotal, totalPaid),
     creator,
     assignedTechnician,
     notes,
@@ -642,6 +650,90 @@ export async function getRepairById({
   }
 }
 
+type RepairStatus = typeof repairs.$inferSelect.status
+
+type StatusEmailType = Extract<EmailType, 'REPAIR_STARTED' | 'READY_FOR_PICKUP' | 'REPAIR_COMPLETED'>
+
+const STATUS_EMAIL_TYPES: Partial<Record<RepairStatus, StatusEmailType>> = {
+  IN_REPAIR: 'REPAIR_STARTED',
+  READY_FOR_PICKUP: 'READY_FOR_PICKUP',
+  COMPLETED: 'REPAIR_COMPLETED',
+}
+
+/** Status-change guards plus everything the status emails need, in one shop-scoped round trip. */
+async function findRepairForStatusUpdate(shopId: string, id: string) {
+  const [row] = await db
+    .select({
+      id: repairs.id,
+      status: repairs.status,
+      assignedTechnicianId: repairs.assignedTechnicianId,
+      finalTotal: repairs.finalTotal,
+      ticketNumber: repairs.ticketNumber,
+      trackingToken: repairs.trackingToken,
+      expectedCompletionDate: repairs.expectedCompletionDate,
+      customerName: customers.name,
+      customerEmail: customers.email,
+      deviceBrand: devices.brand,
+      deviceModel: devices.model,
+      shopName: shops.name,
+      shopAddress: shops.address,
+      shopPhone: shops.phone,
+      shopBusinessHours: shops.businessHours,
+      shopUpiId: shops.upiId,
+    })
+    .from(repairs)
+    .innerJoin(customers, eq(customers.id, repairs.customerId))
+    .innerJoin(devices, eq(devices.id, repairs.deviceId))
+    .innerJoin(shops, eq(shops.id, repairs.shopId))
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+  return row
+}
+
+type StatusUpdateRepair = NonNullable<Awaited<ReturnType<typeof findRepairForStatusUpdate>>>
+
+function buildStatusEmail(type: StatusEmailType, repair: StatusUpdateRepair, totalPaid: number) {
+  const base = {
+    shopName: repair.shopName,
+    customerName: repair.customerName,
+    ticketNumber: repair.ticketNumber,
+    device: { brand: repair.deviceBrand, model: repair.deviceModel },
+    trackingToken: repair.trackingToken,
+  }
+  switch (type) {
+    case 'REPAIR_STARTED':
+      return buildRepairStartedEmail({ ...base, expectedCompletionDate: repair.expectedCompletionDate })
+    case 'READY_FOR_PICKUP':
+      return buildReadyForPickupEmail({
+        ...base,
+        shop: {
+          address: repair.shopAddress,
+          phone: repair.shopPhone,
+          businessHours: repair.shopBusinessHours,
+          upiId: repair.shopUpiId,
+        },
+        balanceDue: repair.finalTotal == null ? 0 : Math.max(repair.finalTotal - totalPaid, 0),
+      })
+    case 'REPAIR_COMPLETED':
+      return buildRepairCompletedEmail({ ...base, amountPaid: totalPaid })
+  }
+}
+
+/** Runs after the status change has committed, so it must never throw. */
+function queueRepairStatusEmail(shopId: string, type: StatusEmailType, repair: StatusUpdateRepair, totalPaid: number) {
+  try {
+    queueShopEmail({
+      shopId,
+      repairId: repair.id,
+      type,
+      to: repair.customerEmail,
+      dedupeKey: `${type}:${repair.id}`,
+      email: buildStatusEmail(type, repair, totalPaid),
+    })
+  } catch (err) {
+    console.error(`Email ${type} for repair ${repair.id} could not be built:`, err instanceof Error ? err.message : err)
+  }
+}
+
 export async function updateRepairStatus({
   shopId,
   userRole,
@@ -654,7 +746,7 @@ export async function updateRepairStatus({
   userRole: string
   userId: string
   id: string
-  status: typeof repairs.$inferSelect.status
+  status: RepairStatus
   note?: string
 }) {
   // PERMISSION CHECK: OWNER is intentionally excluded from direct status changes
@@ -665,15 +757,7 @@ export async function updateRepairStatus({
     })
   }
 
-  const [existing] = await db
-    .select({
-      id: repairs.id,
-      status: repairs.status,
-      assignedTechnicianId: repairs.assignedTechnicianId,
-      finalTotal: repairs.finalTotal,
-    })
-    .from(repairs)
-    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+  const existing = await findRepairForStatusUpdate(shopId, id)
 
   if (!existing) {
     throw new HTTPException(404, { message: 'Repair ticket not found' })
@@ -700,7 +784,12 @@ export async function updateRepairStatus({
     })
   }
 
-  const latestApproval = await getLatestApproval(id)
+  const emailType = STATUS_EMAIL_TYPES[status]
+  const needsTotalPaid = emailType === 'READY_FOR_PICKUP' || emailType === 'REPAIR_COMPLETED'
+  const [latestApproval, totalPaid] = await Promise.all([
+    getLatestApproval(id),
+    needsTotalPaid ? getTotalPaid({ shopId, repairId: id }) : 0,
+  ])
 
   if (latestApproval?.status === 'PENDING' || existing.status === 'WAITING_FOR_APPROVAL') {
     throw new HTTPException(409, {
@@ -709,9 +798,11 @@ export async function updateRepairStatus({
     })
   }
 
+  const isPaidInFull = isBillPaidInFull(existing.finalTotal, totalPaid)
   const completedError = getCompletedTransitionError({
     nextStatus: status,
     finalTotal: existing.finalTotal,
+    isPaidInFull,
   })
   if (completedError) {
     throw new HTTPException(409, { message: completedError })
@@ -719,6 +810,7 @@ export async function updateRepairStatus({
 
   const transitionError = getManualStatusTransitionError(existing.status, status, {
     finalTotal: existing.finalTotal,
+    isPaidInFull,
     approvalStatus: latestApproval?.status,
   })
   if (transitionError) {
@@ -753,6 +845,8 @@ export async function updateRepairStatus({
 
     return res
   })
+
+  if (emailType) queueRepairStatusEmail(shopId, emailType, existing, totalPaid)
 
   return updated
 }

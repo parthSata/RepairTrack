@@ -1,7 +1,6 @@
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import type { PaymentListItem } from '@/features/payments/queries'
-import { PAYMENT_METHOD_LABELS, PAYMENT_TYPE_LABELS } from '@/features/payments/schemas'
+import { PAYMENT_METHOD_LABELS } from '@/features/payments/schemas'
 import { formatDate } from '@/lib/format-date'
 import { formatRupees } from '@/lib/format-money'
 
@@ -14,9 +13,6 @@ export function PaymentListCard({ payment }: { payment: PaymentListItem }) {
             <span className="text-base font-bold tabular-nums text-foreground">
               {formatRupees(payment.amount)}
             </span>
-            <Badge variant={payment.type === 'ADVANCE' ? 'secondary' : 'outline'}>
-              {PAYMENT_TYPE_LABELS[payment.type]}
-            </Badge>
             <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {PAYMENT_METHOD_LABELS[payment.method]}
             </span>

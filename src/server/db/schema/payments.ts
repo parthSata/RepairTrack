@@ -6,8 +6,6 @@ import { repairs } from './repairs'
 
 export const paymentMethodEnum = pgEnum('payment_method', ['CASH', 'UPI', 'CARD', 'BANK_TRANSFER'])
 
-export const paymentTypeEnum = pgEnum('payment_type', ['ADVANCE', 'PAYMENT'])
-
 export const payments = pgTable(
   'payments',
   {
@@ -23,7 +21,6 @@ export const payments = pgTable(
       .references(() => customers.id, { onDelete: 'restrict' }),
     amount: integer('amount').notNull(),
     method: paymentMethodEnum('method').notNull(),
-    type: paymentTypeEnum('type').notNull(),
     /** UPI transaction ID, last 4 card digits or bank reference. */
     reference: text('reference'),
     note: text('note'),

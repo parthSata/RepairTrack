@@ -5,7 +5,6 @@ import Link from 'next/link'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Receipt, RotateCcw } from 'lucide-react'
 import { PaymentListCard } from '@/components/payments/payment-list-card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
@@ -24,7 +23,6 @@ import { usePayments, type PaymentListItem } from '@/features/payments/queries'
 import {
   PAYMENT_FILTER_METHODS,
   PAYMENT_METHOD_LABELS,
-  PAYMENT_TYPE_LABELS,
   type PaymentFilterInput,
   type PaymentFilterMethod,
 } from '@/features/payments/schemas'
@@ -99,16 +97,6 @@ const columns: ColumnDef<PaymentListItem>[] = [
       <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
         {PAYMENT_METHOD_LABELS[row.original.method]}
       </span>
-    ),
-  },
-  {
-    id: 'type',
-    enableSorting: false,
-    header: 'Type',
-    cell: ({ row }) => (
-      <Badge variant={row.original.type === 'ADVANCE' ? 'secondary' : 'outline'}>
-        {PAYMENT_TYPE_LABELS[row.original.type]}
-      </Badge>
     ),
   },
   {
@@ -273,7 +261,7 @@ export function PaymentTable() {
               <TableEmptyState
                 icon={Receipt}
                 title="No payments yet"
-                description="Payments and advances recorded for repair tickets will appear here."
+                description="Payments recorded for repair tickets will appear here."
               />
             )
           }
