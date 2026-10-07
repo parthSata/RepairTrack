@@ -680,6 +680,10 @@ Rules:
   `createInvoiceFromRepair` after its transaction commits, with `dedupeKey`
   `INVOICE_GENERATED:<invoiceId>` (a cancelled-and-reissued invoice has a new id,
   so it is emailed again). The whole invoice is in the body; no PDF attachment.
+  Payment Received is queued from `recordPayment` after its transaction commits,
+  with `dedupeKey` `PAYMENT_RECEIVED:<paymentId>`. Callers pass `email` as a
+  builder (`() => build<Event>Email(data)`); `queueShopEmail` runs it inside its
+  own `try`, so a template error is logged and never fails a committed action.
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses), `components.ts` (`heading`, `ctaButton`,

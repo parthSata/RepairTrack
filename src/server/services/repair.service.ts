@@ -209,7 +209,7 @@ export async function createRepairTicket({
     type: 'REPAIR_RECEIVED',
     to: customer.email,
     dedupeKey: `REPAIR_RECEIVED:${createdRepair.id}`,
-    email: buildRepairReceivedEmail({
+    email: () => buildRepairReceivedEmail({
       shopName: customer.shopName,
       customerName: customer.name,
       ticketNumber: createdRepair.ticketNumber,
@@ -718,20 +718,15 @@ function buildStatusEmail(type: StatusEmailType, repair: StatusUpdateRepair, tot
   }
 }
 
-/** Runs after the status change has committed, so it must never throw. */
 function queueRepairStatusEmail(shopId: string, type: StatusEmailType, repair: StatusUpdateRepair, totalPaid: number) {
-  try {
-    queueShopEmail({
-      shopId,
-      repairId: repair.id,
-      type,
-      to: repair.customerEmail,
-      dedupeKey: `${type}:${repair.id}`,
-      email: buildStatusEmail(type, repair, totalPaid),
-    })
-  } catch (err) {
-    console.error(`Email ${type} for repair ${repair.id} could not be built:`, err instanceof Error ? err.message : err)
-  }
+  queueShopEmail({
+    shopId,
+    repairId: repair.id,
+    type,
+    to: repair.customerEmail,
+    dedupeKey: `${type}:${repair.id}`,
+    email: () => buildStatusEmail(type, repair, totalPaid),
+  })
 }
 
 export async function updateRepairStatus({
@@ -968,7 +963,7 @@ export async function requestCustomerApproval({
     type: 'APPROVAL_REQUIRED',
     to: existing.customerEmail,
     dedupeKey: `APPROVAL_REQUIRED:${approvalId}`,
-    email: buildApprovalRequiredEmail({
+    email: () => buildApprovalRequiredEmail({
       shopName: existing.shopName,
       customerName: existing.customerName,
       ticketNumber: existing.ticketNumber,

@@ -107,20 +107,25 @@ export async function sendAndLogShopEmail(input: ShopEmailInput): Promise<EmailO
   return outcome
 }
 
+type QueuedShopEmailInput = Omit<ShopEmailInput, 'email'> & {
+  email: ShopEmailInput['email'] | (() => ShopEmailInput['email'])
+}
+
 /**
  * Sends a shop email after the response is returned, so a slow or failing Gmail call never
  * delays or fails the action that triggered it. Never throws: outside a request `after()` throws,
- * and the action has usually already committed by then.
+ * a template builder may throw, and the action has usually already committed by then.
  */
-export function queueShopEmail(input: ShopEmailInput): void {
+export function queueShopEmail({ email, ...rest }: QueuedShopEmailInput): void {
   try {
+    const input: ShopEmailInput = { ...rest, email: typeof email === 'function' ? email() : email }
     after(() =>
       sendAndLogShopEmail(input).catch((err) => {
         console.error(`Email ${input.type} for shop ${input.shopId} failed:`, errorMessage(err))
       }),
     )
   } catch (err) {
-    console.error(`Email ${input.type} for shop ${input.shopId} could not be queued:`, errorMessage(err))
+    console.error(`Email ${rest.type} for shop ${rest.shopId} could not be queued:`, errorMessage(err))
   }
 }
 

@@ -56,23 +56,6 @@ export type CreatedInvoice = {
 
 type InvoiceEmail = InvoiceGeneratedEmailData & { invoiceId: string }
 
-/** Runs after the invoice has committed, so it must never throw. */
-function queueInvoiceGeneratedEmail(shopId: string, repairId: string, to: string | null, email: InvoiceEmail) {
-  try {
-    queueShopEmail({
-      shopId,
-      repairId,
-      type: 'INVOICE_GENERATED',
-      to,
-      dedupeKey: `INVOICE_GENERATED:${email.invoiceId}`,
-      email: buildInvoiceGeneratedEmail(email),
-    })
-  } catch (err) {
-    const message = err instanceof Error ? err.message : err
-    console.error(`Email INVOICE_GENERATED for invoice ${email.invoiceId} could not be built:`, message)
-  }
-}
-
 export async function createInvoiceFromRepair({
   shopId,
   repairId,
@@ -175,7 +158,14 @@ export async function createInvoiceFromRepair({
     return { email, customerEmail: repair.customer.email }
   })
 
-  queueInvoiceGeneratedEmail(shopId, repairId, customerEmail, email)
+  queueShopEmail({
+    shopId,
+    repairId,
+    type: 'INVOICE_GENERATED',
+    to: customerEmail,
+    dedupeKey: `INVOICE_GENERATED:${email.invoiceId}`,
+    email: () => buildInvoiceGeneratedEmail(email),
+  })
   return { id: email.invoiceId, invoiceNumber: email.invoiceNumber }
 }
 
