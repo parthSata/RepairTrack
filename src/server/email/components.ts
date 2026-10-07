@@ -1,5 +1,6 @@
 import { formatDate } from '@/lib/format-date'
 import { formatDeviceLabel } from '@/lib/format-device'
+import { formatRupees } from '@/lib/format-money'
 import { escapeHtml } from '@/server/email/escape-html'
 
 // Building blocks for email bodies. Labels and text arguments are inserted as-is: callers escape
@@ -111,6 +112,14 @@ export function detailRow(label: string, value: string, valueStyle: string, isLa
                 </tr>`
 }
 
+/** Rows with an empty value are dropped; values are escaped with line breaks kept; the last row loses its bottom spacing. */
+export function optionalDetailRows(entries: [label: string, value: string | null | undefined][]) {
+  const filled = entries.filter((entry): entry is [string, string] => Boolean(entry[1]?.trim()))
+  return filled.map(([label, value], index) =>
+    detailRow(label, escapeHtml(value.trim()).replace(/\r?\n/g, '<br>'), DETAIL_VALUE_STYLE, index === filled.length - 1),
+  )
+}
+
 export function detailsCard(rows: string[], title?: string) {
   const titleRow = title
     ? `<tr><td colspan="2" style="padding-bottom:10px;font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#2563eb;">${title}</td></tr>
@@ -118,6 +127,51 @@ export function detailsCard(rows: string[], title?: string) {
     : ''
   return `<table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px 20px;margin:20px 0;">
                 ${titleRow}${rows.join('\n                ')}
+              </table>`
+}
+
+/** Amounts in integer paise. */
+export type EmailCharges = {
+  laborCharges: number
+  partsCharges: number
+  additionalCharges: number
+  taxPercent: number
+  taxAmount: number
+  total: number
+}
+
+/** Labor / Parts / Additional / GST rows, then a blue "Total (incl. GST)" band. */
+export function chargesCard(charges: EmailCharges, title: string) {
+  const lines: [string, number][] = [
+    ['Labor', charges.laborCharges],
+    ['Parts', charges.partsCharges],
+    ['Additional', charges.additionalCharges],
+    [`GST (${charges.taxPercent}%)`, charges.taxAmount],
+  ]
+  const rows = lines.map(([label, paise], index) =>
+    detailRow(label, formatRupees(paise), DETAIL_VALUE_STYLE, index === lines.length - 1),
+  )
+
+  return `
+              <p style="margin:24px 0 8px 0;font-size:13px;font-weight:600;color:#64748b;">${title}</p>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border:1px solid #e2e8f0;border-radius:10px;border-collapse:separate;margin:0 0 8px 0;">
+                <tr>
+                  <td style="padding:16px 20px;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      ${rows.join('\n                      ')}
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 20px;background-color:#eff6ff;border-top:1px solid #bfdbfe;border-radius:0 0 10px 10px;">
+                    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+                      <tr>
+                        <td style="font-size:14px;font-weight:700;color:#1e3a8a;">Total (incl. GST)</td>
+                        <td align="right" style="font-size:20px;font-weight:800;color:#1d4ed8;">${formatRupees(charges.total)}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
               </table>`
 }
 

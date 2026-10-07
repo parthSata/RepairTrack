@@ -13,8 +13,11 @@ import {
   type InvoiceSortField,
 } from '@/features/invoices/schemas'
 import { getOffset, toPaginatedResult } from '@/lib/pagination'
+import { buildInvoiceGeneratedEmail, type InvoiceGeneratedEmailData } from '@/server/email/templates/invoice-generated'
 import { toContainsPattern } from '@/server/lib/sql-search'
+import { queueShopEmail } from '@/server/services/email.service'
 import { hasIssuedInvoice } from '@/server/services/invoice-lock.helpers'
+import { getTotalPaid } from '@/server/services/payment.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
 
 const INVOICE_NUMBER_PREFIX = 'INV-'
@@ -51,6 +54,25 @@ export type CreatedInvoice = {
   invoiceNumber: string
 }
 
+type InvoiceEmail = InvoiceGeneratedEmailData & { invoiceId: string }
+
+/** Runs after the invoice has committed, so it must never throw. */
+function queueInvoiceGeneratedEmail(shopId: string, repairId: string, to: string | null, email: InvoiceEmail) {
+  try {
+    queueShopEmail({
+      shopId,
+      repairId,
+      type: 'INVOICE_GENERATED',
+      to,
+      dedupeKey: `INVOICE_GENERATED:${email.invoiceId}`,
+      email: buildInvoiceGeneratedEmail(email),
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : err
+    console.error(`Email INVOICE_GENERATED for invoice ${email.invoiceId} could not be built:`, message)
+  }
+}
+
 export async function createInvoiceFromRepair({
   shopId,
   repairId,
@@ -60,9 +82,9 @@ export async function createInvoiceFromRepair({
   repairId: string
   createdBy: string
 }): Promise<CreatedInvoice> {
-  return db.transaction(async (tx) => {
-    // Row lock prevents two concurrent requests for the same repair from both passing the
-    // "already invoiced" check.
+  const { email, customerEmail } = await db.transaction(async (tx) => {
+    // Locks only the repair row: prevents two concurrent requests for the same repair from both
+    // passing the "already invoiced" check without blocking edits to the joined customer/device.
     const [repair] = await tx
       .select({
         customerId: repairs.customerId,
@@ -70,10 +92,18 @@ export async function createInvoiceFromRepair({
         additionalCharges: repairs.additionalCharges,
         taxPercent: repairs.taxPercent,
         finalTotal: repairs.finalTotal,
+        ticketNumber: repairs.ticketNumber,
+        trackingToken: repairs.trackingToken,
+        customer: { name: customers.name, phone: customers.phone, email: customers.email },
+        device: { brand: devices.brand, model: devices.model, serialNumber: devices.serialNumber },
+        shop: { name: shops.name, address: shops.address, phone: shops.phone, email: shops.email },
       })
       .from(repairs)
+      .innerJoin(customers, eq(customers.id, repairs.customerId))
+      .innerJoin(devices, eq(devices.id, repairs.deviceId))
+      .innerJoin(shops, eq(shops.id, repairs.shopId))
       .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
-      .for('update')
+      .for('update', { of: repairs })
 
     if (!repair) {
       throw new HTTPException(404, { message: INVOICE_MESSAGES.repairNotFound })
@@ -100,38 +130,53 @@ export async function createInvoiceFromRepair({
     }
 
     const invoiceId = crypto.randomUUID()
-    const invoiceNumber = await generateInvoiceNumber(tx, shopId)
-
-    await tx.insert(invoices).values({
-      id: invoiceId,
-      shopId,
-      repairId,
-      customerId: repair.customerId,
-      invoiceNumber,
+    const [invoiceNumber, totalPaid] = await Promise.all([
+      generateInvoiceNumber(tx, shopId),
+      getTotalPaid({ client: tx, shopId, repairId }),
+    ])
+    const charges = {
       laborCharges: repair.laborCharges,
       partsCharges: totals.partsCharges,
       additionalCharges: repair.additionalCharges,
       taxPercent: repair.taxPercent,
       taxAmount: totals.taxAmount,
       total: totals.total,
-      createdBy,
-    })
-
-    if (parts.length > 0) {
-      await tx.insert(invoiceItems).values(
-        parts.map((part) => ({
-          id: crypto.randomUUID(),
-          shopId,
-          invoiceId,
-          partName: part.partName,
-          quantity: part.quantity,
-          unitPrice: part.unitSellingPrice,
-        })),
-      )
     }
 
-    return { id: invoiceId, invoiceNumber }
+    const [inserted] = await tx
+      .insert(invoices)
+      .values({ id: invoiceId, shopId, repairId, customerId: repair.customerId, invoiceNumber, ...charges, createdBy })
+      .returning({ createdAt: invoices.createdAt })
+
+    const items = parts.map((part) => ({
+      partName: part.partName,
+      quantity: part.quantity,
+      unitPrice: part.unitSellingPrice,
+    }))
+    if (items.length > 0) {
+      await tx
+        .insert(invoiceItems)
+        .values(items.map((item) => ({ id: crypto.randomUUID(), shopId, invoiceId, ...item })))
+    }
+
+    const email: InvoiceEmail = {
+      invoiceId,
+      invoiceNumber,
+      issuedAt: inserted?.createdAt ?? new Date(),
+      ticketNumber: repair.ticketNumber,
+      shop: repair.shop,
+      customer: repair.customer,
+      device: repair.device,
+      items,
+      charges,
+      totalPaid,
+      trackingToken: repair.trackingToken,
+    }
+    return { email, customerEmail: repair.customer.email }
   })
+
+  queueInvoiceGeneratedEmail(shopId, repairId, customerEmail, email)
+  return { id: email.invoiceId, invoiceNumber: email.invoiceNumber }
 }
 
 const INVOICE_SORT_COLUMNS = {
