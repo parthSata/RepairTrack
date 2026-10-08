@@ -684,6 +684,17 @@ Rules:
   with `dedupeKey` `PAYMENT_RECEIVED:<paymentId>`. Callers pass `email` as a
   builder (`() => build<Event>Email(data)`); `queueShopEmail` runs it inside its
   own `try`, so a template error is logged and never fails a committed action.
+- Repair email activity (`repair-email.service.ts`, OWNER/STAFF, shop-scoped):
+  `GET /api/repairs/:id/emails` returns the repair's `email_logs`, newest first,
+  as `{ id, type, recipient, status, reason, createdAt, canResend }`. `reason`
+  is the skip reason or the failure code; the raw Gmail error never leaves the
+  server. `POST /api/repairs/:id/emails/:logId/resend` rebuilds a FAILED or
+  SKIPPED email from current data with the same `build<Event>Email` template
+  (`REPAIR_EMAIL_REBUILDERS`, keyed by type; the entity id comes from the
+  `dedupe_key`). It sends it through `sendAndLogShopEmail` under the same
+  `dedupe_key`, which inserts a new log row, and returns `{ status, reason,
+  recipient }`. 409 when the row or its key was already SENT, the invoice was
+  cancelled, or the approval is no longer pending.
 - Email building blocks live in `src/server/email/`: `escape-html.ts`
   (`escapeHtml`), `layout.ts` (`renderEmailLayout`, the shared table
   shell every template uses), `components.ts` (`heading`, `ctaButton`,

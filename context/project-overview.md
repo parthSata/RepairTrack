@@ -234,6 +234,7 @@ sign in; they use the public tracking page only.
 | Connect/disconnect shop Gmail | yes | no | no |
 | See whether shop Gmail is connected (status only, never the address) | yes | yes | no |
 | Trigger a customer email send (e.g. "Send Ready for Pickup Email") | yes | yes | no |
+| View a repair's email activity, resend a failed or skipped repair email | yes | yes | no |
 | Upload / replace / delete repair photos (before & after) while **internal** | yes | yes | assigned repairs only |
 | Upload / replace / delete repair photos while **customer-visible** | yes | yes | no |
 | Hide / unhide repair photos from customer tracking | yes | yes | no |

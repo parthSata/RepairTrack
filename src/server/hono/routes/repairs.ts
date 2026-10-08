@@ -27,6 +27,10 @@ import {
   setRepairPhotosVisibility,
 } from '@/server/services/repair-photo.service'
 import { getTechnicians } from '@/server/services/staff.service'
+import { listRepairEmails, resendRepairEmail } from '@/server/services/repair-email.service'
+import { validationHook } from '@/server/hono/validation'
+import { idParamSchema } from '@/lib/validation'
+import { REPAIR_EMAIL_MESSAGES, repairEmailParamSchema } from '@/features/emails/schemas'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
 import {
   addRepairPartSchema,
@@ -64,12 +68,14 @@ async function requireRepairUserSession(request: Request) {
   }
 }
 
-async function requireCreateRepairAccess(request: Request) {
-  const { session, shopId, userRole } = await requireRepairUserSession(request)
-  if (!['OWNER', 'STAFF'].includes(userRole)) {
-    throw new HTTPException(403, { message: 'Not authorized to create repair tickets' })
+const OWNER_OR_STAFF = ['OWNER', 'STAFF'] as const
+
+async function requireRepairRole(request: Request, roles: readonly string[], forbiddenMessage: string) {
+  const access = await requireRepairUserSession(request)
+  if (!roles.includes(access.userRole)) {
+    throw new HTTPException(403, { message: forbiddenMessage })
   }
-  return { session, shopId }
+  return access
 }
 
 export const repairsRouter = new Hono()
@@ -86,7 +92,11 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { session, shopId } = await requireCreateRepairAccess(c.req.raw)
+      const { session, shopId } = await requireRepairRole(
+        c.req.raw,
+        OWNER_OR_STAFF,
+        'Not authorized to create repair tickets',
+      )
       const data = c.req.valid('json')
       const repair = await createRepairTicket({ shopId, createdBy: session.user.id, data })
       return c.json(repair, 201)
@@ -329,6 +339,20 @@ export const repairsRouter = new Hono()
         expectedCompletionDate,
       })
       return c.json(updated)
+    },
+  )
+  .get('/:id/emails', zValidator('param', idParamSchema, validationHook), async (c) => {
+    const { shopId } = await requireRepairRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
+    const { id } = c.req.valid('param')
+    return c.json(await listRepairEmails({ shopId, repairId: id }))
+  })
+  .post(
+    '/:id/emails/:logId/resend',
+    zValidator('param', repairEmailParamSchema, validationHook),
+    async (c) => {
+      const { shopId } = await requireRepairRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
+      const { id, logId } = c.req.valid('param')
+      return c.json(await resendRepairEmail({ shopId, repairId: id, logId }))
     },
   )
   .post('/:id/regenerate-tracking-link', async (c) => {

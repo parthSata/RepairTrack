@@ -117,7 +117,14 @@ Dashboard should provide:
   OWNER gets a Connect (Reconnect) Gmail button to
   `/settings/email?from=repair`, which highlights the Gmail card; STAFF
   see "Ask the shop owner to connect Gmail". Hidden while loading or on error
-- Repair Details
+- Repair Details — includes an "Emails" card for OWNER/STAFF (`RepairEmailsCard`,
+  after Payments): newest first, each row shows the type label, the recipient, a
+  Sent / Failed / Skipped badge with a reason ("No customer email", "Gmail not
+  connected", …), the time, and a Resend button on rows the API can resend.
+  Shows 3 emails per page (client-side; pager with range text, prev/next and
+  page dots) so the card stays compact.
+  OWNER also sees `GmailStatusWarning` there. It has loading skeleton, error
+  (Retry) and empty ("No emails sent yet") states
 - Edit Repair
 
 ---

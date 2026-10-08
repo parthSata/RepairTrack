@@ -64,6 +64,7 @@ import { RepairPartsSection } from './repair-parts-section'
 import { EstimatePricingPanel } from './estimate-pricing-panel'
 import { RepairInvoiceAction } from './repair-invoice-action'
 import { PaymentSummaryCard } from './payment-summary-card'
+import { RepairEmailsCard } from './repair-emails-card'
 import { getPricingPanelMode, PRICING_MESSAGES } from '@/features/repairs/pricing-rules'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { cn } from '@/lib/utils'
@@ -651,6 +652,8 @@ export function RepairDetails({ id }: { id: string }) {
         repairStatus={repair.status}
         hasFinalBill={repair.finalTotal != null}
       />
+
+      <RepairEmailsCard repairId={id} userRole={userRole} />
 
       {/* Repair Notes Section (Append-only) */}
       <Card className="overflow-hidden border-border/80 shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
