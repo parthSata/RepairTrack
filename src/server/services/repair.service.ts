@@ -652,7 +652,7 @@ export async function getRepairById({
 
 type RepairStatus = typeof repairs.$inferSelect.status
 
-type StatusEmailType = Extract<EmailType, 'REPAIR_STARTED' | 'READY_FOR_PICKUP' | 'REPAIR_COMPLETED'>
+export type StatusEmailType = Extract<EmailType, 'REPAIR_STARTED' | 'READY_FOR_PICKUP' | 'REPAIR_COMPLETED'>
 
 const STATUS_EMAIL_TYPES: Partial<Record<RepairStatus, StatusEmailType>> = {
   IN_REPAIR: 'REPAIR_STARTED',
@@ -660,8 +660,8 @@ const STATUS_EMAIL_TYPES: Partial<Record<RepairStatus, StatusEmailType>> = {
   COMPLETED: 'REPAIR_COMPLETED',
 }
 
-/** Status-change guards plus everything the status emails need, in one shop-scoped round trip. */
-async function findRepairForStatusUpdate(shopId: string, id: string) {
+/** Status-change guards plus everything the repair emails need, in one shop-scoped round trip. */
+export async function findRepairEmailContext(shopId: string, id: string) {
   const [row] = await db
     .select({
       id: repairs.id,
@@ -671,6 +671,10 @@ async function findRepairForStatusUpdate(shopId: string, id: string) {
       ticketNumber: repairs.ticketNumber,
       trackingToken: repairs.trackingToken,
       expectedCompletionDate: repairs.expectedCompletionDate,
+      problemDescription: repairs.problemDescription,
+      laborCharges: repairs.laborCharges,
+      additionalCharges: repairs.additionalCharges,
+      taxPercent: repairs.taxPercent,
       customerName: customers.name,
       customerEmail: customers.email,
       deviceBrand: devices.brand,
@@ -678,6 +682,7 @@ async function findRepairForStatusUpdate(shopId: string, id: string) {
       shopName: shops.name,
       shopAddress: shops.address,
       shopPhone: shops.phone,
+      shopEmail: shops.email,
       shopBusinessHours: shops.businessHours,
       shopUpiId: shops.upiId,
     })
@@ -689,16 +694,21 @@ async function findRepairForStatusUpdate(shopId: string, id: string) {
   return row
 }
 
-type StatusUpdateRepair = NonNullable<Awaited<ReturnType<typeof findRepairForStatusUpdate>>>
+export type RepairEmailContext = NonNullable<Awaited<ReturnType<typeof findRepairEmailContext>>>
 
-function buildStatusEmail(type: StatusEmailType, repair: StatusUpdateRepair, totalPaid: number) {
-  const base = {
+/** Fields every customer repair email template takes. */
+export function repairEmailBase(repair: RepairEmailContext) {
+  return {
     shopName: repair.shopName,
     customerName: repair.customerName,
     ticketNumber: repair.ticketNumber,
     device: { brand: repair.deviceBrand, model: repair.deviceModel },
     trackingToken: repair.trackingToken,
   }
+}
+
+export function buildStatusEmail(type: StatusEmailType, repair: RepairEmailContext, totalPaid: number) {
+  const base = repairEmailBase(repair)
   switch (type) {
     case 'REPAIR_STARTED':
       return buildRepairStartedEmail({ ...base, expectedCompletionDate: repair.expectedCompletionDate })
@@ -718,7 +728,7 @@ function buildStatusEmail(type: StatusEmailType, repair: StatusUpdateRepair, tot
   }
 }
 
-function queueRepairStatusEmail(shopId: string, type: StatusEmailType, repair: StatusUpdateRepair, totalPaid: number) {
+function queueRepairStatusEmail(shopId: string, type: StatusEmailType, repair: RepairEmailContext, totalPaid: number) {
   queueShopEmail({
     shopId,
     repairId: repair.id,
@@ -752,7 +762,7 @@ export async function updateRepairStatus({
     })
   }
 
-  const existing = await findRepairForStatusUpdate(shopId, id)
+  const existing = await findRepairEmailContext(shopId, id)
 
   if (!existing) {
     throw new HTTPException(404, { message: 'Repair ticket not found' })
@@ -1329,7 +1339,7 @@ async function getRepairPricingContext({ shopId, id }: { shopId: string; id: str
   return { ...repair, latestApproval, hasIssuedInvoice: invoiced }
 }
 
-async function resolveRepairPricingTotal({
+export async function resolveRepairPricingTotal({
   shopId,
   repairId,
   laborCharges,

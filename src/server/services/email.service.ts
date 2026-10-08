@@ -47,7 +47,14 @@ function errorMessage(err: unknown) {
   return err instanceof Error ? err.message : String(err)
 }
 
-async function isAlreadySent(shopId: string, dedupeKey: string): Promise<boolean> {
+/** The reason code shown for a non-SENT outcome; matches `skip_reason` and the prefix of `error` in `email_logs`. */
+export function getEmailOutcomeReason(outcome: EmailOutcome): EmailSkipReason | SendFailureReason | null {
+  if (outcome.status === 'SKIPPED') return outcome.skipReason
+  if (outcome.status === 'FAILED') return outcome.reason
+  return null
+}
+
+export async function isAlreadySent(shopId: string, dedupeKey: string): Promise<boolean> {
   const [row] = await db
     .select({ id: emailLogs.id })
     .from(emailLogs)

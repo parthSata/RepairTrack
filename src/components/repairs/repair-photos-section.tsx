@@ -93,33 +93,57 @@ function RepairPhotoSlot({
   }
 
   return (
-    <div className="space-y-3 rounded-xl border border-border/70 bg-muted/10 p-3 sm:p-4">
+    <div className="space-y-2.5 rounded-xl border border-border/70 bg-muted/10 p-3 sm:p-3.5">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-foreground">{label}</h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</h4>
       </div>
 
       <button
         type="button"
-        disabled={!photo}
-        onClick={() => photo && setLightboxOpen(true)}
+        disabled={!photo && !canMutate}
+        onClick={() => {
+          if (photo) {
+            setLightboxOpen(true)
+          } else if (canMutate && !busy && !uploading) {
+            inputRef.current?.click()
+          }
+        }}
         className={cn(
-          'relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/30',
-          photo && 'cursor-zoom-in border-solid transition hover:ring-2 hover:ring-accent/40',
+          'group relative flex h-40 sm:h-44 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/20 transition',
+          photo && 'cursor-zoom-in border-solid hover:ring-2 hover:ring-accent/40',
+          !photo && canMutate && 'cursor-pointer hover:border-accent/60 hover:bg-accent/5',
         )}
       >
         {photo ? (
-          <Image
-            src={photo.url}
-            alt={label}
-            fill
-            unoptimized
-            className="object-cover"
-            sizes="(max-width: 768px) 100vw, 50vw"
-          />
+          <div className="relative h-full w-full">
+            <Image
+              src={photo.url}
+              alt={label}
+              fill
+              unoptimized
+              className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+              sizes="(max-width: 768px) 100vw, 50vw"
+            />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+              <span className="flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">
+                <Eye className="h-3.5 w-3.5" />
+                View full size
+              </span>
+            </div>
+          </div>
         ) : (
-          <div className="px-4 text-center">
-            <ImagePlus className="mx-auto h-7 w-7 text-steel" />
-            <p className="mt-2 text-xs text-muted-foreground">No {label.toLowerCase()} photo yet</p>
+          <div className="flex flex-col items-center justify-center px-4 text-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted">
+              <ImagePlus className="h-4.5 w-4.5 text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-xs font-medium text-foreground">
+              No {label.toLowerCase()} photo yet
+            </p>
+            {canMutate && (
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Click or use button to upload
+              </p>
+            )}
           </div>
         )}
       </button>
@@ -137,46 +161,49 @@ function RepairPhotoSlot({
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        {canMutate && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            disabled={busy || uploading}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploading ? (
-              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Upload className="h-3.5 w-3.5" />
-            )}
-            {photo ? 'Replace' : 'Upload'}
-          </Button>
-        )}
-        {photo && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setLightboxOpen(true)}
-          >
-            Preview
-          </Button>
-        )}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {canMutate && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              disabled={busy || uploading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {uploading ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Upload className="h-3.5 w-3.5" />
+              )}
+              {photo ? 'Replace' : 'Upload'}
+            </Button>
+          )}
+          {photo && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setLightboxOpen(true)}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Preview
+            </Button>
+          )}
+        </div>
         {photo && canMutate && (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="gap-1.5 text-destructive hover:text-destructive"
+            className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
             disabled={busy || uploading || deletePhoto.isPending}
             onClick={() => deletePhoto.mutate(type)}
           >
@@ -213,12 +240,12 @@ export function RepairPhotosSection({ repairId, photos }: Props) {
   const busy = setVisibility.isPending
 
   return (
-    <section className="space-y-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="space-y-3.5 rounded-xl border border-border/80 bg-card p-4 shadow-sm sm:p-5">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-base font-semibold tracking-tight text-foreground">Repair photos</h3>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Before and after only. Shown to the customer automatically at Ready for Pickup.
+          <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+            Before and after photos (recommended: 4:3 or 16:9, max 5MB). Shown to customer at Ready for Pickup.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -248,7 +275,7 @@ export function RepairPhotosSection({ repairId, photos }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
         <RepairPhotoSlot
           repairId={repairId}
           type="BEFORE"
