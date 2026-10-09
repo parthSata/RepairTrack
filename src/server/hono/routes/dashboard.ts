@@ -1,25 +1,55 @@
 import { Hono } from 'hono'
 import { HTTPException } from 'hono/http-exception'
+import { zValidator } from '@hono/zod-validator'
 import { auth } from '@/server/auth'
 import { resolveUserRole } from '@/server/lib/session-role'
 import { getDashboardSummary } from '@/server/services/dashboard.service'
+import { getAnalyticsPeriod } from '@/server/services/dashboard-analytics.service'
+import { analyticsQuerySchema } from '@/features/dashboard/schemas'
+import { jsonError } from '@/server/hono/error-handler'
 
-const DASHBOARD_ROLES = new Set(['OWNER', 'STAFF', 'TECHNICIAN'])
+const DASHBOARD_ROLES = ['OWNER', 'STAFF', 'TECHNICIAN'] as const
+const ANALYTICS_ROLES = ['OWNER', 'STAFF'] as const
 
-async function requireDashboardSession(request: Request) {
+async function requireDashboardSession(request: Request, roles: readonly string[]) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
   const shopId = session.user.shopId
   if (!shopId) throw new HTTPException(403, { message: 'Shop context missing' })
   const userRole = await resolveUserRole(session.user.id, session.user.role)
-  if (!DASHBOARD_ROLES.has(userRole)) {
-    throw new HTTPException(403, { message: 'Not authorized to view dashboard' })
+  if (!roles.includes(userRole)) {
+    const message =
+      roles === ANALYTICS_ROLES
+        ? 'Not authorized to view analytics'
+        : 'Not authorized to view dashboard'
+    throw new HTTPException(403, { message })
   }
   return { shopId, userId: session.user.id, userRole }
 }
 
-export const dashboardRouter = new Hono().get('/summary', async (c) => {
-  const { shopId, userId, userRole } = await requireDashboardSession(c.req.raw)
-  const summary = await getDashboardSummary({ shopId, userId, userRole })
-  return c.json(summary)
-})
+export const dashboardRouter = new Hono()
+  .get('/summary', async (c) => {
+    const { shopId, userId, userRole } = await requireDashboardSession(c.req.raw, DASHBOARD_ROLES)
+    const summary = await getDashboardSummary({ shopId, userId, userRole })
+    return c.json(summary)
+  })
+  .get(
+    '/analytics/period',
+    zValidator('query', analyticsQuerySchema, (result, c) => {
+      if (!result.success) {
+        return jsonError(c, 400, 'Invalid analytics period', 'VALIDATION_ERROR')
+      }
+    }),
+    async (c) => {
+      await requireDashboardSession(c.req.raw, ANALYTICS_ROLES)
+      const { period } = c.req.valid('query')
+      const range = getAnalyticsPeriod(period)
+      return c.json({
+        period,
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+        previousStart: range.previousStart.toISOString(),
+        previousEnd: range.previousEnd.toISOString(),
+      })
+    },
+  )

@@ -94,6 +94,7 @@ Google OAuth should be available where appropriate.
 ## Dashboard
 
 - Dashboard
+- Business Analytics section (OWNER/STAFF)
 
 Dashboard should provide:
 

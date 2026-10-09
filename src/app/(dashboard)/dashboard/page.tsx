@@ -1,10 +1,16 @@
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { ArrowUpRight, ClipboardList } from 'lucide-react'
+import { auth } from '@/server/auth'
 import { Card, CardContent } from '@/components/ui/card'
 import { DashboardStatCards } from '@/features/dashboard/components/dashboard-stat-cards'
 import { DashboardOverdueRepairs } from '@/features/dashboard/components/dashboard-overdue-repairs'
+import { AnalyticsSection } from '@/features/dashboard/components/analytics/analytics-section'
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  const role = session?.user.role ?? 'OWNER'
+
   return (
     <div className="mx-auto max-w-7xl space-y-8">
       <section className="flex flex-col justify-between gap-4 border-b border-border pb-7 sm:flex-row sm:items-end">
@@ -28,6 +34,8 @@ export default function DashboardPage() {
       <DashboardStatCards />
 
       <DashboardOverdueRepairs />
+
+      {role === 'OWNER' || role === 'STAFF' ? <AnalyticsSection /> : null}
 
       <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <Card className="border-border shadow-none">

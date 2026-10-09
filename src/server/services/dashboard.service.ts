@@ -1,19 +1,7 @@
-import { and, eq, gte, lte, sql } from 'drizzle-orm'
+import { and, eq, gte, lt, sql } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { repairStatusHistory, repairs } from '@/server/db/schema/repairs'
-
-function getShopLocalDayBounds() {
-  const dayStart = new Date()
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date()
-  dayEnd.setHours(23, 59, 59, 999)
-  return {
-    dayStart,
-    dayEnd,
-    dayStartIso: dayStart.toISOString(),
-    dayEndIso: dayEnd.toISOString(),
-  }
-}
+import { getTodayRange } from '@/lib/shop-time'
 
 export async function getDashboardSummary({
   shopId,
@@ -24,7 +12,7 @@ export async function getDashboardSummary({
   userId: string
   userRole: string
 }) {
-  const { dayStart, dayEnd, dayStartIso, dayEndIso } = getShopLocalDayBounds()
+  const { start, end } = getTodayRange()
   const technicianId = userRole === 'TECHNICIAN' ? userId : null
 
   const repairScope = technicianId
@@ -34,7 +22,7 @@ export async function getDashboardSummary({
   const [repairCounts, completedResult] = await Promise.all([
     db
       .select({
-        todaysRepairs: sql<number>`count(*) filter (where ${repairs.createdAt} >= ${dayStartIso}::timestamptz and ${repairs.createdAt} <= ${dayEndIso}::timestamptz)`.mapWith(
+        todaysRepairs: sql<number>`count(*) filter (where ${repairs.createdAt} >= ${start.toISOString()}::timestamptz and ${repairs.createdAt} < ${end.toISOString()}::timestamptz)`.mapWith(
           Number,
         ),
         activeRepairs: sql<number>`count(*) filter (where ${repairs.status} not in ('COMPLETED', 'CANCELLED'))`.mapWith(
@@ -56,8 +44,8 @@ export async function getDashboardSummary({
         and(
           eq(repairs.shopId, shopId),
           eq(repairStatusHistory.toStatus, 'COMPLETED'),
-          gte(repairStatusHistory.createdAt, dayStart),
-          lte(repairStatusHistory.createdAt, dayEnd),
+          gte(repairStatusHistory.createdAt, start),
+          lt(repairStatusHistory.createdAt, end),
           technicianId ? eq(repairs.assignedTechnicianId, technicianId) : undefined,
         ),
       ),

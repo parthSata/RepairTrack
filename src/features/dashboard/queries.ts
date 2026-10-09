@@ -2,11 +2,27 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { DashboardSummary } from './schemas'
+import type { AnalyticsPeriod, DashboardSummary } from './schemas'
 
 export const dashboardKeys = {
   all: ['dashboard'] as const,
   summary: () => [...dashboardKeys.all, 'summary'] as const,
+  analytics: (section: string, period: AnalyticsPeriod) =>
+    [...dashboardKeys.all, 'analytics', section, period] as const,
+}
+
+export function useAnalyticsQuery<T>(section: string, period: AnalyticsPeriod) {
+  return useQuery<T>({
+    queryKey: dashboardKeys.analytics(section, period),
+    queryFn: async () => {
+      const response = await apiClient.get<T>(
+        `/dashboard/analytics/${section}?period=${encodeURIComponent(period)}`,
+      )
+      return response.data
+    },
+    staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
+  })
 }
 
 export function useDashboardSummary() {
