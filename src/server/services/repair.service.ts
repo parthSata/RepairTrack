@@ -1,4 +1,4 @@
-import { and, eq, inArray, or, ilike, desc, asc, count, gte, lte, SQL } from 'drizzle-orm'
+import { and, eq, inArray, notInArray, or, ilike, desc, asc, count, gte, lte, SQL } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
@@ -263,7 +263,11 @@ export async function listRepairs({
   }
 
   if (status) {
-    conditions.push(eq(repairs.status, status as typeof repairs.$inferSelect.status))
+    if (status === 'ACTIVE') {
+      conditions.push(notInArray(repairs.status, ['COMPLETED', 'CANCELLED']))
+    } else {
+      conditions.push(eq(repairs.status, status as typeof repairs.$inferSelect.status))
+    }
   }
 
   if (priority) {

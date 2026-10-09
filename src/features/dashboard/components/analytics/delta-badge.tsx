@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface DeltaBadgeProps {
@@ -8,6 +8,7 @@ interface DeltaBadgeProps {
   previous?: number
   delta?: number | null
   className?: string
+  invertTrend?: boolean
 }
 
 export function calculateDelta(current: number, previous: number): number | null {
@@ -15,7 +16,13 @@ export function calculateDelta(current: number, previous: number): number | null
   return ((current - previous) / previous) * 100
 }
 
-export function DeltaBadge({ current, previous, delta: explicitDelta, className }: DeltaBadgeProps) {
+export function DeltaBadge({
+  current,
+  previous,
+  delta: explicitDelta,
+  className,
+  invertTrend = false,
+}: DeltaBadgeProps) {
   const delta =
     explicitDelta !== undefined
       ? explicitDelta
@@ -27,12 +34,11 @@ export function DeltaBadge({ current, previous, delta: explicitDelta, className 
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground bg-muted/60',
+          'inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground bg-muted/60',
           className,
         )}
         aria-label="No prior period data to compare"
       >
-        <Minus className="h-3 w-3" aria-hidden="true" />
         <span>—</span>
       </span>
     )
@@ -45,7 +51,12 @@ export function DeltaBadge({ current, previous, delta: explicitDelta, className 
       ? `${Math.round(delta)}%`
       : `${delta > 0 ? '+' : ''}${Math.abs(delta) >= 10 ? Math.round(delta) : delta.toFixed(1)}%`
 
-  if (isPositive) {
+  // When invertTrend is true, a decrease (negative delta) is favorable (green)
+  // and an increase (positive delta) is unfavorable (rose).
+  const isGood = invertTrend ? isNegative : isPositive
+  const isBad = invertTrend ? isPositive : isNegative
+
+  if (isGood) {
     return (
       <span
         className={cn(
@@ -53,13 +64,17 @@ export function DeltaBadge({ current, previous, delta: explicitDelta, className 
           className,
         )}
       >
-        <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        {isPositive ? (
+          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        ) : (
+          <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
         <span>{formattedPercent}</span>
       </span>
     )
   }
 
-  if (isNegative) {
+  if (isBad) {
     return (
       <span
         className={cn(
@@ -67,7 +82,11 @@ export function DeltaBadge({ current, previous, delta: explicitDelta, className 
           className,
         )}
       >
-        <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+        {isPositive ? (
+          <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+        ) : (
+          <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
         <span>{formattedPercent}</span>
       </span>
     )

@@ -20,6 +20,7 @@ export async function getDashboardSummary({
     active_repairs: string | number
     ready_for_pickup: string | number
     completed_today: string | number
+    overdue_repairs: string | number
   }>(sql`
     WITH repair_counts AS (
       SELECT
@@ -32,7 +33,12 @@ export async function getDashboardSummary({
         ) AS active_repairs,
         COUNT(*) FILTER (
           WHERE ${repairs.status} = 'READY_FOR_PICKUP'
-        ) AS ready_for_pickup
+        ) AS ready_for_pickup,
+        COUNT(*) FILTER (
+          WHERE ${repairs.expectedCompletionDate} IS NOT NULL
+            AND ${repairs.expectedCompletionDate} < ${start.toISOString()}::timestamptz
+            AND ${repairs.status} NOT IN ('COMPLETED', 'CANCELLED')
+        ) AS overdue_repairs
       FROM ${repairs}
       WHERE ${repairs.shopId} = ${shopId}
         ${technicianId ? sql`AND ${repairs.assignedTechnicianId} = ${technicianId}` : sql``}
@@ -52,6 +58,7 @@ export async function getDashboardSummary({
       rc.todays_repairs,
       rc.active_repairs,
       rc.ready_for_pickup,
+      rc.overdue_repairs,
       cc.completed_today
     FROM repair_counts rc
     CROSS JOIN completed_counts cc;
@@ -63,5 +70,6 @@ export async function getDashboardSummary({
     activeRepairs: Number(row?.active_repairs ?? 0),
     readyForPickup: Number(row?.ready_for_pickup ?? 0),
     completedToday: Number(row?.completed_today ?? 0),
+    overdueRepairs: Number(row?.overdue_repairs ?? 0),
   }
 }
