@@ -6,6 +6,7 @@ import { BarChart3, type LucideIcon } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { QueryErrorState } from '@/components/ui/query-error-state'
+import { cn } from '@/lib/utils'
 
 interface AnalyticsCardProps<T> {
   title: string
@@ -14,6 +15,7 @@ interface AnalyticsCardProps<T> {
   isEmpty?: boolean
   emptyText: string
   skeleton?: ReactNode
+  className?: string
   children: (data: T) => ReactNode
 }
 
@@ -24,13 +26,15 @@ export function AnalyticsCard<T>({
   isEmpty = false,
   emptyText,
   skeleton,
+  className,
   children,
 }: AnalyticsCardProps<T>) {
   const { data, isPending, isError, error, isFetching, refetch } = query
 
   return (
-    <Card className="border-border shadow-none">
-      <CardContent className="p-5">
+    <Card className={cn('border-border shadow-none', className)}>
+      <CardContent className="p-5 flex flex-col justify-between h-full">
+
         <div className="flex items-start justify-between gap-4">
           <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
           <Icon className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />

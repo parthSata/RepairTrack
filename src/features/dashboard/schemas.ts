@@ -40,3 +40,24 @@ export const analyticsPeriodResponseSchema = z.object({
 })
 
 export type AnalyticsPeriodResponse = z.infer<typeof analyticsPeriodResponseSchema>
+
+export const monthlyRevenuePointSchema = z.object({
+  month: z.string(),
+  amount: z.number().int().nonnegative(),
+})
+
+export type MonthlyRevenuePoint = z.infer<typeof monthlyRevenuePointSchema>
+
+export const revenueAnalyticsResponseSchema = z.object({
+  periodRevenue: z.number().int().nonnegative(),
+  previousPeriodRevenue: z.number().int().nonnegative(),
+  thisMonth: z.number().int().nonnegative(),
+  lastMonthToDate: z.number().int().nonnegative(),
+  thisYear: z.number().int().nonnegative(),
+  lastYearToDate: z.number().int().nonnegative(),
+  monthly: z.array(monthlyRevenuePointSchema),
+})
+
+export type RevenueAnalyticsResponse = z.infer<typeof revenueAnalyticsResponseSchema>
+
+
