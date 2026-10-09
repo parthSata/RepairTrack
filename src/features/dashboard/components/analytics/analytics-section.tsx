@@ -1,15 +1,20 @@
 'use client'
 
-import { CalendarRange } from 'lucide-react'
+import { useMemo } from 'react'
+import { BarChart3, CalendarRange, Coins } from 'lucide-react'
+
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAnalyticsQuery } from '@/features/dashboard/queries'
+import { useRevenueAnalytics } from '@/features/dashboard/queries'
 import {
   ANALYTICS_PERIOD_LABELS,
   ANALYTICS_PERIODS,
   parseAnalyticsPeriod,
-  type AnalyticsPeriodResponse,
 } from '@/features/dashboard/schemas'
+import { getPeriodRange } from '@/lib/shop-time'
 import { useAnalyticsPeriod } from '@/features/dashboard/use-analytics-period'
+import { AnalyticsCard } from './analytics-card'
+import { KpiCard } from './kpi-card'
+import { MonthlyRevenueChart } from './monthly-revenue-chart'
 
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
@@ -36,12 +41,18 @@ function formatRangeLabel(start: string, end: string) {
     : `${startLabel} ${startYear} – ${endLabel} ${endYear}`
 }
 
-export function AnalyticsSection() {
+interface AnalyticsSectionProps {
+  shopId?: string | null
+}
+
+export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
   const { period, setPeriod } = useAnalyticsPeriod()
-  const periodQuery = useAnalyticsQuery<AnalyticsPeriodResponse>('period', period)
-  const rangeLabel = periodQuery.data
-    ? formatRangeLabel(periodQuery.data.start, periodQuery.data.end)
-    : 'Loading date range...'
+  const revenueQuery = useRevenueAnalytics(period, shopId)
+
+  const rangeLabel = useMemo(() => {
+    const range = getPeriodRange(period)
+    return formatRangeLabel(range.start.toISOString(), range.end.toISOString())
+  }, [period])
 
   return (
     <section
@@ -75,10 +86,55 @@ export function AnalyticsSection() {
           </TabsList>
         </Tabs>
       </div>
+
       <div
         key={period}
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
-      />
+      >
+        <AnalyticsCard
+          title={`Revenue · ${ANALYTICS_PERIOD_LABELS[period]}`}
+          icon={Coins}
+          query={revenueQuery}
+          emptyText="No revenue recorded"
+        >
+          {(data) => {
+            const hint =
+              period === 'this_month'
+                ? 'vs. last month to date'
+                : period === 'this_year'
+                  ? 'vs. last year to date'
+                  : period === 'last_month'
+                    ? 'vs. prior month'
+                    : 'vs. prior 3 months'
+
+            return (
+              <KpiCard
+                value={data.periodRevenue}
+                current={data.periodRevenue}
+                previous={data.previousPeriodRevenue}
+                hint={hint}
+                subtext="Collected payments, incl. GST"
+              />
+            )
+          }}
+        </AnalyticsCard>
+
+        <AnalyticsCard
+          title="Monthly revenue"
+          icon={BarChart3}
+          query={revenueQuery}
+          className="sm:col-span-2 xl:col-span-3"
+          emptyText="No monthly revenue data"
+        >
+          {(data) => (
+            <MonthlyRevenueChart
+              data={data.monthly}
+              subtext="Collected payments, incl. GST"
+            />
+          )}
+        </AnalyticsCard>
+      </div>
+
     </section>
   )
 }

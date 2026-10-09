@@ -1,19 +1,27 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useState } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { parseAnalyticsPeriod, type AnalyticsPeriod } from './schemas'
 
 export function useAnalyticsPeriod() {
   const pathname = usePathname()
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const period = parseAnalyticsPeriod(searchParams.get('period'))
+  const [period, setPeriodState] = useState<AnalyticsPeriod>(() =>
+    parseAnalyticsPeriod(searchParams.get('period')),
+  )
 
-  function setPeriod(nextPeriod: AnalyticsPeriod) {
-    const params = new URLSearchParams(searchParams.toString())
-    params.set('period', nextPeriod)
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }
+  const setPeriod = useCallback(
+    (nextPeriod: AnalyticsPeriod) => {
+      setPeriodState(nextPeriod)
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        url.searchParams.set('period', nextPeriod)
+        window.history.replaceState(null, '', `${pathname}?${url.searchParams.toString()}`)
+      }
+    },
+    [pathname],
+  )
 
   return { period, setPeriod }
 }

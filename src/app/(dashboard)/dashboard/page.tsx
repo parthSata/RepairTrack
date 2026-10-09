@@ -10,6 +10,7 @@ import { AnalyticsSection } from '@/features/dashboard/components/analytics/anal
 export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() })
   const role = session?.user.role ?? 'OWNER'
+  const shopId = session?.user.shopId
 
   return (
     <div className="mx-auto max-w-7xl space-y-8">
@@ -31,11 +32,13 @@ export default async function DashboardPage() {
         </Link>
       </section>
 
-      <DashboardStatCards />
+      <DashboardStatCards shopId={shopId ?? undefined} />
 
       <DashboardOverdueRepairs />
 
-      {role === 'OWNER' || role === 'STAFF' ? <AnalyticsSection /> : null}
+      {role === 'OWNER' || role === 'STAFF' ? (
+        <AnalyticsSection shopId={shopId ?? undefined} />
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
         <Card className="border-border shadow-none">

@@ -86,8 +86,14 @@ function StatCardsGrid({ data }: { data: DashboardSummary }) {
   )
 }
 
-export function DashboardStatCards() {
-  const { data, isPending, isError, refetch } = useDashboardSummary()
+interface DashboardStatCardsProps {
+  shopId?: string | null
+}
+
+export function DashboardStatCards({ shopId }: DashboardStatCardsProps = {}) {
+  const { data, isPending, isError, refetch } = useDashboardSummary(shopId)
+
+
 
   if (isPending && !data) {
     return <StatCardsSkeleton />
