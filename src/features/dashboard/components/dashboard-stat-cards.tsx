@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { useDashboardSummary } from '@/features/dashboard/queries'
 import type { DashboardSummary } from '@/features/dashboard/schemas'
 
+import { AnimatedNumber } from './animated-number'
+
 const METRICS = [
   {
     key: 'todaysRepairs' as const,
@@ -41,12 +43,7 @@ const METRICS = [
 function StatValue({ value }: { value: number }) {
   return (
     <p className="mt-6 text-3xl font-semibold tracking-tight tabular-nums">
-      <span
-        key={value}
-        className="inline-block motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:animate-none"
-      >
-        {value}
-      </span>
+      <AnimatedNumber value={value} />
     </p>
   )
 }

@@ -352,10 +352,9 @@ The dashboard should provide a quick overview of:
 - Repair status distribution
 - Important operational information
 
-Pending approvals, pending payments, and revenue overview are
-intentionally excluded from the current MVP card set. Payments and
-revenue remain blocked until Sprint 2 Invoice/Payment tables exist;
-pending approvals are computable but out of this MVP scope.
+The Dashboard includes a Business Analytics section for OWNER/STAFF
+covering revenue, repair KPIs, technician performance, brands, problems,
+and parts usage. The separate Reports module comes later.
 
 The dashboard should prioritize useful business information over
 decorative widgets.
