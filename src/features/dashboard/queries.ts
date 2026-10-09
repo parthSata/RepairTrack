@@ -2,7 +2,12 @@
 
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { apiClient } from '@/lib/api-client'
-import type { AnalyticsPeriod, DashboardSummary, RevenueAnalyticsResponse } from './schemas'
+import type {
+  AnalyticsPeriod,
+  DashboardSummary,
+  RepairAnalyticsResponse,
+  RevenueAnalyticsResponse,
+} from './schemas'
 
 export const dashboardKeys = {
   all: ['dashboard'] as const,
@@ -33,6 +38,10 @@ export function useAnalyticsQuery<T>(
 
 export function useRevenueAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
   return useAnalyticsQuery<RevenueAnalyticsResponse>('revenue', period, shopId)
+}
+
+export function useRepairAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
+  return useAnalyticsQuery<RepairAnalyticsResponse>('repairs', period, shopId)
 }
 
 export function useDashboardSummary(shopId?: string | null) {

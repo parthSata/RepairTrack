@@ -160,13 +160,24 @@ export function RepairList() {
 
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [status, setStatus] = useState<string>('')
-  const [priority, setPriority] = useState<string>('')
+  const [status, setStatus] = useState<string>(() => searchParams.get('status') ?? '')
+  const [priority, setPriority] = useState<string>(() => searchParams.get('priority') ?? '')
   const [overdue, setOverdue] = useState<string>(() =>
     searchParams.get('overdue') === 'true' ? 'true' : '',
   )
-  const [technicianId, setTechnicianId] = useState<string>('')
+  const [technicianId, setTechnicianId] = useState<string>(() => searchParams.get('technicianId') ?? '')
   const [page, setPage] = useState(1)
+
+  // Synchronize state during render when URL query parameters change (official React pattern)
+  const [prevParamsString, setPrevParamsString] = useState(() => searchParams.toString())
+  if (prevParamsString !== searchParams.toString()) {
+    setPrevParamsString(searchParams.toString())
+    setStatus(searchParams.get('status') ?? '')
+    setOverdue(searchParams.get('overdue') === 'true' ? 'true' : '')
+    setPriority(searchParams.get('priority') ?? '')
+    setTechnicianId(searchParams.get('technicianId') ?? '')
+    setPage(1)
+  }
 
   // Debounce search input by 300ms to eliminate instant keystroke DB queries
   useEffect(() => {
@@ -260,6 +271,7 @@ export function RepairList() {
             className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
           >
             <option value="">All Statuses</option>
+            <option value="ACTIVE">Active (In Progress)</option>
             <option value="RECEIVED">Received</option>
             <option value="DIAGNOSING">Diagnosing</option>
             <option value="WAITING_FOR_APPROVAL">Waiting for Approval</option>

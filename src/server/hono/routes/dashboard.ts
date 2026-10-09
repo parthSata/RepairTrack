@@ -7,7 +7,11 @@ import { db } from '@/server/db'
 import { users } from '@/server/db/schema'
 import { resolveUserRole } from '@/server/lib/session-role'
 import { getDashboardSummary } from '@/server/services/dashboard.service'
-import { getAnalyticsPeriod, getRevenueAnalytics } from '@/server/services/dashboard-analytics.service'
+import {
+  getAnalyticsPeriod,
+  getRepairAnalytics,
+  getRevenueAnalytics,
+} from '@/server/services/dashboard-analytics.service'
 import { analyticsQuerySchema } from '@/features/dashboard/schemas'
 import { jsonError } from '@/server/hono/error-handler'
 
@@ -81,6 +85,20 @@ export const dashboardRouter = new Hono()
       const { period } = c.req.valid('query')
       const revenue = await getRevenueAnalytics(shopId, period)
       return c.json(revenue)
+    },
+  )
+  .get(
+    '/analytics/repairs',
+    zValidator('query', analyticsQuerySchema, (result, c) => {
+      if (!result.success) {
+        return jsonError(c, 400, 'Invalid analytics period', 'VALIDATION_ERROR')
+      }
+    }),
+    async (c) => {
+      const { shopId } = await requireDashboardSession(c.req.raw, ANALYTICS_ROLES)
+      const { period } = c.req.valid('query')
+      const repairsData = await getRepairAnalytics(shopId, period)
+      return c.json(repairsData)
     },
   )
 
