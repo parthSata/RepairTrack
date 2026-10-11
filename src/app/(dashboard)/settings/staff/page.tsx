@@ -20,9 +20,7 @@ export default async function StaffManagementPage() {
     <div className="mx-auto max-w-7xl space-y-8">
       <header className="border-b border-border pb-7">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Settings</p>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-          Staff Management
-        </h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Staff Management</h1>
         <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
           Invite, manage, and assign roles for your repair shop staff and technicians.
         </p>

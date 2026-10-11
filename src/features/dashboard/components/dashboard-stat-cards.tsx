@@ -127,7 +127,7 @@ function OperationCardItem({
 
             <p
               className={cn(
-                'mt-2.5 text-2xl font-bold tracking-tight tabular-nums text-foreground',
+                'mt-3 text-3xl font-bold tracking-tight tabular-nums text-foreground',
                 isAlertActive && 'text-rose-600 dark:text-rose-400',
               )}
             >

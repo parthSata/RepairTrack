@@ -91,18 +91,5 @@ export const repairAnalyticsResponseSchema = z.object({
 
 export type RepairAnalyticsResponse = z.infer<typeof repairAnalyticsResponseSchema>
 
-export const technicianPerformancePointSchema = z.object({
-  technicianId: z.string(),
-  name: z.string(),
-  isActive: z.boolean(),
-  completed: z.number().int().nonnegative(),
-  active: z.number().int().nonnegative(),
-  overdue: z.number().int().nonnegative(),
-  avgRepairHours: z.number().nonnegative().nullable(),
-})
 
-export type TechnicianPerformancePoint = z.infer<typeof technicianPerformancePointSchema>
 
-export const technicianAnalyticsResponseSchema = z.array(technicianPerformancePointSchema)
-
-export type TechnicianAnalyticsResponse = z.infer<typeof technicianAnalyticsResponseSchema>

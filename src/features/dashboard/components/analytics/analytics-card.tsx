@@ -34,8 +34,8 @@ export function AnalyticsCard<T>({
   const { data, isPending, isError, error, isFetching, refetch } = query
 
   return (
-    <Card className={cn('border-border/80 shadow-xs flex flex-col overflow-hidden h-full', className)}>
-      <CardContent className="p-5 flex flex-col flex-1 h-full">
+    <Card className={cn('border-border/80 shadow-xs flex flex-col overflow-hidden', className)}>
+      <CardContent className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
           <div
@@ -64,7 +64,7 @@ export function AnalyticsCard<T>({
             <p className="mt-2 text-sm text-muted-foreground">{emptyText}</p>
           </div>
         ) : data ? (
-          <div className="mt-3 flex flex-1 flex-col h-full">{children(data)}</div>
+          <div className="mt-3 flex flex-1 flex-col">{children(data)}</div>
         ) : null}
 
         {data && isError ? (
