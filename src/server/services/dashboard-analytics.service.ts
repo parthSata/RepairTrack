@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { db } from '@/server/db'
+import { users } from '@/server/db/schema/users'
 import { payments } from '@/server/db/schema/payments'
 import { repairs, repairStatusHistory } from '@/server/db/schema/repairs'
 import { getPeriodRange } from '@/lib/shop-time'
@@ -8,6 +9,7 @@ import type {
   AnalyticsPeriod,
   RepairAnalyticsResponse,
   RevenueAnalyticsResponse,
+  TechnicianAnalyticsResponse,
 } from '@/features/dashboard/schemas'
 
 const MONTH_NAMES = [
@@ -344,3 +346,75 @@ export async function getRepairAnalytics(
   }
 }
 
+interface TechnicianAnalyticsRow extends Record<string, unknown> {
+  technician_id: string
+  name: string
+  is_active: boolean | string | number
+  completed: string | number
+  active: string | number
+  overdue: string | number
+  avg_repair_hours: string | number | null
+}
+
+export async function getTechnicianAnalytics(
+  shopId: string,
+  period: AnalyticsPeriod = 'this_month',
+): Promise<TechnicianAnalyticsResponse> {
+  const now = new Date()
+  const periodRange = getPeriodRange(period, now)
+  const dayStartIso = getStartOfToday(now).toISOString()
+
+  const rows = await db.execute<TechnicianAnalyticsRow>(sql`
+    WITH period_completions AS (
+      SELECT
+        r.id AS repair_id,
+        MAX(rsh.created_at) AS latest_completed_at,
+        EXTRACT(EPOCH FROM (MAX(rsh.created_at) - r.created_at)) / 3600.0 AS repair_hours
+      FROM ${repairStatusHistory} rsh
+      INNER JOIN ${repairs} r ON r.id = rsh.repair_id
+      WHERE r.shop_id = ${shopId}
+        AND r.assigned_technician_id IS NOT NULL
+        AND rsh.to_status = 'COMPLETED'
+        AND rsh.created_at >= ${periodRange.start.toISOString()}::timestamptz
+        AND rsh.created_at < ${periodRange.end.toISOString()}::timestamptz
+      GROUP BY r.id, r.created_at
+    )
+    SELECT
+      u.id AS technician_id,
+      u.name,
+      (u.status = 'ACTIVE') AS is_active,
+      COUNT(DISTINCT pc.repair_id)::int AS completed,
+      COUNT(DISTINCT CASE WHEN r.status NOT IN ('COMPLETED', 'CANCELLED') THEN r.id END)::int AS active,
+      COUNT(DISTINCT CASE WHEN r.status NOT IN ('COMPLETED', 'CANCELLED')
+        AND r.expected_completion_date IS NOT NULL
+        AND r.expected_completion_date < ${dayStartIso}::timestamptz THEN r.id END)::int AS overdue,
+      AVG(pc.repair_hours) AS avg_repair_hours
+    FROM ${users} u
+    INNER JOIN ${repairs} r ON r.assigned_technician_id = u.id AND r.shop_id = ${shopId}
+    LEFT JOIN period_completions pc ON pc.repair_id = r.id
+    WHERE u.shop_id = ${shopId}
+      AND (
+        pc.repair_id IS NOT NULL
+        OR r.status NOT IN ('COMPLETED', 'CANCELLED')
+        OR (
+          r.created_at >= ${periodRange.start.toISOString()}::timestamptz
+          AND r.created_at < ${periodRange.end.toISOString()}::timestamptz
+        )
+      )
+    GROUP BY u.id, u.name, u.status
+    ORDER BY completed DESC, active DESC, u.name ASC
+  `)
+
+  return rows.map((row) => ({
+    technicianId: String(row.technician_id),
+    name: String(row.name),
+    isActive: row.is_active === true || row.is_active === 't' || row.is_active === 1,
+    completed: Number(row.completed ?? 0),
+    active: Number(row.active ?? 0),
+    overdue: Number(row.overdue ?? 0),
+    avgRepairHours:
+      row.avg_repair_hours != null
+        ? Math.max(0, Math.round(Number(row.avg_repair_hours) * 10) / 10)
+        : null,
+  }))
+}

@@ -11,6 +11,7 @@ import {
   getAnalyticsPeriod,
   getRepairAnalytics,
   getRevenueAnalytics,
+  getTechnicianAnalytics,
 } from '@/server/services/dashboard-analytics.service'
 import { analyticsQuerySchema } from '@/features/dashboard/schemas'
 import { jsonError } from '@/server/hono/error-handler'
@@ -101,5 +102,17 @@ export const dashboardRouter = new Hono()
       return c.json(repairsData)
     },
   )
-
-
+  .get(
+    '/analytics/technicians',
+    zValidator('query', analyticsQuerySchema, (result, c) => {
+      if (!result.success) {
+        return jsonError(c, 400, 'Invalid analytics period', 'VALIDATION_ERROR')
+      }
+    }),
+    async (c) => {
+      const { shopId } = await requireDashboardSession(c.req.raw, ANALYTICS_ROLES)
+      const { period } = c.req.valid('query')
+      const technicians = await getTechnicianAnalytics(shopId, period)
+      return c.json(technicians)
+    },
+  )

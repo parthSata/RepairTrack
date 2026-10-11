@@ -7,6 +7,7 @@ import type {
   DashboardSummary,
   RepairAnalyticsResponse,
   RevenueAnalyticsResponse,
+  TechnicianAnalyticsResponse,
 } from './schemas'
 
 export const dashboardKeys = {
@@ -42,6 +43,10 @@ export function useRevenueAnalytics(period: AnalyticsPeriod, shopId?: string | n
 
 export function useRepairAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
   return useAnalyticsQuery<RepairAnalyticsResponse>('repairs', period, shopId)
+}
+
+export function useTechnicianAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
+  return useAnalyticsQuery<TechnicianAnalyticsResponse>('technicians', period, shopId)
 }
 
 export function useDashboardSummary(shopId?: string | null) {

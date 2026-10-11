@@ -30,6 +30,7 @@ import { AnalyticsCard } from './analytics-card'
 import { KpiCard } from './kpi-card'
 import { MonthlyRevenueChart } from './monthly-revenue-chart'
 import { RepairStatusChart } from './repair-status-chart'
+import { TechnicianPerformanceCard } from './technician-performance-card'
 
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
   day: 'numeric',
@@ -93,7 +94,7 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">
             Business Analytics
           </p>
-          <h2 id="business-analytics-heading" className="mt-2 text-2xl font-semibold tracking-tight">
+          <h2 id="business-analytics-heading" className="mt-1.5 text-xl font-bold tracking-tight text-foreground">
             Understand the work behind the queue.
           </h2>
           <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -249,22 +250,22 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
       {/* Analytics Charts Grid: Large Revenue Trend + Repair Status Breakdown */}
       <div
         key={`charts-${period}`}
-        className="grid gap-4 lg:grid-cols-12 items-start motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
+        className="grid gap-4 lg:grid-cols-12 items-stretch motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
       >
         <AnalyticsCard
           title={`Revenue trend · ${ANALYTICS_PERIOD_LABELS[period]}`}
           icon={BarChart3}
           iconContainerClassName="bg-accent/10 text-accent"
           query={revenueQuery}
-          className="lg:col-span-7 xl:col-span-8"
+          className="lg:col-span-7 xl:col-span-8 h-full"
           emptyText="No revenue data recorded"
         >
           {(data) => (
-            <div className="space-y-4">
+            <div className="space-y-4 flex flex-col flex-1 justify-between h-full">
               <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border/50 pb-3">
                 <div>
                   <span className="text-xs text-muted-foreground">Collected revenue</span>
-                  <div className="text-2xl font-bold tracking-tight text-foreground">
+                  <div className="text-xl font-bold tracking-tight text-foreground">
                     {formatRupees(data.periodRevenue)}
                   </div>
                 </div>
@@ -286,7 +287,7 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           icon={Layers}
           iconContainerClassName="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
           query={repairsQuery}
-          className="lg:col-span-5 xl:col-span-4"
+          className="lg:col-span-5 xl:col-span-4 h-full"
           emptyText="No active repairs in queue"
         >
           {(data) => (
@@ -297,6 +298,9 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           )}
         </AnalyticsCard>
       </div>
+
+      {/* Technician Performance — full width */}
+      <TechnicianPerformanceCard period={period} shopId={shopId} />
     </section>
   )
 }
