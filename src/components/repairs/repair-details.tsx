@@ -243,7 +243,7 @@ export function RepairDetails({ id }: { id: string }) {
                 <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   Repair ticket
                 </p>
-                <h1 className="font-mono text-2xl font-bold tracking-tight text-foreground wrap-break-word">
+                <h1 className="font-mono text-2xl font-bold tracking-tight text-foreground wrap-break-word sm:text-3xl">
                   #{repair.ticketNumber}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2">

@@ -74,8 +74,8 @@ export function RepairStatusChart({
 
   if (total === 0 || data.length === 0) {
     return (
-      <div className="flex flex-col flex-1 justify-between space-y-4 h-full">
-        <div className="flex flex-1 min-h-48 flex-col items-center justify-center text-center">
+      <div className="flex flex-col justify-between space-y-4">
+        <div className="flex h-48 flex-col items-center justify-center text-center">
           <p className="text-sm font-medium text-muted-foreground">No active repairs</p>
           <p className="mt-1 text-xs text-muted-foreground/80">
             Work queue is currently clear.
@@ -91,7 +91,7 @@ export function RepairStatusChart({
   }
 
   return (
-    <div className="flex flex-col flex-1 justify-between space-y-4 h-full">
+    <div className="flex flex-col justify-between space-y-4">
       <div className="space-y-3.5">
         {/* Proportional Segmented Progress Bar */}
         <div

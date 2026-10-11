@@ -19,9 +19,7 @@ export default async function DashboardPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">
             Operations Dashboard
           </p>
-          <h1 className="mt-2 text-2xl font-bold tracking-tight text-foreground">
-            Keep the bench moving.
-          </h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Keep the bench moving.</h1>
           <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
             Real-time intake, active queue status, and business performance at a glance.
           </p>

@@ -47,7 +47,7 @@ export function KpiCard({
       <div>
         <div
           className={cn(
-            'text-2xl font-bold tracking-tight tabular-nums text-foreground',
+            'text-3xl font-semibold tracking-tight tabular-nums text-foreground',
             valueClassName,
           )}
         >

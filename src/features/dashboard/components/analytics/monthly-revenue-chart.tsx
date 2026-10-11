@@ -46,8 +46,8 @@ export function MonthlyRevenueChart({
   }, [chartData.length])
 
   return (
-    <div className="flex flex-col flex-1 justify-between space-y-3 h-full">
-      <ChartContainer config={chartConfig} className="aspect-auto h-55 w-full">
+    <div className="flex flex-col space-y-3">
+      <ChartContainer config={chartConfig} className="aspect-auto h-[220px] w-full">
         <BarChart
           data={chartData}
           margin={{ top: 12, right: 6, left: 6, bottom: 0 }}
