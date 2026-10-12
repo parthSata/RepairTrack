@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
-import Link from 'next/link'
-import { Bell, Boxes, CircleDollarSign, CreditCard, LayoutDashboard, Settings, Smartphone, UserPlus, Users, Wrench } from 'lucide-react'
+import { Bell } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/server/auth'
 import { LogoutButton } from '@/components/auth/logout-button'
 import { MobileNav } from '@/components/dashboard/mobile-nav'
+import { SidebarNav } from '@/components/dashboard/sidebar-nav'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -20,9 +20,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   const role = session.user.role ?? 'OWNER'
-  const restricted = role === 'TECHNICIAN'
-  const owner = role === 'OWNER'
-  const navClass = 'group flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground'
 
   return (
     <div className="flex min-h-screen bg-background print:block print:min-h-0 print:bg-white">
@@ -31,13 +28,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-xs font-bold text-accent-foreground">RT</span>
           <span className="font-semibold tracking-tight">RepairTrack</span>
         </div>
-        <nav aria-label="Primary navigation" className="space-y-1 p-4">
-          <Link className={`${navClass} bg-muted font-medium text-foreground`} href="/dashboard"><LayoutDashboard className="h-4 w-4" />Dashboard</Link>
-          <Link className={navClass} href="/repairs"><Wrench className="h-4 w-4" />Repairs</Link>
-          <Link className={navClass} href="/customers"><Users className="h-4 w-4" />Customers</Link>
-          <Link className={navClass} href="/devices"><Smartphone className="h-4 w-4" />Devices</Link>
-          {!restricted && <><Link className={navClass} href="/inventory"><Boxes className="h-4 w-4" />Inventory</Link><Link className={navClass} href="/invoices"><CircleDollarSign className="h-4 w-4" />Invoices</Link><Link className={navClass} href="/payments"><CreditCard className="h-4 w-4" />Payments</Link>{owner && <><Link className={navClass} href="/settings/staff"><UserPlus className="h-4 w-4" />Staff</Link><Link className={navClass} href="/settings/shop"><Settings className="h-4 w-4" />Settings</Link></>}</>}
-        </nav>
+        <SidebarNav role={role} />
         <div className="mx-4 mt-4 rounded-lg border border-border bg-muted p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">Workspace</p>
           <p className="mt-2 text-sm font-medium">{role}</p>

@@ -2,12 +2,16 @@ import { sql } from 'drizzle-orm'
 import { db } from '@/server/db'
 import { payments } from '@/server/db/schema/payments'
 import { repairs, repairStatusHistory } from '@/server/db/schema/repairs'
+import { repairParts } from '@/server/db/schema/repair-parts'
+import { inventory } from '@/server/db/schema/inventory'
 import { getPeriodRange } from '@/lib/shop-time'
 import { getStartOfToday } from '@/features/repairs/overdue'
-import type {
-  AnalyticsPeriod,
-  RepairAnalyticsResponse,
-  RevenueAnalyticsResponse,
+import {
+  partsAnalyticsResponseSchema,
+  type AnalyticsPeriod,
+  type PartsAnalyticsResponse,
+  type RepairAnalyticsResponse,
+  type RevenueAnalyticsResponse,
 } from '@/features/dashboard/schemas'
 
 const MONTH_NAMES = [
@@ -342,5 +346,105 @@ export async function getRepairAnalytics(
     previousAvgRepairHours,
     statusDistribution,
   }
+}
+
+export async function getPartsAnalytics(
+  shopId: string,
+  period: AnalyticsPeriod = 'this_month',
+): Promise<PartsAnalyticsResponse> {
+  const periodRange = getPeriodRange(period)
+
+  const rows = await db.execute<{
+    total_quantity: string | number
+    total_value: string | number
+    low_stock_count: string | number
+    top: unknown
+  }>(sql`
+    WITH period_parts AS (
+      SELECT
+        rp.inventory_id,
+        rp.quantity,
+        rp.unit_selling_price
+      FROM ${repairParts} rp
+      WHERE rp.shop_id = ${shopId}
+        AND rp.created_at >= ${periodRange.start.toISOString()}::timestamptz
+        AND rp.created_at < ${periodRange.end.toISOString()}::timestamptz
+    ),
+    totals AS (
+      SELECT
+        COALESCE(SUM(quantity), 0)::int AS total_quantity,
+        COALESCE(SUM(quantity::bigint * unit_selling_price::bigint), 0)::bigint AS total_value
+      FROM period_parts
+    ),
+    low_stock AS (
+      SELECT
+        COUNT(*)::int AS low_stock_count
+      FROM ${inventory}
+      WHERE ${inventory.shopId} = ${shopId}
+        AND ${inventory.quantity} > 0
+        AND ${inventory.stockAlert} > 0
+        AND ${inventory.quantity} <= ${inventory.stockAlert}
+    ),
+    top_parts AS (
+      SELECT
+        rp.inventory_id AS "partId",
+        i.name AS "name",
+        i.sku AS "sku",
+        SUM(rp.quantity)::int AS "quantity",
+        SUM(rp.quantity::bigint * rp.unit_selling_price::bigint)::bigint AS "value"
+      FROM ${repairParts} rp
+      INNER JOIN ${inventory} i ON i.id = rp.inventory_id AND i.shop_id = ${shopId}
+      WHERE rp.shop_id = ${shopId}
+        AND rp.created_at >= ${periodRange.start.toISOString()}::timestamptz
+        AND rp.created_at < ${periodRange.end.toISOString()}::timestamptz
+      GROUP BY rp.inventory_id, i.name, i.sku
+      ORDER BY "quantity" DESC, "value" DESC
+      LIMIT 10
+    )
+    SELECT
+      t.total_quantity,
+      t.total_value,
+      ls.low_stock_count,
+      COALESCE(
+        (SELECT json_agg(tp ORDER BY tp.quantity DESC, tp.value DESC) FROM top_parts tp),
+        '[]'::json
+      ) AS top
+    FROM totals t
+    CROSS JOIN low_stock ls;
+  `)
+
+  const row = rows[0]
+  const totalQuantity = Number(row?.total_quantity ?? 0)
+  const totalValue = Number(row?.total_value ?? 0)
+  const lowStockCount = Number(row?.low_stock_count ?? 0)
+
+  let rawTop = row?.top
+  if (typeof rawTop === 'string') {
+    try {
+      rawTop = JSON.parse(rawTop)
+    } catch {
+      rawTop = []
+    }
+  }
+
+  const top = Array.isArray(rawTop)
+    ? rawTop.map((item) => {
+        const record = typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : {}
+        return {
+          partId: String(record.partId ?? ''),
+          name: String(record.name ?? ''),
+          sku: String(record.sku ?? ''),
+          quantity: Number(record.quantity ?? 0),
+          value: Number(record.value ?? 0),
+        }
+      })
+    : []
+
+  return partsAnalyticsResponseSchema.parse({
+    totalQuantity,
+    totalValue,
+    lowStockCount,
+    top,
+  })
 }
 

@@ -91,5 +91,24 @@ export const repairAnalyticsResponseSchema = z.object({
 
 export type RepairAnalyticsResponse = z.infer<typeof repairAnalyticsResponseSchema>
 
+export const topPartUsageSchema = z.object({
+  partId: z.string(),
+  name: z.string(),
+  sku: z.string(),
+  quantity: z.number().int().nonnegative(),
+  value: z.number().int().nonnegative(),
+})
+
+export type TopPartUsage = z.infer<typeof topPartUsageSchema>
+
+export const partsAnalyticsResponseSchema = z.object({
+  totalQuantity: z.number().int().nonnegative(),
+  totalValue: z.number().int().nonnegative(),
+  lowStockCount: z.number().int().nonnegative(),
+  top: z.array(topPartUsageSchema),
+})
+
+export type PartsAnalyticsResponse = z.infer<typeof partsAnalyticsResponseSchema>
+
 
 

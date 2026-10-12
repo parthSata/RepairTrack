@@ -10,12 +10,17 @@ import {
   CheckCircle2,
   Clock,
   Layers,
+  Package,
   Timer,
   Wrench,
 } from 'lucide-react'
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useRepairAnalytics, useRevenueAnalytics } from '@/features/dashboard/queries'
+import {
+  usePartsAnalytics,
+  useRepairAnalytics,
+  useRevenueAnalytics,
+} from '@/features/dashboard/queries'
 import {
   ANALYTICS_PERIOD_LABELS,
   ANALYTICS_PERIODS,
@@ -29,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { AnalyticsCard } from './analytics-card'
 import { KpiCard } from './kpi-card'
 import { MonthlyRevenueChart } from './monthly-revenue-chart'
+import { RankedBarList } from './ranked-bar-list'
 import { RepairStatusChart } from './repair-status-chart'
 
 const dateFormatter = new Intl.DateTimeFormat('en-IN', {
@@ -64,6 +70,7 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
   const { period, setPeriod } = useAnalyticsPeriod()
   const repairsQuery = useRepairAnalytics(period, shopId)
   const revenueQuery = useRevenueAnalytics(period, shopId)
+  const partsQuery = usePartsAnalytics(period, shopId)
 
   const rangeLabel = useMemo(() => {
     const range = getPeriodRange(period)
@@ -193,8 +200,8 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           emptyText="No overdue repairs"
           className={cn(
             repairsQuery.data &&
-              repairsQuery.data.overdue > 0 &&
-              'border-rose-300/80 bg-rose-500/[0.04] dark:border-rose-900/60 dark:bg-rose-500/[0.08]',
+            repairsQuery.data.overdue > 0 &&
+            'border-rose-300/80 bg-rose-500/[0.04] dark:border-rose-900/60 dark:bg-rose-500/[0.08]',
           )}
         >
           {(data) => (
@@ -294,6 +301,127 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
               data={data.statusDistribution}
               subtext="Current active queue stages"
             />
+          )}
+        </AnalyticsCard>
+      </div>
+
+      {/* Parts Usage Analytics — Full width with balanced responsive layout */}
+      <div
+        key={`parts-${period}`}
+        className="w-full motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
+      >
+        <AnalyticsCard
+          title="Parts usage & inventory insights"
+          icon={Package}
+          iconContainerClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          query={partsQuery}
+          className="w-full"
+          emptyText="No parts used in this period"
+        >
+          {(data) => (
+            <div className="grid gap-6 lg:grid-cols-12 lg:items-start pt-1">
+              {/* Left Column: Metrics & Stock Health */}
+              <div className="flex flex-col justify-between space-y-4 lg:col-span-5 xl:col-span-4">
+                {/* Mini Stats: Parts used & Parts value */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-border/70 bg-muted/40 p-3.5 transition-colors hover:bg-muted/60">
+                    <span className="text-xs font-medium text-muted-foreground">Parts used</span>
+                    <div className="mt-1 text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                      {data.totalQuantity}
+                    </div>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground/80">
+                      In current period
+                    </span>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/40 p-3.5 transition-colors hover:bg-muted/60">
+                    <span className="text-xs font-medium text-muted-foreground">Parts value</span>
+                    <div className="mt-1 text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                      {formatRupees(data.totalValue)}
+                    </div>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground/80">
+                      Billed value
+                    </span>
+                  </div>
+                </div>
+
+                {/* Stock Health & Low-Stock Alert */}
+                {data.lowStockCount > 0 ? (
+                  <div className="flex items-center justify-between rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-medium text-amber-800 dark:text-amber-300">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle
+                        className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+                        aria-hidden="true"
+                      />
+                      <Link
+                        href="/inventory"
+                        className="font-semibold text-amber-900 underline-offset-4 hover:underline dark:text-amber-200"
+                      >
+                        {data.lowStockCount} {data.lowStockCount === 1 ? 'part' : 'parts'} low on stock
+                      </Link>
+                    </div>
+                    <Link
+                      href="/inventory"
+                      className="inline-flex items-center gap-1 font-semibold text-amber-900 underline-offset-4 hover:underline dark:text-amber-200"
+                    >
+                      View inventory
+                      <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2
+                        className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+                        aria-hidden="true"
+                      />
+                      <span className="font-medium">All stock levels healthy</span>
+                    </div>
+                    <Link
+                      href="/inventory"
+                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-900 hover:underline dark:text-emerald-200"
+                    >
+                      Inventory
+                      <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+                    </Link>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Inventory items consumed across repair work orders for this shop.
+                </p>
+              </div>
+
+              {/* Right Column: Top 10 Ranked Bar List */}
+              <div className="space-y-3 lg:col-span-7 xl:col-span-8 lg:border-l lg:border-border/60 lg:pl-6">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">Top parts by quantity</span>
+                  <span>Quantity / Total value</span>
+                </div>
+                {data.top.length > 0 ? (
+                  <RankedBarList
+                    items={data.top.map((part) => ({
+                      id: part.partId,
+                      name: part.name,
+                      subtitle: part.sku,
+                      value: part.quantity,
+                      valueLabel: `${part.quantity} used`,
+                      secondaryValue: formatRupees(part.value),
+                      href: `/inventory/${part.partId}`,
+                    }))}
+                  />
+                ) : (
+                  <div className="flex min-h-[140px] flex-col items-center justify-center rounded-lg border border-dashed border-border/80 p-6 text-center">
+                    <Package className="h-7 w-7 text-muted-foreground/40 mb-1.5" aria-hidden="true" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No parts consumed in this period
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/70">
+                      Parts attached to repair tickets in this timeframe will be ranked here.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </AnalyticsCard>
       </div>
