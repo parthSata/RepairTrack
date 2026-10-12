@@ -9,6 +9,7 @@ import { resolveUserRole } from '@/server/lib/session-role'
 import { getDashboardSummary } from '@/server/services/dashboard.service'
 import {
   getAnalyticsPeriod,
+  getPartsAnalytics,
   getRepairAnalytics,
   getRevenueAnalytics,
 } from '@/server/services/dashboard-analytics.service'
@@ -99,6 +100,20 @@ export const dashboardRouter = new Hono()
       const { period } = c.req.valid('query')
       const repairsData = await getRepairAnalytics(shopId, period)
       return c.json(repairsData)
+    },
+  )
+  .get(
+    '/analytics/parts',
+    zValidator('query', analyticsQuerySchema, (result, c) => {
+      if (!result.success) {
+        return jsonError(c, 400, 'Invalid analytics period', 'VALIDATION_ERROR')
+      }
+    }),
+    async (c) => {
+      const { shopId } = await requireDashboardSession(c.req.raw, ANALYTICS_ROLES)
+      const { period } = c.req.valid('query')
+      const partsData = await getPartsAnalytics(shopId, period)
+      return c.json(partsData)
     },
   )
 

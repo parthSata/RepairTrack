@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api-client'
 import type {
   AnalyticsPeriod,
   DashboardSummary,
+  PartsAnalyticsResponse,
   RepairAnalyticsResponse,
   RevenueAnalyticsResponse,
 } from './schemas'
@@ -42,6 +43,10 @@ export function useRevenueAnalytics(period: AnalyticsPeriod, shopId?: string | n
 
 export function useRepairAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
   return useAnalyticsQuery<RepairAnalyticsResponse>('repairs', period, shopId)
+}
+
+export function usePartsAnalytics(period: AnalyticsPeriod, shopId?: string | null) {
+  return useAnalyticsQuery<PartsAnalyticsResponse>('parts', period, shopId)
 }
 
 export function useDashboardSummary(shopId?: string | null) {
