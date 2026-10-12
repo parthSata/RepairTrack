@@ -29,7 +29,7 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterInput) {
     setFormError(null)
-    
+
     let isAlreadyRegistered = false
     try {
       const response = await apiClient.post<{ valid: boolean; exists?: boolean }>('email-check', { email: values.email })
@@ -128,9 +128,7 @@ export function RegisterForm() {
         )}
         {isSubmitting ? 'Creating your shop...' : 'Create shop'}
       </Button>
-      <p className="text-center text-xs leading-5 text-muted-foreground">
-        You will become the OWNER. Staff and technicians can be invited later from Settings.
-      </p>
+
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
         <Link href="/login" className="font-medium text-foreground hover:underline">

@@ -10,21 +10,8 @@ import {
   markInvitationAccepted,
   requirePendingInvitation,
 } from '@/server/auth/invite-oauth'
+import { readInviteToken, readShopName } from '@/server/auth/registration-logic'
 import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
-
-function readShopName(body: unknown, userName?: string): string {
-  const nameStr = userName || 'Owner'
-  const fallbackName = `${nameStr}'s shop`
-  if (!body || typeof body !== 'object' || !('shopName' in body)) return fallbackName
-
-  const shopName = (body as Record<string, unknown>).shopName
-  if (typeof shopName !== 'string') return fallbackName
-
-  const trimmedShopName = shopName.trim()
-  if (trimmedShopName.length < 2 || trimmedShopName.length > 120) return fallbackName
-
-  return trimmedShopName
-}
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -54,36 +41,47 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      role: { type: 'string', required: false, defaultValue: 'OWNER' },
-      status: { type: 'string', required: false, defaultValue: 'ACTIVE' },
-      shopId: { type: 'string', required: false },
+      role: { type: 'string', required: false, defaultValue: 'OWNER', input: false },
+      status: { type: 'string', required: false, defaultValue: 'ACTIVE', input: false },
+      shopId: { type: 'string', required: false, input: false },
     },
   },
   databaseHooks: {
     user: {
       create: {
         before: async (user, context) => {
-          const inviteToken = await getOAuthInviteToken()
-          if (inviteToken) {
-            const invitation = await requirePendingInvitation(inviteToken, user.email)
+          const oauthInviteToken = await getOAuthInviteToken()
+          if (oauthInviteToken) {
+            const invitation = await requirePendingInvitation(oauthInviteToken, user.email)
             // Google has verified this address and it matches the invitation, so no verification email.
             return { data: { ...user, role: invitation.role, shopId: invitation.shopId } }
           }
 
-          const hasShopId = typeof user.shopId === 'string' && user.shopId.trim().length > 0
-          const shopId = hasShopId ? (user.shopId as string) : crypto.randomUUID()
-
-          if (!hasShopId) {
-            await db.insert(shops).values({
-              id: shopId,
-              name: readShopName(context?.body, user.name),
-            })
+          const bodyInviteToken = readInviteToken(context?.body)
+          if (bodyInviteToken) {
+            const invitation = await requirePendingInvitation(bodyInviteToken, user.email)
+            return {
+              data: {
+                ...user,
+                role: invitation.role,
+                shopId: invitation.shopId,
+                status: 'ACTIVE',
+                emailVerified: false,
+              },
+            }
           }
+
+          const shopId = crypto.randomUUID()
+          await db.insert(shops).values({
+            id: shopId,
+            name: readShopName(context?.body, user.name),
+          })
 
           return {
             data: {
               ...user,
-              role: user.role ?? 'OWNER',
+              role: 'OWNER',
+              status: 'ACTIVE',
               shopId,
               emailVerified: false,
             },
@@ -144,6 +142,8 @@ export const auth = betterAuth({
       if (user.emailVerified) {
         return
       }
+
+
 
       // Throwing makes the resend endpoint report the failure; sign-up/sign-in only log it.
       const result = await sendAccountVerificationEmail({ to: user.email, name: user.name, url })

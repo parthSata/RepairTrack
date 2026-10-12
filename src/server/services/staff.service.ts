@@ -713,8 +713,11 @@ export async function acceptInvitation(token: string, input: AcceptInvitationInp
             email: invitation.email,
             password: input.password,
             name: input.name?.trim() || invitation.name,
-            role: invitation.role,
-            shopId: invitation.shopId,
+            inviteToken: token,
+          } as unknown as {
+            email: string
+            password: string
+            name: string
           },
         })
 
