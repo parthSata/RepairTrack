@@ -105,7 +105,7 @@ export function MobileNav({ role }: { role: string }) {
                     className={cn(
                       'flex items-center gap-3 rounded-md px-3 py-3 text-sm transition-colors',
                       active
-                        ? 'bg-accent/10 font-semibold text-accent border-l-2 border-accent pl-[10px]'
+                        ? 'bg-accent/10 font-semibold text-accent border-l-2 border-accent pl-2.5'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     )}
                     aria-current={active ? 'page' : undefined}

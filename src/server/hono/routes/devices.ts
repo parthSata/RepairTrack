@@ -1,8 +1,7 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import { deviceFilterSchema, deviceSchema } from '@/features/devices/schemas'
-import { auth } from '@/server/auth'
+import { requireRole } from '@/server/hono/session'
 import {
   createDevice,
   deleteDevice,
@@ -15,14 +14,7 @@ import {
 const devicesRouter = new Hono()
 
 async function requireDeviceAccess(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-  const role = session.user.role ?? 'OWNER'
-  const shopId = session.user.shopId
-  if (!['OWNER', 'STAFF'].includes(role) || !shopId) {
-    throw new HTTPException(403, { message: 'Not authorized to manage devices' })
-  }
-  return { session, shopId }
+  return requireRole(request, ['OWNER', 'STAFF'], 'Not authorized to manage devices')
 }
 
 devicesRouter.get(
@@ -86,13 +78,13 @@ devicesRouter.delete('/:id', async (c) => {
 })
 
 devicesRouter.get('/:id/repairs', async (c) => {
-  const { shopId, session } = await requireDeviceAccess(c.req.raw)
+  const { shopId, userRole, userId } = await requireDeviceAccess(c.req.raw)
   const id = c.req.param('id')
   const history = await getDeviceRepairHistory({
     shopId,
     deviceId: id,
-    userRole: session.user.role ?? 'OWNER',
-    userId: session.user.id,
+    userRole,
+    userId,
   })
   return c.json(history)
 })

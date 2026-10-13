@@ -1,13 +1,12 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import {
   adjustStockSchema,
   partDetailsSchema,
   partFilterSchema,
   stockMovementFilterSchema,
 } from '@/features/inventory/schemas'
-import { auth } from '@/server/auth'
+import { requireRole } from '@/server/hono/session'
 import {
   adjustStock,
   createPart,
@@ -21,30 +20,12 @@ import {
 const inventoryRouter = new Hono()
 
 async function requireInventoryAccess(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-
-  const role = session.user.role ?? 'OWNER'
-  const shopId = session.user.shopId
-  if (!['OWNER', 'STAFF'].includes(role) || !shopId) {
-    throw new HTTPException(403, { message: 'Not authorized to manage inventory' })
-  }
-
-  return { session, shopId, userId: session.user.id }
+  return requireRole(request, ['OWNER', 'STAFF'], 'Not authorized to manage inventory')
 }
 
 /** Read access for OWNER/STAFF (manage) and TECHNICIAN (record parts used on repairs). */
 async function requireInventoryReadAccess(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-
-  const role = session.user.role ?? 'OWNER'
-  const shopId = session.user.shopId
-  if (!['OWNER', 'STAFF', 'TECHNICIAN'].includes(role) || !shopId) {
-    throw new HTTPException(403, { message: 'Not authorized to view inventory' })
-  }
-
-  return { session, shopId, userId: session.user.id }
+  return requireRole(request, ['OWNER', 'STAFF', 'TECHNICIAN'], 'Not authorized to view inventory')
 }
 
 inventoryRouter.get(

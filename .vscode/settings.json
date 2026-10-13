@@ -1,4 +1,5 @@
 {
   "chat.useAgentsMdFile": true,
-  "chat.includeReferencedInstructions": true
+  "chat.includeReferencedInstructions": true,
+  "json.schemaDownload.enable": true
 }

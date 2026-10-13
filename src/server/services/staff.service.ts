@@ -4,7 +4,7 @@ import { hashPassword } from 'better-auth/crypto'
 import { HTTPException } from 'hono/http-exception'
 import { auth } from '@/server/auth'
 import { db } from '@/server/db'
-import { accounts, staffInvitations, users } from '@/server/db/schema'
+import { accounts, sessions, staffInvitations, users } from '@/server/db/schema'
 import { devices, repairs } from '@/server/db/schema/repairs'
 import { repairAssignments } from '@/server/db/schema/repair-assignments'
 import type {
@@ -408,10 +408,22 @@ export async function setStaffStatus(shopId: string, userId: string, status: 'AC
     throw new HTTPException(404, { message: 'Staff member not found' })
   }
 
-  await db
-    .update(users)
-    .set({ status, updatedAt: new Date() })
-    .where(and(eq(users.id, userId), eq(users.shopId, shopId)))
+  const now = new Date()
+  if (status === 'INACTIVE') {
+    await db.transaction(async (tx) => {
+      await tx
+        .update(users)
+        .set({ status, updatedAt: now })
+        .where(and(eq(users.id, userId), eq(users.shopId, shopId)))
+
+      await tx.delete(sessions).where(eq(sessions.userId, userId))
+    })
+  } else {
+    await db
+      .update(users)
+      .set({ status, updatedAt: now })
+      .where(and(eq(users.id, userId), eq(users.shopId, shopId)))
+  }
 
   return { success: true, userId, status }
 }

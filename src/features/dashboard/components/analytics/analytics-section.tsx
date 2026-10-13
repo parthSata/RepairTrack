@@ -201,7 +201,7 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           className={cn(
             repairsQuery.data &&
             repairsQuery.data.overdue > 0 &&
-            'border-rose-300/80 bg-rose-500/[0.04] dark:border-rose-900/60 dark:bg-rose-500/[0.08]',
+            'border-rose-300/80 bg-rose-500/4 dark:border-rose-900/60 dark:bg-rose-500/8',
           )}
         >
           {(data) => (
@@ -410,7 +410,7 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
                     }))}
                   />
                 ) : (
-                  <div className="flex min-h-[140px] flex-col items-center justify-center rounded-lg border border-dashed border-border/80 p-6 text-center">
+                  <div className="flex min-h-35 flex-col items-center justify-center rounded-lg border border-dashed border-border/80 p-6 text-center">
                     <Package className="h-7 w-7 text-muted-foreground/40 mb-1.5" aria-hidden="true" />
                     <p className="text-sm font-medium text-muted-foreground">
                       No parts consumed in this period

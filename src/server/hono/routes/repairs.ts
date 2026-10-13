@@ -2,8 +2,7 @@ import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { HTTPException } from 'hono/http-exception'
-import { auth } from '@/server/auth'
-import { resolveUserRole } from '@/server/lib/session-role'
+import { requireRole } from '@/server/hono/session'
 import {
   addRepairNote,
   createRepairTicket,
@@ -54,33 +53,15 @@ import {
   repairPhotoVisibilitySchema,
 } from '@/features/repairs/photos/schemas'
 
-async function requireRepairUserSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-  const shopId = session.user.shopId
-  if (!shopId) throw new HTTPException(403, { message: 'Shop context missing' })
-  const userRole = await resolveUserRole(session.user.id, session.user.role)
-  return {
-    session,
-    shopId,
-    userId: session.user.id,
-    userRole,
-  }
-}
-
+const REPAIR_ROLES = ['OWNER', 'STAFF', 'TECHNICIAN'] as const
 const OWNER_OR_STAFF = ['OWNER', 'STAFF'] as const
 
-async function requireRepairRole(request: Request, roles: readonly string[], forbiddenMessage: string) {
-  const access = await requireRepairUserSession(request)
-  if (!roles.includes(access.userRole)) {
-    throw new HTTPException(403, { message: forbiddenMessage })
-  }
-  return access
-}
+const requireRepairAccess = (request: Request) =>
+  requireRole(request, REPAIR_ROLES, 'Not authorized to access repairs')
 
 export const repairsRouter = new Hono()
   .get('/technicians', async (c) => {
-    const { shopId } = await requireRepairUserSession(c.req.raw)
+    const { shopId } = await requireRepairAccess(c.req.raw)
     const techs = await getTechnicians(shopId)
     return c.json(techs)
   })
@@ -92,13 +73,13 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { session, shopId } = await requireRepairRole(
+      const { shopId, userId } = await requireRole(
         c.req.raw,
         OWNER_OR_STAFF,
         'Not authorized to create repair tickets',
       )
       const data = c.req.valid('json')
-      const repair = await createRepairTicket({ shopId, createdBy: session.user.id, data })
+      const repair = await createRepairTicket({ shopId, createdBy: userId, data })
       return c.json(repair, 201)
     },
   )
@@ -120,7 +101,7 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const query = c.req.valid('query')
       const result = await listRepairs({
         shopId,
@@ -133,7 +114,7 @@ export const repairsRouter = new Hono()
     },
   )
   .get('/:id', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+    const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
     const id = c.req.param('id')
     const repair = await getRepairById({ shopId, userRole, userId, id })
     return c.json(repair)
@@ -148,7 +129,7 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { status, note } = c.req.valid('json')
 
@@ -167,7 +148,7 @@ export const repairsRouter = new Hono()
     '/:id/request-approval',
     zValidator('json', requestCustomerApprovalSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const body = c.req.valid('json')
 
@@ -185,7 +166,7 @@ export const repairsRouter = new Hono()
     '/:id/reopen',
     zValidator('json', reopenRepairSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { reason, action } = c.req.valid('json')
 
@@ -209,7 +190,7 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { technicianId } = c.req.valid('json')
 
@@ -232,7 +213,7 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { diagnosis } = c.req.valid('json')
 
@@ -250,7 +231,7 @@ export const repairsRouter = new Hono()
     '/:id/estimated-cost',
     zValidator('json', updateEstimatedCostSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { estimatedCost } = c.req.valid('json')
 
@@ -268,7 +249,7 @@ export const repairsRouter = new Hono()
     '/:id/estimate',
     zValidator('json', repairPricingFieldsSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const body = c.req.valid('json')
 
@@ -286,7 +267,7 @@ export const repairsRouter = new Hono()
     '/:id/final-total',
     zValidator('json', repairPricingFieldsSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const body = c.req.valid('json')
 
@@ -309,7 +290,7 @@ export const repairsRouter = new Hono()
       }),
     ),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { note } = c.req.valid('json')
 
@@ -327,7 +308,7 @@ export const repairsRouter = new Hono()
     '/:id/expected-completion-date',
     zValidator('json', updateExpectedCompletionDateSchema),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { expectedCompletionDate } = c.req.valid('json')
 
@@ -342,7 +323,7 @@ export const repairsRouter = new Hono()
     },
   )
   .get('/:id/emails', zValidator('param', idParamSchema, validationHook), async (c) => {
-    const { shopId } = await requireRepairRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
+    const { shopId } = await requireRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
     const { id } = c.req.valid('param')
     return c.json(await listRepairEmails({ shopId, repairId: id }))
   })
@@ -350,13 +331,13 @@ export const repairsRouter = new Hono()
     '/:id/emails/:logId/resend',
     zValidator('param', repairEmailParamSchema, validationHook),
     async (c) => {
-      const { shopId } = await requireRepairRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
+      const { shopId } = await requireRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
       const { id, logId } = c.req.valid('param')
       return c.json(await resendRepairEmail({ shopId, repairId: id, logId }))
     },
   )
   .post('/:id/regenerate-tracking-link', async (c) => {
-    const { shopId, userRole } = await requireRepairUserSession(c.req.raw)
+    const { shopId, userRole } = await requireRepairAccess(c.req.raw)
     const id = c.req.param('id')
 
     const updated = await regenerateTrackingToken({
@@ -374,7 +355,7 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { type, size } = c.req.valid('json')
       const upload = await requestRepairPhotoUploadUrl(
@@ -392,7 +373,7 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { type, publicId } = c.req.valid('json')
       const payload = await confirmRepairPhoto(
@@ -403,7 +384,7 @@ export const repairsRouter = new Hono()
     },
   )
   .delete('/:id/photos/:type', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+    const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
     const id = c.req.param('id')
     const typeParam = c.req.param('type').toUpperCase()
     if (!repairPhotoTypeValues.includes(typeParam as (typeof repairPhotoTypeValues)[number])) {
@@ -423,7 +404,7 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { hidden } = c.req.valid('json')
       const payload = await setRepairPhotosVisibility(
@@ -441,7 +422,7 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const { inventoryId, quantity } = c.req.valid('json')
       const part = await addRepairPart({
@@ -463,7 +444,7 @@ export const repairsRouter = new Hono()
       }
     }),
     async (c) => {
-      const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
       const id = c.req.param('id')
       const partRowId = c.req.param('partRowId')
       const { quantity } = c.req.valid('json')
@@ -479,7 +460,7 @@ export const repairsRouter = new Hono()
     },
   )
   .delete('/:id/parts/:partRowId', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairUserSession(c.req.raw)
+    const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
     const id = c.req.param('id')
     const partRowId = c.req.param('partRowId')
     const result = await removeRepairPart({

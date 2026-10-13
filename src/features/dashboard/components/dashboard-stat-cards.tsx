@@ -108,7 +108,7 @@ function OperationCardItem({
         className={cn(
           'border-border/80 shadow-xs transition-all duration-200 group-hover:border-border group-hover:shadow-sm h-full flex flex-col justify-between',
           isAlertActive &&
-            'border-rose-300/80 bg-rose-500/[0.04] dark:border-rose-900/60 dark:bg-rose-500/[0.08]',
+            'border-rose-300/80 bg-rose-500/4 dark:border-rose-900/60 dark:bg-rose-500/8',
         )}
       >
         <CardContent className="p-5 flex flex-col justify-between h-full">
