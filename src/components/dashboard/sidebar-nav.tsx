@@ -69,7 +69,7 @@ export function SidebarNav({ role }: SidebarNavProps) {
             className={cn(
               'group flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-all duration-150',
               active
-                ? 'bg-accent/10 font-semibold text-accent border-l-2 border-accent pl-[10px]'
+                ? 'bg-accent/10 font-semibold text-accent border-l-2 border-accent pl-2.5'
                 : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
             )}
             aria-current={active ? 'page' : undefined}

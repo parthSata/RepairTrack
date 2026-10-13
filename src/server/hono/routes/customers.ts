@@ -1,8 +1,7 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
-import { HTTPException } from 'hono/http-exception'
 import { customerFilterSchema, customerSchema } from '@/features/customers/schemas'
-import { auth } from '@/server/auth'
+import { requireRole } from '@/server/hono/session'
 import {
   checkCustomerEmail,
   createCustomer,
@@ -16,14 +15,7 @@ import {
 const customersRouter = new Hono()
 
 async function requireCustomerAccess(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-  const role = session.user.role ?? 'OWNER'
-  const shopId = session.user.shopId
-  if (!['OWNER', 'STAFF'].includes(role) || !shopId) {
-    throw new HTTPException(403, { message: 'Not authorized to manage customers' })
-  }
-  return { session, shopId }
+  return requireRole(request, ['OWNER', 'STAFF'], 'Not authorized to manage customers')
 }
 
 
@@ -96,13 +88,13 @@ customersRouter.delete('/:id', async (c) => {
 })
 
 customersRouter.get('/:id/repairs', async (c) => {
-  const { shopId, session } = await requireCustomerAccess(c.req.raw)
+  const { shopId, userRole, userId } = await requireCustomerAccess(c.req.raw)
   const id = c.req.param('id')
   const history = await getCustomerRepairHistory({
     shopId,
     customerId: id,
-    userRole: session.user.role ?? 'OWNER',
-    userId: session.user.id,
+    userRole,
+    userId,
   })
   return c.json(history)
 })

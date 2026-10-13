@@ -52,7 +52,11 @@ export function LoginForm() {
   async function signInWithGoogle() {
     setFormError(null)
     setIsGooglePending(true)
-    const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/dashboard' })
+    const result = await authClient.signIn.social({
+      provider: 'google',
+      callbackURL: '/dashboard',
+      errorCallbackURL: '/login?error=account_deactivated',
+    })
     if (result.error) {
       const msg = result.error.message || 'Google sign-in is unavailable right now.'
       setFormError(msg)

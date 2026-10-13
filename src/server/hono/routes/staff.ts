@@ -7,7 +7,7 @@ import {
   resumeAssignmentsSchema,
   setStaffStatusSchema,
 } from '@/features/staff/schemas'
-import { auth } from '@/server/auth'
+import { requireRole } from '@/server/hono/session'
 import {
   changeStaffRole,
   getStaffActiveAssignments,
@@ -21,45 +21,32 @@ import {
 
 const staffRouter = new Hono()
 
-async function ownerSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-  if (session.user.role !== 'OWNER' || !session.user.shopId) {
-    throw new HTTPException(403, { message: 'Forbidden: Only shop owners can manage staff' })
-  }
-  return { session, shopId: session.user.shopId, userId: session.user.id }
-}
-
-async function shopUserSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) throw new HTTPException(401, { message: 'Unauthorized' })
-  if (!session.user.shopId) {
-    throw new HTTPException(403, { message: 'Shop context missing' })
-  }
-  return { session, shopId: session.user.shopId, userId: session.user.id }
-}
+const requireOwner = (request: Request) =>
+  requireRole(request, ['OWNER'], 'Forbidden: Only shop owners can manage staff')
+const requireShopUser = (request: Request) =>
+  requireRole(request, ['OWNER', 'STAFF', 'TECHNICIAN'], 'Not authorized')
 
 staffRouter.get('/', async (c) => {
-  const { shopId } = await ownerSession(c.req.raw)
+  const { shopId } = await requireOwner(c.req.raw)
   const staffList = await listStaff(shopId)
   return c.json(staffList)
 })
 
 staffRouter.get('/technicians', async (c) => {
-  const { shopId } = await shopUserSession(c.req.raw)
+  const { shopId } = await requireShopUser(c.req.raw)
   const techs = await getTechnicians(shopId)
   return c.json(techs)
 })
 
 staffRouter.get('/:id/active-assignments', async (c) => {
-  const { shopId } = await ownerSession(c.req.raw)
+  const { shopId } = await requireOwner(c.req.raw)
   const targetId = c.req.param('id')
   const assignments = await getStaffActiveAssignments(shopId, targetId)
   return c.json({ assignments })
 })
 
 staffRouter.get('/:id/held-assignments', async (c) => {
-  const { shopId } = await ownerSession(c.req.raw)
+  const { shopId } = await requireOwner(c.req.raw)
   const targetId = c.req.param('id')
   const assignments = await getStaffHeldAssignments(shopId, targetId)
   return c.json({ assignments })
@@ -73,7 +60,7 @@ staffRouter.post(
     }
   }),
   async (c) => {
-    const { shopId } = await ownerSession(c.req.raw)
+    const { shopId } = await requireOwner(c.req.raw)
     const targetId = c.req.param('id')
     const { assignmentIds } = c.req.valid('json')
     const result = await resumeHeldAssignments(shopId, targetId, assignmentIds)
@@ -89,7 +76,7 @@ staffRouter.post(
     }
   }),
   async (c) => {
-    const { shopId, userId } = await ownerSession(c.req.raw)
+    const { shopId, userId } = await requireOwner(c.req.raw)
     const input = c.req.valid('json')
     const invitation = await inviteStaff(shopId, userId, input)
     return c.json(invitation)
@@ -104,7 +91,7 @@ staffRouter.patch(
     }
   }),
   async (c) => {
-    const { shopId } = await ownerSession(c.req.raw)
+    const { shopId } = await requireOwner(c.req.raw)
     const targetId = c.req.param('id')
     const { status } = c.req.valid('json')
     const result = await setStaffStatus(shopId, targetId, status)
@@ -120,7 +107,7 @@ staffRouter.patch(
     }
   }),
   async (c) => {
-    const { shopId, userId } = await ownerSession(c.req.raw)
+    const { shopId, userId } = await requireOwner(c.req.raw)
     const targetId = c.req.param('id')
     const input = c.req.valid('json')
     try {

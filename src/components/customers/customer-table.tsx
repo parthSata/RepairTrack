@@ -71,7 +71,7 @@ export function CustomerTable() {
         return email ? (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Mail className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate max-w-[180px]">{email}</span>
+            <span className="max-w-45 truncate">{email}</span>
           </div>
         ) : (
           <span className="text-xs text-muted-foreground/60 italic">—</span>
