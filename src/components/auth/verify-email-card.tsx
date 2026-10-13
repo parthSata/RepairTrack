@@ -108,7 +108,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
       callbackURL: '/dashboard',
     })
     if (result.error) {
-      setErrorMsg('We could not send the verification email. Please try again later.')
+      setErrorMsg('We could not deliver a verification email to this address. Check the address and try again.')
     } else {
       const nextCount = resendCount + 1
       setResendCount(nextCount)

@@ -149,7 +149,7 @@ export const auth = betterAuth({
       const result = await sendAccountVerificationEmail({ to: user.email, name: user.name, url })
       if (!result.sent) {
         throw new APIError('SERVICE_UNAVAILABLE', {
-          message: 'We could not send the verification email. Please try again later.',
+          message: 'We could not deliver a verification email to this address. Check the address and try again.',
         })
       }
     },
@@ -163,4 +163,3 @@ export const auth = betterAuth({
     },
   },
 })
-

@@ -1,22 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { ArrowRight, LoaderCircle } from 'lucide-react'
+import { AlertCircle, ArrowRight, LoaderCircle } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { toast } from 'react-toastify'
 import { apiClient } from '@/lib/api-client'
+import { getApiErrorMessage } from '@/lib/api-error'
 import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { registerSchema, type RegisterInput } from '@/features/auth/schemas'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 
 export function RegisterForm() {
-  const router = useRouter()
   const [formError, setFormError] = useState<string | null>(null)
   const [verificationSent, setVerificationSent] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
@@ -30,34 +29,24 @@ export function RegisterForm() {
   async function onSubmit(values: RegisterInput) {
     setFormError(null)
 
-    let isAlreadyRegistered = false
     try {
-      const response = await apiClient.post<{ valid: boolean; exists?: boolean }>('email-check', { email: values.email })
-      if (!response.data.valid) throw new Error('Email domain is not valid')
-      if (response.data.exists) {
-        isAlreadyRegistered = true
-      }
-    } catch {
-      setFormError('This email address cannot receive email. Check the address and try again.')
-      return
-    }
-
-    if (isAlreadyRegistered) {
-      const signInResult = await authClient.signIn.email({
+      const response = await apiClient.post<{ valid: boolean }>('email-check', {
         email: values.email,
-        password: values.password,
-        callbackURL: '/dashboard',
       })
-
-      if (!signInResult.error) {
-        router.push('/dashboard')
-        router.refresh()
-        return
-      } else {
-        toast.info('User already exist')
-        router.push('/login')
+      if (!response.data.valid) {
+        setFormError(
+          'This email address cannot receive email. Check the address and try again.',
+        )
         return
       }
+    } catch (error: unknown) {
+      setFormError(
+        getApiErrorMessage(
+          error,
+          'This email address cannot receive email. Check the address and try again.',
+        ),
+      )
+      return
     }
 
     const signUpResult = await authClient.signUp.email({
@@ -68,21 +57,11 @@ export function RegisterForm() {
     })
 
     if (signUpResult.error) {
-      const signInResult = await authClient.signIn.email({
-        email: values.email,
-        password: values.password,
-        callbackURL: '/dashboard',
-      })
-
-      if (!signInResult.error) {
-        router.push('/dashboard')
-        router.refresh()
-        return
-      } else {
-        toast.info('User already exist')
-        router.push('/login')
-        return
-      }
+      setFormError(
+        signUpResult.error.message ||
+          'Unable to create account. Please try again.',
+      )
+      return
     }
 
     setVerificationEmail(values.email)
@@ -96,31 +75,53 @@ export function RegisterForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       {formError && (
-        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive transition-colors"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           {formError}
-        </p>
+        </div>
       )}
       <div className="space-y-2">
         <Label htmlFor="shopName">Shop name</Label>
-        <Input id="shopName" autoComplete="organization" {...register('shopName')} />
-        {errors.shopName && <p className="text-sm text-destructive">{errors.shopName.message}</p>}
+        <Input
+          id="shopName"
+          autoComplete="organization"
+          {...register('shopName')}
+        />
+        <FieldError message={errors.shopName?.message} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="ownerName">Your name</Label>
         <Input id="ownerName" autoComplete="name" {...register('ownerName')} />
-        {errors.ownerName && <p className="text-sm text-destructive">{errors.ownerName.message}</p>}
+        <FieldError message={errors.ownerName?.message} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
-        <Input id="email" type="email" autoComplete="email" {...register('email')} />
-        {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+        <Input
+          id="email"
+          type="email"
+          autoComplete="email"
+          {...register('email')}
+        />
+        <FieldError message={errors.email?.message} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
-        <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
-        {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+        <Input
+          id="password"
+          type="password"
+          autoComplete="new-password"
+          {...register('password')}
+        />
+        <FieldError message={errors.password?.message} />
       </div>
-      <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
+      <Button
+        type="submit"
+        disabled={isSubmitting}
+        className="w-full gap-2 transition-colors active:scale-[0.99]"
+      >
         {isSubmitting ? (
           <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" />
         ) : (
@@ -131,7 +132,10 @@ export function RegisterForm() {
 
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-foreground hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-foreground hover:underline"
+        >
           Sign in
         </Link>
       </p>
