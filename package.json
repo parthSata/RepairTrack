@@ -18,9 +18,10 @@
     "verify:reopen-repair": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-reopen-repair.ts",
     "verify:technician-role-change": "bun run scripts/verify-technician-role-change.ts",
     "verify:repair-photos": "bun run scripts/verify-repair-photos.ts",
-    "test": "bun test",
+    "verify:email": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-email.ts",
     "audit:integrity": "bun run scripts/audit-user-shop-integrity.ts",
-    "verify:email": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-email.ts"
+    "test": "bun test",
+    "test:integration": "bun run scripts/run-integration.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.1",
