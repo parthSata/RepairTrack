@@ -2,47 +2,77 @@
 
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle, LoaderCircle, MailCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { authClient } from '@/lib/auth-client'
+import { apiClient } from '@/lib/api-client'
 
 const TWO_HOURS_MS = 2 * 60 * 60 * 1000
 const MAX_RESENDS = 2
 
-export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
+export function VerifyEmailCard({
+  initialEmail,
+  pendingRegistration = false,
+}: {
+  initialEmail?: string
+  pendingRegistration?: boolean
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
+  const registrationToken = searchParams.get('registrationToken')
+  const usesPendingRegistration =
+    pendingRegistration || Boolean(registrationToken)
   const emailParam = searchParams.get('email') || initialEmail || ''
   const isVerifiedParam = searchParams.get('verified') === 'true'
 
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'error'>(
-    isVerifiedParam ? 'success' : token ? 'verifying' : 'idle',
+  const [status, setStatus] = useState<
+    'idle' | 'verifying' | 'success' | 'error'
+  >(
+    isVerifiedParam
+      ? 'success'
+      : token || registrationToken
+        ? 'verifying'
+        : 'idle',
   )
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [verificationEmail] = useState(emailParam)
   // Starts at 0 on server and client alike; the stored count is restored after hydration.
   const [resendCount, setResendCount] = useState(0)
   const [isResending, setIsResending] = useState(false)
-  const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null)
+  const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(
+    null,
+  )
+  const hasVerifiedRef = useRef(false)
 
   useEffect(() => {
-    if (!token || isVerifiedParam) return
+    if ((!token && !registrationToken) || isVerifiedParam) return
+    if (hasVerifiedRef.current) return
+    hasVerifiedRef.current = true
 
     async function verifyToken() {
       setStatus('verifying')
       setErrorMsg(null)
       try {
-        const result = await authClient.verifyEmail({
-          query: { token: token! },
-        })
-
-        if (result.error) {
-          setStatus('error')
-          setErrorMsg(result.error.message || 'Verification link is invalid or has expired.')
-        } else {
-          setStatus('success')
+        if (registrationToken) {
+          await apiClient.post('/registration/verify', {
+            token: registrationToken,
+          })
+        } else if (token) {
+          const result = await authClient.verifyEmail({
+            query: { token },
+          })
+          if (result.error) {
+            throw new Error(
+              result.error.message ||
+                'Verification link is invalid or has expired.',
+            )
+          }
+        }
+        setStatus('success')
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', '/verify-email?verified=true')
         }
       } catch (err: unknown) {
         setStatus('error')
@@ -52,7 +82,7 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
     }
 
     void verifyToken()
-  }, [token, isVerifiedParam])
+  }, [token, registrationToken, isVerifiedParam])
 
   useEffect(() => {
     if (!verificationEmail) return
@@ -68,7 +98,9 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
 
     // localStorage doesn't exist during SSR, so the stored count can only be applied after hydration.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setResendCount(inCooldown ? MAX_RESENDS : Number(localStorage.getItem(countKey)) || 0)
+    setResendCount(
+      inCooldown ? MAX_RESENDS : Number(localStorage.getItem(countKey)) || 0,
+    )
     if (!inCooldown) return
 
     updateCooldownText(expiryTime)
@@ -97,28 +129,51 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   }
 
   async function resendVerification() {
-    if (!verificationEmail || resendCount >= MAX_RESENDS || isResending || cooldownRemaining) {
+    if (
+      !verificationEmail ||
+      resendCount >= MAX_RESENDS ||
+      isResending ||
+      cooldownRemaining
+    ) {
       return
     }
     setErrorMsg(null)
     setIsResending(true)
 
-    const result = await authClient.sendVerificationEmail({
-      email: verificationEmail,
-      callbackURL: '/dashboard',
-    })
-    if (result.error) {
-      setErrorMsg('We could not send the verification email. Please try again later.')
-    } else {
-      const nextCount = resendCount + 1
-      setResendCount(nextCount)
-      localStorage.setItem(`resend_count_${verificationEmail}`, nextCount.toString())
-
-      if (nextCount >= MAX_RESENDS) {
-        const expiryTime = Date.now() + TWO_HOURS_MS
-        localStorage.setItem(`resend_cooldown_${verificationEmail}`, expiryTime.toString())
-        updateCooldownText(expiryTime)
+    try {
+      if (usesPendingRegistration) {
+        await apiClient.post('/registration/resend', {
+          email: verificationEmail,
+        })
+      } else {
+        const result = await authClient.sendVerificationEmail({
+          email: verificationEmail,
+          callbackURL: '/dashboard',
+        })
+        if (result.error) throw new Error(result.error.message)
       }
+    } catch {
+      setErrorMsg(
+        'We could not deliver a verification email to this address. Check the address and try again.',
+      )
+      setIsResending(false)
+      return
+    }
+
+    const nextCount = resendCount + 1
+    setResendCount(nextCount)
+    localStorage.setItem(
+      `resend_count_${verificationEmail}`,
+      nextCount.toString(),
+    )
+
+    if (nextCount >= MAX_RESENDS) {
+      const expiryTime = Date.now() + TWO_HOURS_MS
+      localStorage.setItem(
+        `resend_cooldown_${verificationEmail}`,
+        expiryTime.toString(),
+      )
+      updateCooldownText(expiryTime)
     }
     setIsResending(false)
   }
@@ -126,11 +181,13 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
   useEffect(() => {
     if (status !== 'success') return
     const timer = setTimeout(() => {
-      router.push('/dashboard')
+      router.push(
+        usesPendingRegistration ? '/login?verified=registration' : '/dashboard',
+      )
       router.refresh()
     }, 1500)
     return () => clearTimeout(timer)
-  }, [status, router])
+  }, [status, router, usesPendingRegistration])
 
   useEffect(() => {
     if (status !== 'idle') return
@@ -171,12 +228,24 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         </div>
         <h2 className="text-xl font-semibold">Email Verified!</h2>
         <p className="text-sm text-muted-foreground">
-          Your email address has been verified. Redirecting to your dashboard...
+          {usesPendingRegistration
+            ? 'Your account is ready. Redirecting you to sign in...'
+            : 'Your email address has been verified. Redirecting to your dashboard...'}
         </p>
         <div className="flex justify-center pt-2">
           <LoaderCircle className="h-5 w-5 animate-spin text-accent" />
         </div>
-        <Button onClick={() => router.push('/dashboard')} variant="outline" className="w-full mt-2">
+        <Button
+          onClick={() =>
+            router.push(
+              usesPendingRegistration
+                ? '/login?verified=registration'
+                : '/dashboard',
+            )
+          }
+          variant="outline"
+          className="mt-2 w-full"
+        >
           Click here if not redirected automatically
         </Button>
       </div>
@@ -189,26 +258,33 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertCircle className="h-6 w-6" />
         </div>
-        <h2 className="text-xl font-semibold">Verification Failed</h2>
+        <h2 className="text-xl font-semibold">Verification Link Expired or Used</h2>
         <p className="text-sm text-destructive font-medium">{errorMsg}</p>
         <p className="text-xs text-muted-foreground leading-5">
-          If your link expired, you can request a new verification email below or return to sign in.
+          If you already verified your account, you can sign in directly below. If your link expired, you can request a new verification email.
         </p>
         <div className="space-y-2 pt-2">
+          <Button
+            onClick={() => router.push('/login')}
+            className="w-full"
+          >
+            Go to Sign In
+          </Button>
           {verificationEmail && (
             <Button
               type="button"
               variant="outline"
-              disabled={isResending || resendCount >= MAX_RESENDS || Boolean(cooldownRemaining)}
+              disabled={
+                isResending ||
+                resendCount >= MAX_RESENDS ||
+                Boolean(cooldownRemaining)
+              }
               onClick={() => void resendVerification()}
               className="w-full"
             >
               {isResending ? 'Sending...' : 'Resend Verification Email'}
             </Button>
           )}
-          <Button onClick={() => router.push('/login')} variant="ghost" className="w-full">
-            Return to Sign In
-          </Button>
         </div>
       </div>
     )
@@ -224,20 +300,27 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
         <h2 className="text-xl font-semibold">Check your email</h2>
         <p className="text-sm text-muted-foreground leading-5">
           We sent a verification link to{' '}
-          <span className="font-semibold text-foreground">{verificationEmail || 'your email address'}</span>.
-          Please check your inbox and verify your email to open your workspace.
+          <span className="font-semibold text-foreground">
+            {verificationEmail || 'your email address'}
+          </span>
+          . Please check your inbox and verify your email to open your
+          workspace.
         </p>
       </div>
 
       {errorMsg && (
-        <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive"
+        >
           {errorMsg}
         </p>
       )}
 
       {cooldownRemaining ? (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 font-medium text-center">
-          Resend limit reached. Try again after 2 hours (remaining: {cooldownRemaining}).
+          Resend limit reached. Try again after 2 hours (remaining:{' '}
+          {cooldownRemaining}).
         </div>
       ) : resendCount < MAX_RESENDS ? (
         <Button
@@ -247,7 +330,9 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
           onClick={() => void resendVerification()}
           className="w-full"
         >
-          {isResending ? 'Sending...' : `Resend verification email (${MAX_RESENDS - resendCount} remaining)`}
+          {isResending
+            ? 'Sending...'
+            : `Resend verification email (${MAX_RESENDS - resendCount} remaining)`}
         </Button>
       ) : (
         <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400 font-medium text-center">
@@ -256,7 +341,10 @@ export function VerifyEmailCard({ initialEmail }: { initialEmail?: string }) {
       )}
 
       <div className="pt-2 text-center">
-        <Link href="/login" className="text-sm font-medium text-foreground hover:underline">
+        <Link
+          href="/login"
+          className="text-sm font-medium text-foreground hover:underline"
+        >
           Return to sign in
         </Link>
       </div>

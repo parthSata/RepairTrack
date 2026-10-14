@@ -27,7 +27,9 @@ const nameSchema = (label: string) =>
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string({ error: 'Password is required' }).min(1, 'Password is required'),
+  password: z
+    .string({ error: 'Password is required' })
+    .min(1, 'Password is required'),
 })
 
 export const registerSchema = z.object({
@@ -42,6 +44,10 @@ export const registerSchema = z.object({
 })
 
 export const emailCheckSchema = z.object({ email: emailSchema })
+export const registrationTokenSchema = z.object({
+  token: z.string().min(1).max(200),
+})
+export const registrationResendSchema = z.object({ email: emailSchema })
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>

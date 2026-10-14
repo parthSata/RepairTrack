@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { auth } from '@/server/auth'
 import { shopsRouter } from '@/server/hono/routes/shops'
 import { emailCheckRouter } from '@/server/hono/routes/email-check'
+import { registrationRouter } from '@/server/hono/routes/registration'
 import { customersRouter } from '@/server/hono/routes/customers'
 import { devicesRouter } from '@/server/hono/routes/devices'
 import { repairsRouter } from '@/server/hono/routes/repairs'
@@ -16,23 +17,21 @@ import { gmailRouter } from '@/server/hono/routes/gmail'
 import { handleApiError, handleApiNotFound } from '@/server/hono/error-handler'
 
 export const app = new Hono()
-	.onError(handleApiError)
-	.notFound(handleApiNotFound)
-	.get('/api/health', (context) => context.json({ status: 'ok' }))
-	.on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
-	.route('/api/email-check', emailCheckRouter)
-	.route('/api/track', trackRouter)
-	.route('/api/shops', shopsRouter)
-	.route('/api/customers', customersRouter)
-	.route('/api/devices', devicesRouter)
-	.route('/api/dashboard', dashboardRouter)
-	.route('/api/repairs', repairsRouter)
-	.route('/api/staff', staffRouter)
-	.route('/api/invitations', invitationsRouter)
-	.route('/api/inventory', inventoryRouter)
-	.route('/api/invoices', invoicesRouter)
-	.route('/api/payments', paymentsRouter)
-	.route('/api/settings/gmail', gmailRouter)
-
-
-
+  .onError(handleApiError)
+  .notFound(handleApiNotFound)
+  .get('/api/health', (context) => context.json({ status: 'ok' }))
+  .on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
+  .route('/api/email-check', emailCheckRouter)
+  .route('/api/registration', registrationRouter)
+  .route('/api/track', trackRouter)
+  .route('/api/shops', shopsRouter)
+  .route('/api/customers', customersRouter)
+  .route('/api/devices', devicesRouter)
+  .route('/api/dashboard', dashboardRouter)
+  .route('/api/repairs', repairsRouter)
+  .route('/api/staff', staffRouter)
+  .route('/api/invitations', invitationsRouter)
+  .route('/api/inventory', inventoryRouter)
+  .route('/api/invoices', invoicesRouter)
+  .route('/api/payments', paymentsRouter)
+  .route('/api/settings/gmail', gmailRouter)

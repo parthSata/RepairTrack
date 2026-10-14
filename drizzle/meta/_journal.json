@@ -225,6 +225,13 @@
       "when": 1791349428050,
       "tag": "0031_chubby_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791954142839,
+      "tag": "0032_cute_the_anarchist",
+      "breakpoints": true
     }
   ]
 }
