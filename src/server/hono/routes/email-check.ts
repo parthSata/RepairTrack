@@ -2,6 +2,7 @@ import { resolveMx } from 'node:dns/promises'
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { emailCheckSchema } from '@/features/auth/schemas'
+import { createRateLimitMiddleware } from '@/server/hono/middleware/rate-limit'
 
 const DISALLOWED_DOMAINS = new Set([
   'example.com',
@@ -14,6 +15,7 @@ const emailCheckRouter = new Hono()
 
 emailCheckRouter.post(
   '/',
+  createRateLimitMiddleware({ windowMs: 15 * 60_000, max: 10 }),
   zValidator('json', emailCheckSchema, (result, context) => {
     if (!result.success) {
       return context.json(

@@ -6,7 +6,7 @@ import {
   trackDecisionSchema,
   trackVerifySchema,
 } from '@/features/tracking/schemas'
-import { createRateLimitMiddleware } from '@/server/hono/middleware/rate-limit'
+import { createRateLimitMiddleware, getClientIp } from '@/server/hono/middleware/rate-limit'
 import { isTrackingToken } from '@/server/lib/tokens'
 import {
   decideRepairApprovalByTrackingToken,
@@ -24,6 +24,14 @@ trackRouter.post(
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
     }
+  }),
+  createRateLimitMiddleware({
+    windowMs: 15 * 60_000,
+    max: 10,
+    key: async (c) => {
+      const { ticketNumber } = trackVerifySchema.parse(await c.req.json())
+      return `track:verify:${ticketNumber}`
+    },
   }),
   async (c) => {
     const { ticketNumber, phone } = c.req.valid('json')
@@ -48,12 +56,7 @@ trackRouter.post(
   createRateLimitMiddleware({
     windowMs: 60_000,
     max: 10,
-    key: (c) => {
-      const forwarded = c.req.header('x-forwarded-for')
-      const realIp = c.req.header('x-real-ip')
-      const ip = forwarded?.split(',')[0]?.trim() || realIp || 'unknown'
-      return `${ip}:${c.req.param('trackingToken')}`
-    },
+    key: (c) => `${getClientIp(c)}:${c.req.param('trackingToken')}`,
   }),
   zValidator('param', trackDecisionParamSchema, (result) => {
     if (!result.success) {
