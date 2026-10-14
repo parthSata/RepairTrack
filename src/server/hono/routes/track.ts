@@ -6,7 +6,7 @@ import {
   trackDecisionSchema,
   trackVerifySchema,
 } from '@/features/tracking/schemas'
-import { createRateLimitMiddleware } from '@/server/hono/middleware/rate-limit'
+import { createRateLimitMiddleware, getClientIp } from '@/server/hono/middleware/rate-limit'
 import { isTrackingToken } from '@/server/lib/tokens'
 import {
   decideRepairApprovalByTrackingToken,
@@ -14,9 +14,17 @@ import {
   verifyPublicRepairByTicketAndPhone,
 } from '@/server/services/tracking.service'
 
-const trackRouter = new Hono()
+import { eq } from 'drizzle-orm'
+import { db } from '@/server/db'
+import { rateLimits } from '@/server/db/schema'
 
-trackRouter.use('*', createRateLimitMiddleware({ windowMs: 60_000, max: 30 }))
+type TrackEnv = {
+  Variables: {
+    rateLimitRemaining?: number
+  }
+}
+
+const trackRouter = new Hono<TrackEnv>()
 
 trackRouter.post(
   '/verify',
@@ -25,35 +33,74 @@ trackRouter.post(
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
     }
   }),
+  createRateLimitMiddleware({
+    windowMs: 15 * 60_000,
+    max: 10,
+    key: async (c) => {
+      try {
+        const body = (await c.req.raw.clone().json().catch(() => null)) as Record<string, unknown> | null
+        const rawTicket = typeof body?.ticketNumber === 'string' ? body.ticketNumber : null
+        if (rawTicket) {
+          const cleaned = rawTicket.replace(/\D/g, '')
+          if (cleaned.length === 10) {
+            return `track:verify:${cleaned}`
+          }
+        }
+      } catch {
+        // Fallback to IP if parsing body fails
+      }
+      return getClientIp(c)
+    },
+  }),
   async (c) => {
     const { ticketNumber, phone } = c.req.valid('json')
-    const payload = await verifyPublicRepairByTicketAndPhone(ticketNumber, phone)
-    return c.json(payload)
+    try {
+      const payload = await verifyPublicRepairByTicketAndPhone(ticketNumber, phone)
+      await db
+        .delete(rateLimits)
+        .where(eq(rateLimits.key, `track:verify:${ticketNumber}`))
+        .catch(() => {})
+      return c.json(payload)
+    } catch (err) {
+      if (err instanceof HTTPException && err.status === 404) {
+        const remaining = c.get('rateLimitRemaining') as number | undefined
+        return c.json(
+          {
+            error: {
+              message: "We couldn't find this repair. Check your repair number and phone, then try again.",
+              code: 'NOT_FOUND',
+              remaining,
+            },
+          },
+          404,
+        )
+      }
+      throw err
+    }
   },
 )
 
-trackRouter.get('/:identifier', async (c) => {
-  const identifier = c.req.param('identifier')
+trackRouter.get(
+  '/:identifier',
+  createRateLimitMiddleware({ windowMs: 60_000, max: 30 }),
+  async (c) => {
+    const identifier = c.req.param('identifier')
 
-  if (!isTrackingToken(identifier)) {
-    throw new HTTPException(404, { message: "We couldn't find this repair." })
-  }
+    if (!identifier || !isTrackingToken(identifier)) {
+      throw new HTTPException(404, { message: "We couldn't find this repair." })
+    }
 
-  const payload = await getPublicRepairByTrackingToken(identifier)
-  return c.json(payload)
-})
+    const payload = await getPublicRepairByTrackingToken(identifier)
+    return c.json(payload)
+  },
+)
 
 trackRouter.post(
   '/:trackingToken/decision',
   createRateLimitMiddleware({
     windowMs: 60_000,
     max: 10,
-    key: (c) => {
-      const forwarded = c.req.header('x-forwarded-for')
-      const realIp = c.req.header('x-real-ip')
-      const ip = forwarded?.split(',')[0]?.trim() || realIp || 'unknown'
-      return `${ip}:${c.req.param('trackingToken')}`
-    },
+    key: (c) => `${getClientIp(c)}:${c.req.param('trackingToken')}`,
   }),
   zValidator('param', trackDecisionParamSchema, (result) => {
     if (!result.success) {

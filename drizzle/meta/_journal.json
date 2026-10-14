@@ -232,6 +232,13 @@
       "when": 1791954142839,
       "tag": "0032_cute_the_anarchist",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791968545486,
+      "tag": "0033_calm_rogue",
+      "breakpoints": true
     }
   ]
 }

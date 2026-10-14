@@ -428,6 +428,10 @@ Core entities may include:
 - invoices
 - payments
 - notifications
+- rate_limits (application request throttling: `key` primary key, `count`,
+  `reset_at`)
+- rate_limit (Better Auth database throttling: `id`, unique `key`, `count`,
+  `last_request`)
 
 Conventions:
 
@@ -459,6 +463,13 @@ structure manually.
 
 Indexes only for columns the app actually filters or sorts on
 (`shop_id`, `status`, `created_at`).
+
+Application rate limits are stored in PostgreSQL rather than process memory.
+The shared Hono middleware uses one atomic `INSERT ... ON CONFLICT` update,
+so limits work across server instances without a cleanup worker. Expired
+application rows are deleted opportunistically on roughly 1% of requests.
+Better Auth uses its separate `rate_limit` table with
+`storage: 'database'`.
 
 Do not create database tables simply because a UI pattern appears
 useful. Every table must have a clear product requirement in the
@@ -567,6 +578,12 @@ Because it is unauthenticated, it must:
   id or the date. Do not expose the database uuid, and do not use an
   incrementing or year-prefixed number such as `RT-2026-00124`.
 - Be rate-limited per IP.
+- Phone verification also has a 10-attempt, 15-minute limit per public ticket
+  number so rotating IP addresses cannot brute-force a ticket.
+- Client IP headers (`x-forwarded-for` and `x-real-ip`) are trusted only when
+  `TRUST_PROXY=true`; otherwise the application uses one fallback key. Set
+  `TRUST_PROXY=true` only behind a proxy such as Vercel that overwrites these
+  headers.
 - Stay read-only **except** for the one named public mutation:
   `POST /api/track/[trackingToken]/decision`. That endpoint exists
   only for customer approve/reject on a currently pending

@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { TrackErrorState } from '@/components/tracking/track-error-state'
 import { TrackPageShell } from '@/components/tracking/track-page-shell'
-import { TrackSearchForm } from '@/components/tracking/track-search-form'
+import { TrackSearchForm, type RateLimitState } from '@/components/tracking/track-search-form'
 import { TrackSkeleton } from '@/components/tracking/track-skeleton'
 import { TrackStatusView } from '@/components/tracking/track-status-view'
 import type { PublicTrackingResponse } from '@/features/tracking/schemas'
@@ -13,6 +13,7 @@ import {
   useVerifyPublicTracking,
 } from '@/features/tracking/queries'
 import { isTicketNumber, isTrackingToken } from '@/features/tracking/identifiers'
+import { getRateLimitInfo } from '@/lib/api-error'
 
 export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
   const isToken = isTrackingToken(ticketId)
@@ -21,7 +22,8 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
   const decisionMutation = useTrackDecision(ticketId)
   const verifyMutation = useVerifyPublicTracking()
   const [verifiedData, setVerifiedData] = React.useState<PublicTrackingResponse | null>(null)
-  const [submitError, setSubmitError] = React.useState(false)
+  const [submitError, setSubmitError] = React.useState<string | null>(null)
+  const [rateLimit, setRateLimit] = React.useState<RateLimitState | null>(null)
 
   if (!isToken && !isTicket) {
     return (
@@ -110,13 +112,44 @@ export function TrackDynamicPage({ ticketId }: { ticketId: string }) {
         defaultTicketNumber={ticketId}
         isSubmitting={verifyMutation.isPending}
         submitError={submitError}
+        rateLimit={rateLimit}
+        onRateLimitExpire={() => {
+          setRateLimit(null)
+          setSubmitError(null)
+        }}
         onSubmit={async (values) => {
-          setSubmitError(false)
+          setSubmitError(null)
+          setRateLimit(null)
           try {
             const data = await verifyMutation.mutateAsync(values)
             setVerifiedData(data)
-          } catch {
-            setSubmitError(true)
+          } catch (error) {
+            const rlInfo = getRateLimitInfo(error)
+            if (rlInfo) {
+              setRateLimit({
+                resetAt: rlInfo.resetAt,
+                ticketNumber: values.ticketNumber,
+              })
+              try {
+                sessionStorage.setItem(
+                  `rt_rl_verify_${values.ticketNumber}`,
+                  String(rlInfo.resetAt),
+                )
+              } catch {
+                // Ignore storage errors
+              }
+            } else {
+              const resData = (
+                error as { response?: { data?: { error?: { remaining?: unknown } } } }
+              )?.response?.data
+              const remaining = resData?.error?.remaining
+              const message =
+                typeof remaining === 'number' && remaining > 0 && remaining <= 5
+                  ? `We couldn't find this repair. Check your repair number and phone, then try again. (${remaining} attempt${remaining === 1 ? '' : 's'} remaining)`
+                  : "We couldn't find this repair. Check your repair number and phone, then try again."
+
+              setSubmitError(message)
+            }
           }
         }}
       />

@@ -9,6 +9,7 @@ import {
   shops,
   users,
   verifications,
+  betterAuthRateLimits,
 } from '@/server/db/schema'
 import {
   assertInviteSessionUser,
@@ -27,6 +28,7 @@ export const auth = betterAuth({
       session: sessions,
       account: accounts,
       verification: verifications,
+      rateLimit: betterAuthRateLimits,
     },
   }),
   secret: process.env.BETTER_AUTH_SECRET,
@@ -49,6 +51,9 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
+  },
+  rateLimit: {
+    storage: 'database',
   },
   user: {
     additionalFields: {

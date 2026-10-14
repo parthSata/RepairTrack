@@ -1,28 +1,45 @@
 'use client'
 
+import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { trackVerifySchema, type TrackVerifyInput } from '@/features/tracking/schemas'
+
+export type RateLimitState = {
+  resetAt: number
+  ticketNumber?: string
+}
+
+function formatDuration(totalSeconds: number): string {
+  const mins = Math.floor(totalSeconds / 60)
+  const secs = totalSeconds % 60
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
 
 export function TrackSearchForm({
   onSubmit,
   isSubmitting,
   defaultTicketNumber,
   submitError,
+  rateLimit,
+  onRateLimitExpire,
 }: {
   onSubmit: (values: TrackVerifyInput) => Promise<void>
   isSubmitting: boolean
   defaultTicketNumber?: string
-  submitError?: boolean
+  submitError?: string | boolean | null
+  rateLimit?: RateLimitState | null
+  onRateLimitExpire?: () => void
 }) {
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<TrackVerifyInput>({
     resolver: zodResolver(trackVerifySchema),
@@ -32,17 +49,118 @@ export function TrackSearchForm({
     },
   })
 
+  const [secondsLeft, setSecondsLeft] = React.useState<number>(0)
+  const [storedResetAt, setStoredResetAt] = React.useState<number | null>(null)
+
+  const watchedTicket = watch('ticketNumber')
+
+  // Check sessionStorage for active rate limit for current ticket
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    const ticket = watchedTicket || defaultTicketNumber || ''
+    if (!ticket) {
+      setStoredResetAt(null)
+      return
+    }
+    const stored = sessionStorage.getItem(`rt_rl_verify_${ticket}`)
+    if (stored) {
+      const resetTime = parseInt(stored, 10)
+      if (resetTime > Date.now()) {
+        setStoredResetAt(resetTime)
+      } else {
+        sessionStorage.removeItem(`rt_rl_verify_${ticket}`)
+        setStoredResetAt(null)
+      }
+    } else {
+      setStoredResetAt(null)
+    }
+  }, [watchedTicket, defaultTicketNumber])
+
+  // Resolve the effective resetAt timestamp
+  const activeResetAt = React.useMemo(() => {
+    const currentTicket = watchedTicket || defaultTicketNumber || ''
+    if (rateLimit && (!rateLimit.ticketNumber || rateLimit.ticketNumber === currentTicket)) {
+      return rateLimit.resetAt
+    }
+    return storedResetAt
+  }, [rateLimit, watchedTicket, defaultTicketNumber, storedResetAt])
+
+  // Countdown timer effect
+  React.useEffect(() => {
+    if (!activeResetAt) {
+      setSecondsLeft(0)
+      return
+    }
+
+    const calculate = () => Math.max(0, Math.ceil((activeResetAt - Date.now()) / 1000))
+    const initial = calculate()
+    setSecondsLeft(initial)
+
+    if (initial <= 0) {
+      const currentTicket = watchedTicket || defaultTicketNumber || ''
+      if (currentTicket && typeof window !== 'undefined') {
+        sessionStorage.removeItem(`rt_rl_verify_${currentTicket}`)
+      }
+      onRateLimitExpire?.()
+      return
+    }
+
+    const interval = setInterval(() => {
+      const remaining = calculate()
+      setSecondsLeft(remaining)
+      if (remaining <= 0) {
+        clearInterval(interval)
+        const currentTicket = watchedTicket || defaultTicketNumber || ''
+        if (currentTicket && typeof window !== 'undefined') {
+          sessionStorage.removeItem(`rt_rl_verify_${currentTicket}`)
+        }
+        onRateLimitExpire?.()
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [activeResetAt, watchedTicket, defaultTicketNumber, onRateLimitExpire])
+
   return (
     <form
       onSubmit={handleSubmit(async (values) => {
+        if (isSubmitting || secondsLeft > 0) return
         await onSubmit(values)
       })}
       className="space-y-5"
     >
-      {submitError ? (
+      {secondsLeft > 0 ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200 space-y-2.5">
+          <div className="flex items-start gap-2.5">
+            <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+            <div className="space-y-1">
+              <p className="font-semibold text-amber-950 dark:text-amber-100">Too many verification attempts</p>
+              <p className="text-xs text-amber-900/80 dark:text-amber-300/80 leading-relaxed">
+                For security, lookups for this repair ticket are paused after 10 attempts. Please wait 15 minutes before trying again.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-amber-500/15 px-3 py-2 text-xs font-medium text-amber-950 dark:text-amber-100">
+            <span className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+              </span>
+              <span>Time remaining</span>
+            </span>
+            <span className="font-mono text-sm font-bold tabular-nums">
+              {formatDuration(secondsLeft)}
+            </span>
+          </div>
+        </div>
+      ) : submitError ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive flex items-start gap-2">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-          <p>We couldn&apos;t find this repair. Check your repair number and phone, then try again.</p>
+          <p>
+            {typeof submitError === 'string'
+              ? submitError
+              : "We couldn't find this repair. Check your repair number and phone, then try again."}
+          </p>
         </div>
       ) : null}
 
@@ -53,7 +171,7 @@ export function TrackSearchForm({
           inputMode="numeric"
           autoComplete="off"
           placeholder="10-digit repair number"
-          disabled={isSubmitting}
+          disabled={isSubmitting || secondsLeft > 0}
           {...register('ticketNumber', {
             onChange: (event) => {
               const cleaned = event.target.value.replace(/\D/g, '')
@@ -75,7 +193,7 @@ export function TrackSearchForm({
           type="tel"
           autoComplete="tel"
           placeholder="e.g. 9876543210 or +919876543210"
-          disabled={isSubmitting}
+          disabled={isSubmitting || secondsLeft > 0}
           {...register('phone', {
             onChange: (event) => {
               const value = event.target.value
@@ -93,9 +211,18 @@ export function TrackSearchForm({
         )}
       </div>
 
-      <Button type="submit" className="w-full transition-colors duration-200" disabled={isSubmitting}>
-        {isSubmitting ? 'Checking…' : 'Track Repair'}
+      <Button
+        type="submit"
+        className="w-full transition-colors duration-200"
+        disabled={isSubmitting || secondsLeft > 0}
+      >
+        {secondsLeft > 0
+          ? `Try again in ${formatDuration(secondsLeft)}`
+          : isSubmitting
+            ? 'Checking…'
+            : 'Track Repair'}
       </Button>
     </form>
   )
 }
+
