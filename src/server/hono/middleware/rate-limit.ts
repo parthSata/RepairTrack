@@ -26,8 +26,11 @@ export function getClientIp(c: Context): string {
   return c.req.header('x-real-ip')?.trim() || FALLBACK_CLIENT_KEY
 }
 
-async function incrementRateLimit(key: string, windowMs: number): Promise<number> {
-  const result = await db.execute<{ count: number }>(sql`
+async function incrementRateLimit(
+  key: string,
+  windowMs: number,
+): Promise<{ count: number; resetAt: Date }> {
+  const result = await db.execute<{ count: number; reset_at: string | Date }>(sql`
     INSERT INTO rate_limits ("key", "count", "reset_at")
     VALUES (${key}, 1, now() + (${windowMs} * interval '1 millisecond'))
     ON CONFLICT ("key") DO UPDATE
@@ -38,18 +41,21 @@ async function incrementRateLimit(key: string, windowMs: number): Promise<number
       END,
       "reset_at" = CASE
         WHEN rate_limits."reset_at" <= now()
-          THEN now() + (${windowMs} * interval '1 millisecond')
+          THEN now() + (${windowMs} * interval '1 millisecond') 
         ELSE rate_limits."reset_at"
       END
-    RETURNING "count"
+    RETURNING "count", "reset_at"
   `)
 
-  const count = result[0]?.count
-  if (count === undefined) {
+  const row = result[0]
+  if (!row || row.count === undefined) {
     throw new Error('Rate limit update did not return a count')
   }
 
-  return count
+  return {
+    count: Number(row.count),
+    resetAt: new Date(row.reset_at),
+  }
 }
 
 async function cleanupExpiredRateLimits(): Promise<void> {
@@ -67,14 +73,29 @@ export function createRateLimitMiddleware(options?: RateLimitOptions) {
 
   return async (c: Context, next: Next) => {
     const key = await keyFn(c)
-    const [count] = await Promise.all([
+    const [{ count, resetAt }] = await Promise.all([
       incrementRateLimit(key, windowMs),
       cleanupExpiredRateLimits(),
     ])
 
+    const remaining = Math.max(0, max - count)
+    c.set('rateLimitRemaining', remaining)
+    c.header('X-RateLimit-Limit', String(max))
+    c.header('X-RateLimit-Remaining', String(remaining))
+    c.header('X-RateLimit-Reset', String(Math.ceil(resetAt.getTime() / 1000)))
+
     if (count > max) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000))
+      c.header('Retry-After', String(retryAfterSeconds))
       return c.json(
-        { error: { message: RATE_LIMITED_MESSAGE, code: 'RATE_LIMITED' } },
+        {
+          error: {
+            message: RATE_LIMITED_MESSAGE,
+            code: 'RATE_LIMITED',
+            retryAfter: retryAfterSeconds,
+            resetAt: resetAt.toISOString(),
+          },
+        },
         429,
       )
     }
