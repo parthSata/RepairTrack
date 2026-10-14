@@ -3,7 +3,13 @@ import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { db } from '@/server/db'
-import { accounts, sessions, shops, users, verifications } from '@/server/db/schema'
+import {
+  accounts,
+  sessions,
+  shops,
+  users,
+  verifications,
+} from '@/server/db/schema'
 import {
   assertInviteSessionUser,
   getOAuthInviteToken,
@@ -16,7 +22,12 @@ import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
-    schema: { user: users, session: sessions, account: accounts, verification: verifications },
+    schema: {
+      user: users,
+      session: sessions,
+      account: accounts,
+      verification: verifications,
+    },
   }),
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL,
@@ -41,8 +52,18 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      role: { type: 'string', required: false, defaultValue: 'OWNER', input: false },
-      status: { type: 'string', required: false, defaultValue: 'ACTIVE', input: false },
+      role: {
+        type: 'string',
+        required: false,
+        defaultValue: 'OWNER',
+        input: false,
+      },
+      status: {
+        type: 'string',
+        required: false,
+        defaultValue: 'ACTIVE',
+        input: false,
+      },
       shopId: { type: 'string', required: false, input: false },
     },
   },
@@ -52,14 +73,26 @@ export const auth = betterAuth({
         before: async (user, context) => {
           const oauthInviteToken = await getOAuthInviteToken()
           if (oauthInviteToken) {
-            const invitation = await requirePendingInvitation(oauthInviteToken, user.email)
+            const invitation = await requirePendingInvitation(
+              oauthInviteToken,
+              user.email,
+            )
             // Google has verified this address and it matches the invitation, so no verification email.
-            return { data: { ...user, role: invitation.role, shopId: invitation.shopId } }
+            return {
+              data: {
+                ...user,
+                role: invitation.role,
+                shopId: invitation.shopId,
+              },
+            }
           }
 
           const bodyInviteToken = readInviteToken(context?.body)
           if (bodyInviteToken) {
-            const invitation = await requirePendingInvitation(bodyInviteToken, user.email)
+            const invitation = await requirePendingInvitation(
+              bodyInviteToken,
+              user.email,
+            )
             return {
               data: {
                 ...user,
@@ -83,7 +116,9 @@ export const auth = betterAuth({
               role: 'OWNER',
               status: 'ACTIVE',
               shopId,
-              emailVerified: false,
+              emailVerified:
+                context?.headers?.get('x-repairtrack-pending-registration') ===
+                '1',
             },
           }
         },
@@ -99,8 +134,12 @@ export const auth = betterAuth({
           const now = new Date()
           const accessToken = account.accessToken ?? crypto.randomUUID()
           const refreshToken = account.refreshToken ?? crypto.randomUUID()
-          const accessTokenExpiresAt = account.accessTokenExpiresAt ?? new Date(now.getTime() + 24 * 60 * 60 * 1000)
-          const refreshTokenExpiresAt = account.refreshTokenExpiresAt ?? new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+          const accessTokenExpiresAt =
+            account.accessTokenExpiresAt ??
+            new Date(now.getTime() + 24 * 60 * 60 * 1000)
+          const refreshTokenExpiresAt =
+            account.refreshTokenExpiresAt ??
+            new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
 
           return {
             data: {
@@ -123,12 +162,14 @@ export const auth = betterAuth({
             })
             if (dbUser?.status === 'INACTIVE') {
               throw new APIError('FORBIDDEN', {
-                message: 'Your account has been deactivated. Contact the owner for activation.',
+                message:
+                  'Your account has been deactivated. Contact the owner for activation.',
               })
             }
 
             const inviteToken = await getOAuthInviteToken()
-            if (inviteToken && dbUser) await assertInviteSessionUser(inviteToken, dbUser)
+            if (inviteToken && dbUser)
+              await assertInviteSessionUser(inviteToken, dbUser)
           }
         },
       },
@@ -143,13 +184,16 @@ export const auth = betterAuth({
         return
       }
 
-
-
       // Throwing makes the resend endpoint report the failure; sign-up/sign-in only log it.
-      const result = await sendAccountVerificationEmail({ to: user.email, name: user.name, url })
+      const result = await sendAccountVerificationEmail({
+        to: user.email,
+        name: user.name,
+        url,
+      })
       if (!result.sent) {
         throw new APIError('SERVICE_UNAVAILABLE', {
-          message: 'We could not deliver a verification email to this address. Check the address and try again.',
+          message:
+            'We could not deliver a verification email to this address. Check the address and try again.',
         })
       }
     },

@@ -11,4 +11,4 @@ export * from './invoices'
 export * from './payments'
 export * from './gmail-connections'
 export * from './email-logs'
-
+export * from './pending-registrations'

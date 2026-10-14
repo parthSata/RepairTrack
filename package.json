@@ -21,7 +21,8 @@
     "verify:email": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-email.ts",
     "audit:integrity": "bun run scripts/audit-user-shop-integrity.ts",
     "test": "bun test",
-    "test:integration": "bun run scripts/run-integration.ts"
+    "test:integration": "bun run scripts/run-integration.ts",
+    "generate:key": "bun run scripts/generate-key.ts"
   },
   "dependencies": {
     "@better-auth/infra": "^0.4.1",

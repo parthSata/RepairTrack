@@ -7,7 +7,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { apiClient } from '@/lib/api-client'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { authClient } from '@/lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field-error'
 import { Input } from '@/components/ui/input'
@@ -49,17 +48,14 @@ export function RegisterForm() {
       return
     }
 
-    const signUpResult = await authClient.signUp.email({
-      email: values.email,
-      password: values.password,
-      name: values.ownerName,
-      callbackURL: '/dashboard',
-    })
-
-    if (signUpResult.error) {
+    try {
+      await apiClient.post('/registration', values)
+    } catch (error: unknown) {
       setFormError(
-        signUpResult.error.message ||
-          'Unable to create account. Please try again.',
+        getApiErrorMessage(
+          error,
+          'Unable to start registration. Please try again.',
+        ),
       )
       return
     }
@@ -69,7 +65,9 @@ export function RegisterForm() {
   }
 
   if (verificationSent) {
-    return <VerifyEmailCard initialEmail={verificationEmail} />
+    return (
+      <VerifyEmailCard initialEmail={verificationEmail} pendingRegistration />
+    )
   }
 
   return (
