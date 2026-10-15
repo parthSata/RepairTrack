@@ -14,6 +14,13 @@
 - [ ] Typecheck: `bun run typecheck`
 - [ ] Lint: `bun run lint`
 - [ ] Production build: `bun run build`
+- [ ] Pre-PR check: `bun run check`
+
+## Manual testing
+
+- [ ] Checklist sections run: <!-- List the sections completed from docs/testing/manual-test-checklist.md. -->
+- [ ] Roles used: <!-- List OWNER, STAFF, TECHNICIAN, and/or customer tracking. -->
+- [ ] Screenshots for UI changes: <!-- Attach screenshots or write "N/A". -->
 
 ## Risk and rollback
 

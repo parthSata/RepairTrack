@@ -21,6 +21,7 @@
     "verify:email": "bun --preload=./scripts/server-only-shim.mjs scripts/verify-email.ts",
     "audit:integrity": "bun run scripts/audit-user-shop-integrity.ts",
     "test": "bun test",
+    "check": "bun run typecheck && bun run lint -- --max-warnings=0 && bun run test && bun run build",
     "test:integration": "bun run scripts/run-integration.ts",
     "generate:key": "bun run scripts/generate-key.ts"
   },
