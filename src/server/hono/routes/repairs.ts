@@ -28,8 +28,13 @@ import {
 import { getTechnicians } from '@/server/services/staff.service'
 import { listRepairEmails, resendRepairEmail } from '@/server/services/repair-email.service'
 import { validationHook } from '@/server/hono/validation'
-import { idParamSchema } from '@/lib/validation'
-import { REPAIR_EMAIL_MESSAGES, repairEmailParamSchema } from '@/features/emails/schemas'
+import {
+  idAndLogIdParamSchema,
+  idAndPartRowIdParamSchema,
+  idAndPhotoTypeParamSchema,
+  idParamSchema,
+} from '@/lib/validation'
+import { REPAIR_EMAIL_MESSAGES } from '@/features/emails/schemas'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
 import {
   addRepairPartSchema,
@@ -113,14 +118,15 @@ export const repairsRouter = new Hono()
       return c.json(result)
     },
   )
-  .get('/:id', async (c) => {
+  .get('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
     const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
     const repair = await getRepairById({ shopId, userRole, userId, id })
     return c.json(repair)
   })
   .patch(
     '/:id/status',
+    zValidator('param', idParamSchema, validationHook),
     zValidator(
       'json',
       z.object({
@@ -130,7 +136,7 @@ export const repairsRouter = new Hono()
     ),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { status, note } = c.req.valid('json')
 
       const updated = await updateRepairStatus({
@@ -146,10 +152,11 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/request-approval',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', requestCustomerApprovalSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const body = c.req.valid('json')
 
       const repair = await requestCustomerApproval({
@@ -164,10 +171,11 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/reopen',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', reopenRepairSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { reason, action } = c.req.valid('json')
 
       const updated = await reopenRepairTicket({
@@ -183,6 +191,7 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/technician',
+    zValidator('param', idParamSchema, validationHook),
     zValidator(
       'json',
       z.object({
@@ -191,7 +200,7 @@ export const repairsRouter = new Hono()
     ),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { technicianId } = c.req.valid('json')
 
       const updated = await reassignTechnician({
@@ -206,6 +215,7 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/diagnosis',
+    zValidator('param', idParamSchema, validationHook),
     zValidator(
       'json',
       z.object({
@@ -214,7 +224,7 @@ export const repairsRouter = new Hono()
     ),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { diagnosis } = c.req.valid('json')
 
       const updated = await updateDiagnosis({
@@ -229,10 +239,11 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/estimated-cost',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', updateEstimatedCostSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { estimatedCost } = c.req.valid('json')
 
       const updated = await updateEstimatedCost({
@@ -247,10 +258,11 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/estimate',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', repairPricingFieldsSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const body = c.req.valid('json')
 
       const updated = await updateRepairEstimatePricing({
@@ -265,10 +277,11 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/final-total',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', repairPricingFieldsSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const body = c.req.valid('json')
 
       const updated = await updateRepairFinalTotal({
@@ -283,6 +296,7 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/notes',
+    zValidator('param', idParamSchema, validationHook),
     zValidator(
       'json',
       z.object({
@@ -291,7 +305,7 @@ export const repairsRouter = new Hono()
     ),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { note } = c.req.valid('json')
 
       const createdNote = await addRepairNote({
@@ -306,10 +320,11 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/expected-completion-date',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', updateExpectedCompletionDateSchema),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { expectedCompletionDate } = c.req.valid('json')
 
       const updated = await updateExpectedCompletionDate({
@@ -329,16 +344,16 @@ export const repairsRouter = new Hono()
   })
   .post(
     '/:id/emails/:logId/resend',
-    zValidator('param', repairEmailParamSchema, validationHook),
+    zValidator('param', idAndLogIdParamSchema, validationHook),
     async (c) => {
       const { shopId } = await requireRole(c.req.raw, OWNER_OR_STAFF, REPAIR_EMAIL_MESSAGES.forbidden)
       const { id, logId } = c.req.valid('param')
       return c.json(await resendRepairEmail({ shopId, repairId: id, logId }))
     },
   )
-  .post('/:id/regenerate-tracking-link', async (c) => {
+  .post('/:id/regenerate-tracking-link', zValidator('param', idParamSchema, validationHook), async (c) => {
     const { shopId, userRole } = await requireRepairAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
 
     const updated = await regenerateTrackingToken({
       shopId,
@@ -349,6 +364,7 @@ export const repairsRouter = new Hono()
   })
   .post(
     '/:id/photos/upload-url',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', repairPhotoUploadUrlSchema, (result, c) => {
       if (!result.success) {
         return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -356,7 +372,7 @@ export const repairsRouter = new Hono()
     }),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { type, size } = c.req.valid('json')
       const upload = await requestRepairPhotoUploadUrl(
         { shopId, userRole, userId, repairId: id },
@@ -367,6 +383,7 @@ export const repairsRouter = new Hono()
   )
   .put(
     '/:id/photos',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', repairPhotoConfirmSchema, (result, c) => {
       if (!result.success) {
         return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -374,7 +391,7 @@ export const repairsRouter = new Hono()
     }),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { type, publicId } = c.req.valid('json')
       const payload = await confirmRepairPhoto(
         { shopId, userRole, userId, repairId: id },
@@ -383,21 +400,26 @@ export const repairsRouter = new Hono()
       return c.json(payload)
     },
   )
-  .delete('/:id/photos/:type', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-    const id = c.req.param('id')
-    const typeParam = c.req.param('type').toUpperCase()
-    if (!repairPhotoTypeValues.includes(typeParam as (typeof repairPhotoTypeValues)[number])) {
-      throw new HTTPException(400, { message: 'Photo type must be BEFORE or AFTER' })
-    }
-    const payload = await deleteRepairPhoto(
-      { shopId, userRole, userId, repairId: id },
-      typeParam as (typeof repairPhotoTypeValues)[number],
-    )
-    return c.json(payload)
-  })
+  .delete(
+    '/:id/photos/:type',
+    zValidator('param', idAndPhotoTypeParamSchema, validationHook),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
+      const { id, type } = c.req.valid('param')
+      const typeParam = type.toUpperCase()
+      if (!repairPhotoTypeValues.includes(typeParam as (typeof repairPhotoTypeValues)[number])) {
+        throw new HTTPException(400, { message: 'Photo type must be BEFORE or AFTER' })
+      }
+      const payload = await deleteRepairPhoto(
+        { shopId, userRole, userId, repairId: id },
+        typeParam as (typeof repairPhotoTypeValues)[number],
+      )
+      return c.json(payload)
+    },
+  )
   .patch(
     '/:id/photos/visibility',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', repairPhotoVisibilitySchema, (result, c) => {
       if (!result.success) {
         return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -405,7 +427,7 @@ export const repairsRouter = new Hono()
     }),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { hidden } = c.req.valid('json')
       const payload = await setRepairPhotosVisibility(
         { shopId, userRole, userId, repairId: id },
@@ -416,6 +438,7 @@ export const repairsRouter = new Hono()
   )
   .post(
     '/:id/parts',
+    zValidator('param', idParamSchema, validationHook),
     zValidator('json', addRepairPartSchema, (result, c) => {
       if (!result.success) {
         return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -423,7 +446,7 @@ export const repairsRouter = new Hono()
     }),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
+      const id = c.req.valid('param').id
       const { inventoryId, quantity } = c.req.valid('json')
       const part = await addRepairPart({
         shopId,
@@ -438,6 +461,7 @@ export const repairsRouter = new Hono()
   )
   .patch(
     '/:id/parts/:partRowId',
+    zValidator('param', idAndPartRowIdParamSchema, validationHook),
     zValidator('json', updateRepairPartSchema, (result, c) => {
       if (!result.success) {
         return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -445,8 +469,7 @@ export const repairsRouter = new Hono()
     }),
     async (c) => {
       const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-      const id = c.req.param('id')
-      const partRowId = c.req.param('partRowId')
+      const { id, partRowId } = c.req.valid('param')
       const { quantity } = c.req.valid('json')
       const part = await updateRepairPartQuantity({
         shopId,
@@ -459,16 +482,19 @@ export const repairsRouter = new Hono()
       return c.json(part)
     },
   )
-  .delete('/:id/parts/:partRowId', async (c) => {
-    const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
-    const id = c.req.param('id')
-    const partRowId = c.req.param('partRowId')
-    const result = await removeRepairPart({
-      shopId,
-      repairId: id,
-      partRowId,
-      userRole,
-      userId,
-    })
-    return c.json(result)
-  })
+  .delete(
+    '/:id/parts/:partRowId',
+    zValidator('param', idAndPartRowIdParamSchema, validationHook),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
+      const { id, partRowId } = c.req.valid('param')
+      const result = await removeRepairPart({
+        shopId,
+        repairId: id,
+        partRowId,
+        userRole,
+        userId,
+      })
+      return c.json(result)
+    },
+  )

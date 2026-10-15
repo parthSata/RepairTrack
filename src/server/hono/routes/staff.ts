@@ -7,7 +7,9 @@ import {
   resumeAssignmentsSchema,
   setStaffStatusSchema,
 } from '@/features/staff/schemas'
+import { idParamSchema } from '@/lib/validation'
 import { requireRole } from '@/server/hono/session'
+import { validationHook } from '@/server/hono/validation'
 import {
   changeStaffRole,
   getStaffActiveAssignments,
@@ -38,22 +40,23 @@ staffRouter.get('/technicians', async (c) => {
   return c.json(techs)
 })
 
-staffRouter.get('/:id/active-assignments', async (c) => {
+staffRouter.get('/:id/active-assignments', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireOwner(c.req.raw)
-  const targetId = c.req.param('id')
+  const targetId = c.req.valid('param').id
   const assignments = await getStaffActiveAssignments(shopId, targetId)
   return c.json({ assignments })
 })
 
-staffRouter.get('/:id/held-assignments', async (c) => {
+staffRouter.get('/:id/held-assignments', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireOwner(c.req.raw)
-  const targetId = c.req.param('id')
+  const targetId = c.req.valid('param').id
   const assignments = await getStaffHeldAssignments(shopId, targetId)
   return c.json({ assignments })
 })
 
 staffRouter.post(
   '/:id/resume-assignments',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', resumeAssignmentsSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -61,7 +64,7 @@ staffRouter.post(
   }),
   async (c) => {
     const { shopId } = await requireOwner(c.req.raw)
-    const targetId = c.req.param('id')
+    const targetId = c.req.valid('param').id
     const { assignmentIds } = c.req.valid('json')
     const result = await resumeHeldAssignments(shopId, targetId, assignmentIds)
     return c.json(result)
@@ -85,6 +88,7 @@ staffRouter.post(
 
 staffRouter.patch(
   '/:id/status',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', setStaffStatusSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -92,7 +96,7 @@ staffRouter.patch(
   }),
   async (c) => {
     const { shopId } = await requireOwner(c.req.raw)
-    const targetId = c.req.param('id')
+    const targetId = c.req.valid('param').id
     const { status } = c.req.valid('json')
     const result = await setStaffStatus(shopId, targetId, status)
     return c.json(result)
@@ -101,6 +105,7 @@ staffRouter.patch(
 
 staffRouter.patch(
   '/:id/role',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', changeStaffRoleSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -108,7 +113,7 @@ staffRouter.patch(
   }),
   async (c) => {
     const { shopId, userId } = await requireOwner(c.req.raw)
-    const targetId = c.req.param('id')
+    const targetId = c.req.valid('param').id
     const input = c.req.valid('json')
     try {
       const result = await changeStaffRole(shopId, targetId, input, userId)

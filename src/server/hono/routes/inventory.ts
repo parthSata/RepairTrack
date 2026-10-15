@@ -6,7 +6,9 @@ import {
   partFilterSchema,
   stockMovementFilterSchema,
 } from '@/features/inventory/schemas'
+import { idParamSchema } from '@/lib/validation'
 import { requireRole } from '@/server/hono/session'
+import { validationHook } from '@/server/hono/validation'
 import {
   adjustStock,
   createPart,
@@ -61,15 +63,16 @@ inventoryRouter.post(
   },
 )
 
-inventoryRouter.get('/:id', async (c) => {
+inventoryRouter.get('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireInventoryReadAccess(c.req.raw)
-  const id = c.req.param('id')
+  const id = c.req.valid('param').id
   const part = await getPartById({ shopId, id })
   return c.json(part)
 })
 
 inventoryRouter.get(
   '/:id/movements',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('query', stockMovementFilterSchema, (result, c) => {
     if (!result.success) {
       return c.json(
@@ -80,7 +83,7 @@ inventoryRouter.get(
   }),
   async (c) => {
     const { shopId } = await requireInventoryAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
     const filters = c.req.valid('query')
     const result = await listStockMovements({ ...filters, shopId, inventoryId: id })
     return c.json(result)
@@ -89,6 +92,7 @@ inventoryRouter.get(
 
 inventoryRouter.post(
   '/:id/adjust-stock',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', adjustStockSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -96,7 +100,7 @@ inventoryRouter.post(
   }),
   async (c) => {
     const { shopId, userId } = await requireInventoryAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
     const data = c.req.valid('json')
     const updated = await adjustStock({ shopId, id, data, createdBy: userId })
     return c.json(updated)
@@ -105,6 +109,7 @@ inventoryRouter.post(
 
 inventoryRouter.patch(
   '/:id',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', partDetailsSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -112,16 +117,16 @@ inventoryRouter.patch(
   }),
   async (c) => {
     const { shopId } = await requireInventoryAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
     const data = c.req.valid('json')
     const updated = await updatePart({ shopId, id, data })
     return c.json(updated)
   },
 )
 
-inventoryRouter.delete('/:id', async (c) => {
+inventoryRouter.delete('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireInventoryAccess(c.req.raw)
-  const id = c.req.param('id')
+  const id = c.req.valid('param').id
   const result = await deletePart({ shopId, id })
   return c.json(result)
 })
