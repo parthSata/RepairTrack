@@ -1,6 +1,5 @@
-import { z } from 'zod'
 import type { BadgeProps } from '@/components/ui/badge'
-import { idParamSchema } from '@/lib/validation'
+import { idAndLogIdParamSchema } from '@/lib/validation'
 
 /** Email types written with a `repair_id`, each rebuildable from its `<TYPE>:<entityId>` dedupe key. */
 export const REPAIR_EMAIL_TYPES = [
@@ -33,9 +32,7 @@ export type ResendEmailResult = {
   recipient: string | null
 }
 
-export const repairEmailParamSchema = idParamSchema.extend({
-  logId: z.uuid({ message: 'Invalid email id' }),
-})
+export const repairEmailParamSchema = idAndLogIdParamSchema
 
 export const EMAIL_TYPE_LABELS: Record<RepairEmailType, string> = {
   REPAIR_RECEIVED: 'Repair received',

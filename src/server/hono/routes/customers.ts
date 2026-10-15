@@ -1,7 +1,9 @@
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { customerFilterSchema, customerSchema } from '@/features/customers/schemas'
+import { idParamSchema } from '@/lib/validation'
 import { requireRole } from '@/server/hono/session'
+import { validationHook } from '@/server/hono/validation'
 import {
   checkCustomerEmail,
   createCustomer,
@@ -57,15 +59,16 @@ customersRouter.post(
   },
 )
 
-customersRouter.get('/:id', async (c) => {
+customersRouter.get('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireCustomerAccess(c.req.raw)
-  const id = c.req.param('id')
+  const id = c.req.valid('param').id
   const customer = await getCustomerById({ shopId, id })
   return c.json(customer)
 })
 
 customersRouter.patch(
   '/:id',
+  zValidator('param', idParamSchema, validationHook),
   zValidator('json', customerSchema, (result, c) => {
     if (!result.success) {
       return c.json({ error: { message: 'Validation failed', code: 'VALIDATION_ERROR' } }, 400)
@@ -73,23 +76,23 @@ customersRouter.patch(
   }),
   async (c) => {
     const { shopId } = await requireCustomerAccess(c.req.raw)
-    const id = c.req.param('id')
+    const id = c.req.valid('param').id
     const data = c.req.valid('json')
     const updated = await updateCustomer({ shopId, id, data })
     return c.json(updated)
   },
 )
 
-customersRouter.delete('/:id', async (c) => {
+customersRouter.delete('/:id', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId } = await requireCustomerAccess(c.req.raw)
-  const id = c.req.param('id')
+  const id = c.req.valid('param').id
   const result = await deleteCustomer({ shopId, id })
   return c.json(result)
 })
 
-customersRouter.get('/:id/repairs', async (c) => {
+customersRouter.get('/:id/repairs', zValidator('param', idParamSchema, validationHook), async (c) => {
   const { shopId, userRole, userId } = await requireCustomerAccess(c.req.raw)
-  const id = c.req.param('id')
+  const id = c.req.valid('param').id
   const history = await getCustomerRepairHistory({
     shopId,
     customerId: id,
