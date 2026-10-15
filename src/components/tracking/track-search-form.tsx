@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -37,9 +37,9 @@ export function TrackSearchForm({
 }) {
   const {
     register,
+    control,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<TrackVerifyInput>({
     resolver: zodResolver(trackVerifySchema),
@@ -52,28 +52,30 @@ export function TrackSearchForm({
   const [secondsLeft, setSecondsLeft] = React.useState<number>(0)
   const [storedResetAt, setStoredResetAt] = React.useState<number | null>(null)
 
-  const watchedTicket = watch('ticketNumber')
+  const watchedTicket = useWatch({ control, name: 'ticketNumber' })
 
   // Check sessionStorage for active rate limit for current ticket
   React.useEffect(() => {
     if (typeof window === 'undefined') return
     const ticket = watchedTicket || defaultTicketNumber || ''
-    if (!ticket) {
-      setStoredResetAt(null)
-      return
-    }
-    const stored = sessionStorage.getItem(`rt_rl_verify_${ticket}`)
-    if (stored) {
-      const resetTime = parseInt(stored, 10)
-      if (resetTime > Date.now()) {
-        setStoredResetAt(resetTime)
+    queueMicrotask(() => {
+      if (!ticket) {
+        setStoredResetAt(null)
+        return
+      }
+      const stored = sessionStorage.getItem(`rt_rl_verify_${ticket}`)
+      if (stored) {
+        const resetTime = parseInt(stored, 10)
+        if (resetTime > Date.now()) {
+          setStoredResetAt(resetTime)
+        } else {
+          sessionStorage.removeItem(`rt_rl_verify_${ticket}`)
+          setStoredResetAt(null)
+        }
       } else {
-        sessionStorage.removeItem(`rt_rl_verify_${ticket}`)
         setStoredResetAt(null)
       }
-    } else {
-      setStoredResetAt(null)
-    }
+    })
   }, [watchedTicket, defaultTicketNumber])
 
   // Resolve the effective resetAt timestamp
@@ -87,14 +89,10 @@ export function TrackSearchForm({
 
   // Countdown timer effect
   React.useEffect(() => {
-    if (!activeResetAt) {
-      setSecondsLeft(0)
-      return
-    }
+    if (!activeResetAt) return
 
     const calculate = () => Math.max(0, Math.ceil((activeResetAt - Date.now()) / 1000))
     const initial = calculate()
-    setSecondsLeft(initial)
 
     if (initial <= 0) {
       const currentTicket = watchedTicket || defaultTicketNumber || ''
@@ -104,6 +102,10 @@ export function TrackSearchForm({
       onRateLimitExpire?.()
       return
     }
+
+    queueMicrotask(() => {
+      setSecondsLeft(initial)
+    })
 
     const interval = setInterval(() => {
       const remaining = calculate()
@@ -121,15 +123,17 @@ export function TrackSearchForm({
     return () => clearInterval(interval)
   }, [activeResetAt, watchedTicket, defaultTicketNumber, onRateLimitExpire])
 
+  const displaySecondsLeft = activeResetAt ? secondsLeft : 0
+
   return (
     <form
       onSubmit={handleSubmit(async (values) => {
-        if (isSubmitting || secondsLeft > 0) return
+        if (isSubmitting || displaySecondsLeft > 0) return
         await onSubmit(values)
       })}
       className="space-y-5"
     >
-      {secondsLeft > 0 ? (
+      {displaySecondsLeft > 0 ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-200 space-y-2.5">
           <div className="flex items-start gap-2.5">
             <Clock className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
@@ -149,7 +153,7 @@ export function TrackSearchForm({
               <span>Time remaining</span>
             </span>
             <span className="font-mono text-sm font-bold tabular-nums">
-              {formatDuration(secondsLeft)}
+              {formatDuration(displaySecondsLeft)}
             </span>
           </div>
         </div>
@@ -171,7 +175,7 @@ export function TrackSearchForm({
           inputMode="numeric"
           autoComplete="off"
           placeholder="10-digit repair number"
-          disabled={isSubmitting || secondsLeft > 0}
+          disabled={isSubmitting || displaySecondsLeft > 0}
           {...register('ticketNumber', {
             onChange: (event) => {
               const cleaned = event.target.value.replace(/\D/g, '')
@@ -193,7 +197,7 @@ export function TrackSearchForm({
           type="tel"
           autoComplete="tel"
           placeholder="e.g. 9876543210 or +919876543210"
-          disabled={isSubmitting || secondsLeft > 0}
+          disabled={isSubmitting || displaySecondsLeft > 0}
           {...register('phone', {
             onChange: (event) => {
               const value = event.target.value
@@ -214,10 +218,10 @@ export function TrackSearchForm({
       <Button
         type="submit"
         className="w-full transition-colors duration-200"
-        disabled={isSubmitting || secondsLeft > 0}
+        disabled={isSubmitting || displaySecondsLeft > 0}
       >
-        {secondsLeft > 0
-          ? `Try again in ${formatDuration(secondsLeft)}`
+        {displaySecondsLeft > 0
+          ? `Try again in ${formatDuration(displaySecondsLeft)}`
           : isSubmitting
             ? 'Checking…'
             : 'Track Repair'}

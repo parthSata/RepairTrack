@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Check, Copy, Link2, LoaderCircle, Send, UserPlus } from 'lucide-react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ConnectGmailPrompt } from '@/components/email/connect-gmail-prompt'
 import { Button } from '@/components/ui/button'
@@ -53,8 +53,8 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
 
   const {
     register,
+    control,
     handleSubmit,
-    watch,
     reset,
     formState: { errors },
   } = useForm<InviteStaffInput>({
@@ -66,7 +66,7 @@ export function AddStaffDialog({ trigger }: { trigger?: React.ReactNode }) {
     },
   })
 
-  const selectedRole = watch('role')
+  const selectedRole = useWatch({ control, name: 'role' })
 
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen)

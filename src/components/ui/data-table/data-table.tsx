@@ -88,11 +88,14 @@ export function DataTable<TData, TValue>({
   onSortingChangeManual,
   renderMobileCard,
 }: DataTableProps<TData, TValue>) {
+  'use no memo' // Opt out of React Compiler memoization because TanStack Table returns non-memoizable functions
+
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [rowSelection, setRowSelection] = React.useState({})
 
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data,
     columns,

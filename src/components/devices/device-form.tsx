@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle } from 'lucide-react'
 import { toast } from '@/components/ui/sonner'
@@ -41,9 +41,9 @@ export function DeviceForm({
 
   const {
     register,
+    control,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<DeviceFormInput>({
     resolver: zodResolver(deviceSchema),
@@ -53,6 +53,7 @@ export function DeviceForm({
       customerId: initialData?.customerId ?? initialCustomer?.id ?? '',
       brand: initialData?.brand ?? '',
       model: initialData?.model ?? '',
+      markUnverified: initialData?.markUnverified ?? false,
       serialNumber: initialData?.serialNumber ?? '',
       deviceType: initialData?.deviceType ?? 'PHONE',
       condition: initialData?.condition ?? 'GOOD',
@@ -60,8 +61,9 @@ export function DeviceForm({
     },
   })
 
-  const currentDeviceType = watch('deviceType')
-  const customerId = watch('customerId')
+  const currentDeviceType = useWatch({ control, name: 'deviceType' })
+  const customerId = useWatch({ control, name: 'customerId' })
+  const watchedModel = useWatch({ control, name: 'model' })
 
   const createMutation = useCreateDevice()
   const updateMutation = useUpdateDevice()
@@ -141,7 +143,7 @@ export function DeviceForm({
             </p>
           )}
 
-          {watch('model')?.trim() ? (
+          {watchedModel?.trim() ? (
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"

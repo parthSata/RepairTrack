@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Mail, MapPin, Phone, User, FileText, AlertCircle } from 'lucide-react'
 import { customerSchema, type CustomerFormInput } from '@/features/customers/schemas'
@@ -39,7 +39,7 @@ export function CustomerForm({
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     setError,
     formState: { errors },
   } = useForm<CustomerFormInput>({
@@ -55,12 +55,13 @@ export function CustomerForm({
     },
   })
 
-  const watchedEmail = watch('email')
+  const watchedEmail = useWatch({ control, name: 'email' })
+  const isEmailValidFormat = Boolean(watchedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(watchedEmail))
+  const displayedEmailWarning = isEmailValidFormat ? emailWarning : null
 
   // Real-time email check effect
   React.useEffect(() => {
     if (!watchedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(watchedEmail)) {
-      setEmailWarning(null)
       return
     }
 
@@ -201,10 +202,10 @@ export function CustomerForm({
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
             {errors.email.message}
           </p>
-        ) : emailWarning ? (
+        ) : displayedEmailWarning ? (
           <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 font-medium mt-1">
             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            {emailWarning}
+            {displayedEmailWarning}
           </p>
         ) : null}
       </div>
