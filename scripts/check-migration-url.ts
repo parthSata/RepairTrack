@@ -7,7 +7,6 @@ function isPoolerUrl(url: string): boolean {
 }
 
 const databaseUrl = process.env.DATABASE_URL
-const migrationUrl = process.env.MIGRATION_DATABASE_URL ?? databaseUrl
 
 console.log('RepairTrack migration URL check\n')
 

@@ -1006,7 +1006,6 @@ async function recoverRepair({
   reason?: string
   action?: 'reopen' | 'restore'
 }) {
-  const actionLabel = action === 'restore' ? 'Restore Repair' : 'Reopen Repair'
   if (!['OWNER', 'STAFF'].includes(userRole)) {
     throw new HTTPException(403, {
       message: 'Only Owner and Staff can reopen or restore eligible repair tickets.',

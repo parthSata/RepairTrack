@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   User,
@@ -100,9 +100,9 @@ export function NewRepairWorkflow() {
   // 5. Main Repair Form Hook
   const {
     register,
+    control,
     handleSubmit,
     setValue,
-    watch,
     reset: resetRepairForm,
     formState: { errors },
   } = useForm<CreateRepairInput>({
@@ -122,10 +122,10 @@ export function NewRepairWorkflow() {
     },
   })
 
-  const watchPriority = watch('priority')
-  const watchTechId = watch('assignedTechnicianId')
-  const watchProblem = watch('problemDescription')
-  const watchCondition = watch('initialCondition')
+  const watchPriority = useWatch({ control, name: 'priority' })
+  const watchTechId = useWatch({ control, name: 'assignedTechnicianId' })
+  const watchProblem = useWatch({ control, name: 'problemDescription' })
+  const watchCondition = useWatch({ control, name: 'initialCondition' })
 
   const assignedTechObj = technicians?.find((t) => t.id === watchTechId)
 
