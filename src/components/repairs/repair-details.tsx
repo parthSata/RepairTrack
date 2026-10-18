@@ -99,11 +99,13 @@ export function RepairDetails({ id }: { id: string }) {
   const [newNoteText, setNewNoteText] = React.useState<string>('')
   const [isEditingExpectedDate, setIsEditingExpectedDate] = React.useState<boolean>(false)
   const [expectedDateValue, setExpectedDateValue] = React.useState<string>('')
+  const [isPricingUnlocked, setIsPricingUnlocked] = React.useState(false)
 
   if (repair && prevRepairId !== repair.id) {
     setPrevRepairId(repair.id)
     setSelectedTechId(repair.assignedTechnicianId ?? '')
     setDiagnosisText(repair.diagnosis ?? '')
+    setIsPricingUnlocked(false)
     if (repair.expectedCompletionDate) {
       const dateObj = new Date(repair.expectedCompletionDate)
       if (!isNaN(dateObj.getTime())) {
@@ -621,7 +623,13 @@ export function RepairDetails({ id }: { id: string }) {
         repairId={id}
         parts={repair.parts ?? []}
         canEdit={canRecordParts}
-        lockedReason={hasIssuedInvoice ? PRICING_MESSAGES.invoiceIssued : null}
+        lockedReason={
+          hasIssuedInvoice
+            ? PRICING_MESSAGES.invoiceIssued
+            : pricingPanelMode === 'finalize' && !isPricingUnlocked
+              ? PRICING_MESSAGES.partsLockedUntilUnlock
+              : null
+        }
       />
 
       {pricingPanelMode !== 'hidden' ? (
@@ -635,6 +643,7 @@ export function RepairDetails({ id }: { id: string }) {
           estimatedTotal={repair.estimatedTotal ?? null}
           finalTotal={repair.finalTotal ?? null}
           isInvoiced={hasIssuedInvoice}
+          onUnlockedChange={setIsPricingUnlocked}
         />
       ) : null}
 

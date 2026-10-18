@@ -81,7 +81,8 @@ export function mapRepairPhotosPayload(
           id: row.id,
           type: row.type,
           publicId: row.cloudinaryPublicId,
-          url: cloudinaryPublicUrl(row.cloudinaryPublicId),
+          // Version from updatedAt so replace/re-upload after delete does not serve a cached prior image.
+          url: cloudinaryPublicUrl(row.cloudinaryPublicId, row.updatedAt),
           uploadedBy: row.uploadedBy,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
@@ -271,7 +272,7 @@ export async function getPublicRepairPhotos(shopId: string, repairId: string, st
   if (!visible || !before || !after) return null
 
   return {
-    beforeUrl: cloudinaryPublicUrl(before.cloudinaryPublicId),
-    afterUrl: cloudinaryPublicUrl(after.cloudinaryPublicId),
+    beforeUrl: cloudinaryPublicUrl(before.cloudinaryPublicId, before.updatedAt),
+    afterUrl: cloudinaryPublicUrl(after.cloudinaryPublicId, after.updatedAt),
   }
 }

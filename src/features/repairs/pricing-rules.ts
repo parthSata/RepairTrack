@@ -41,6 +41,8 @@ export const PRICING_MESSAGES = {
     'The customer already approved this estimate. Staff or owner can change it now.',
   invoiceIssued:
     'An invoice has been issued for this repair. Cancel the invoice to change charges or parts.',
+  partsLockedUntilUnlock:
+    'Unlock to edit on the estimate to add or remove parts. The total stays as saved until then.',
 } as const
 
 const CLOSED_STATUSES = new Set(['COMPLETED', 'CANCELLED'])

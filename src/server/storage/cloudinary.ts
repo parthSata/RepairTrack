@@ -40,8 +40,15 @@ export function createRepairPhotoUploadData(shopId: string, repairId: string, ty
   const { cloudName, apiKey, apiSecret, presetKey } = configureCloudinary()
   const timestamp = Math.floor(Date.now() / 1000)
   const publicId = repairPhotoPublicId(shopId, repairId, type)
+  // overwrite + invalidate so a replace clears the previous CDN object at this public_id
   const signature = cloudinary.utils.api_sign_request(
-    { public_id: publicId, timestamp, upload_preset: presetKey, overwrite: true },
+    {
+      public_id: publicId,
+      timestamp,
+      upload_preset: presetKey,
+      overwrite: true,
+      invalidate: true,
+    },
     apiSecret,
   )
   return {
@@ -52,6 +59,7 @@ export function createRepairPhotoUploadData(shopId: string, repairId: string, ty
     apiKey,
     presetKey,
     overwrite: true as const,
+    invalidate: true as const,
   }
 }
 
@@ -60,14 +68,27 @@ export async function deleteObject(publicId: string) {
   await cloudinary.uploader.destroy(publicId, { invalidate: true, resource_type: 'image' })
 }
 
-export function logoPublicUrl(publicId: string) {
-  const { cloudName } = configureCloudinary()
-  return `https://res.cloudinary.com/${cloudName}/image/upload/${publicId}`
+function toCloudinaryVersion(cacheVersion?: Date | string | number | null): string {
+  if (cacheVersion == null || cacheVersion === '') return ''
+  const ms =
+    typeof cacheVersion === 'number'
+      ? cacheVersion
+      : cacheVersion instanceof Date
+        ? cacheVersion.getTime()
+        : Date.parse(String(cacheVersion))
+  if (!Number.isFinite(ms) || ms <= 0) return ''
+  // Cloudinary version segment busts CDN/browser cache when the same public_id is overwritten.
+  return `v${Math.floor(ms / 1000)}/`
 }
 
-/** CDN URL for any stored public_id (logo or repair photo). */
-export function cloudinaryPublicUrl(publicId: string) {
-  return logoPublicUrl(publicId)
+export function logoPublicUrl(publicId: string, cacheVersion?: Date | string | number | null) {
+  const { cloudName } = configureCloudinary()
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${toCloudinaryVersion(cacheVersion)}${publicId}`
+}
+
+/** CDN URL for any stored public_id (logo or repair photo). Pass updatedAt when overwriting a stable id. */
+export function cloudinaryPublicUrl(publicId: string, cacheVersion?: Date | string | number | null) {
+  return logoPublicUrl(publicId, cacheVersion)
 }
 
 export { MAX_UPLOAD_SIZE }

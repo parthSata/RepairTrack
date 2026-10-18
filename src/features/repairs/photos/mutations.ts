@@ -21,6 +21,7 @@ type UploadUrlResponse = {
   apiKey: string
   presetKey: string
   overwrite: true
+  invalidate?: true
 }
 
 function photoErrorMessage(error: unknown, fallback: string) {
@@ -65,9 +66,12 @@ export function useDeleteRepairPhoto(repairId: string) {
     mutationFn: async (type) =>
       (await apiClient.delete<RepairPhotosPayload>(`/repairs/${repairId}/photos/${type}`)).data,
     onSuccess: (payload) => {
+      queryClient.setQueryData(repairKeys.detail(repairId), (prev: unknown) => {
+        if (!prev || typeof prev !== 'object') return prev
+        return { ...prev, photos: payload, customerPhotosHidden: payload.customerPhotosHidden }
+      })
       queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
       toast.success('Photo deleted')
-      return payload
     },
     onError: (error) => toast.error(photoErrorMessage(error, 'Failed to delete photo')),
   })

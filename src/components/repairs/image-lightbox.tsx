@@ -60,6 +60,7 @@ export function ImageLightbox({ open, src, alt, onClose }: Props) {
         </button>
         <div className="relative flex max-h-[80vh] min-h-[200px] items-center justify-center bg-muted/30 p-4 sm:p-6">
           <Image
+            key={src}
             src={src}
             alt={alt}
             width={1200}

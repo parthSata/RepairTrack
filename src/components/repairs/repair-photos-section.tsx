@@ -52,19 +52,21 @@ function RepairPhotoSlot({
   const confirmUpload = useConfirmRepairPhoto(repairId)
   const deletePhoto = useDeleteRepairPhoto(repairId)
   const [progress, setProgress] = useState(0)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
 
-  const uploading =
-    requestUpload.isPending || confirmUpload.isPending || (progress > 0 && progress < 100)
+  const uploadLocked = busy || uploading
 
   async function selectFile(file: File | undefined) {
-    if (!file || !canMutate) return
+    if (!file || !canMutate || uploadLocked) return
     setError(null)
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
       setError('Choose a JPEG, PNG, or WebP image up to 5MB.')
       return
     }
+    setUploading(true)
+    setProgress(0)
     try {
       const data = await requestUpload.mutateAsync({
         type,
@@ -79,15 +81,18 @@ function RepairPhotoSlot({
       body.append('upload_preset', data.presetKey)
       body.append('public_id', data.publicId)
       body.append('overwrite', 'true')
+      body.append('invalidate', 'true')
       await apiClient.post(data.uploadUrl, body, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (event) =>
           setProgress(event.progress ? Math.round(event.progress * 100) : 0),
       })
+      setProgress(100)
       await confirmUpload.mutateAsync({ type, publicId: data.publicId })
-      setProgress(0)
     } catch {
       setError('Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
       setProgress(0)
     }
   }
@@ -100,23 +105,26 @@ function RepairPhotoSlot({
 
       <button
         type="button"
-        disabled={!photo && !canMutate}
+        disabled={(!photo && !canMutate) || uploadLocked}
         onClick={() => {
+          if (uploading) return
           if (photo) {
             setLightboxOpen(true)
-          } else if (canMutate && !busy && !uploading) {
+          } else if (canMutate && !uploadLocked) {
             inputRef.current?.click()
           }
         }}
         className={cn(
           'group relative flex h-40 sm:h-44 w-full items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/20 transition',
-          photo && 'cursor-zoom-in border-solid hover:ring-2 hover:ring-accent/40',
-          !photo && canMutate && 'cursor-pointer hover:border-accent/60 hover:bg-accent/5',
+          photo && !uploading && 'cursor-zoom-in border-solid hover:ring-2 hover:ring-accent/40',
+          !photo && canMutate && !uploadLocked && 'cursor-pointer hover:border-accent/60 hover:bg-accent/5',
+          uploadLocked && 'cursor-not-allowed opacity-90',
         )}
       >
         {photo ? (
           <div className="relative h-full w-full">
             <Image
+              key={photo.url}
               src={photo.url}
               alt={label}
               fill
@@ -124,12 +132,14 @@ function RepairPhotoSlot({
               className="object-cover transition-transform duration-200 group-hover:scale-[1.02]"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-              <span className="flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">
-                <Eye className="h-3.5 w-3.5" />
-                View full size
-              </span>
-            </div>
+            {!uploading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/35 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                <span className="flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">
+                  <Eye className="h-3.5 w-3.5" />
+                  View full size
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center px-4 text-center">
@@ -139,11 +149,23 @@ function RepairPhotoSlot({
             <p className="mt-2 text-xs font-medium text-foreground">
               No {label.toLowerCase()} photo yet
             </p>
-            {canMutate && (
+            {canMutate && !uploading && (
               <p className="mt-0.5 text-[11px] text-muted-foreground">
                 Click or use button to upload
               </p>
             )}
+          </div>
+        )}
+        {uploading && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/70 backdrop-blur-[1px]"
+            aria-live="polite"
+            aria-busy="true"
+          >
+            <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
+            <p className="text-xs font-medium text-foreground">
+              {progress > 0 && progress < 100 ? `Uploading ${progress}%` : 'Uploading…'}
+            </p>
           </div>
         )}
       </button>
@@ -174,7 +196,7 @@ function RepairPhotoSlot({
               variant="outline"
               size="sm"
               className="h-8 gap-1.5 text-xs"
-              disabled={busy || uploading}
+              disabled={uploadLocked}
               onClick={() => inputRef.current?.click()}
             >
               {uploading ? (
@@ -182,7 +204,7 @@ function RepairPhotoSlot({
               ) : (
                 <Upload className="h-3.5 w-3.5" />
               )}
-              {photo ? 'Replace' : 'Upload'}
+              {uploading ? 'Uploading…' : photo ? 'Replace' : 'Upload'}
             </Button>
           )}
           {photo && (
@@ -191,6 +213,7 @@ function RepairPhotoSlot({
               variant="ghost"
               size="sm"
               className="h-8 gap-1.5 text-xs"
+              disabled={uploading}
               onClick={() => setLightboxOpen(true)}
             >
               <Eye className="h-3.5 w-3.5" />
@@ -204,7 +227,7 @@ function RepairPhotoSlot({
             variant="ghost"
             size="sm"
             className="h-8 gap-1.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-            disabled={busy || uploading || deletePhoto.isPending}
+            disabled={uploadLocked || deletePhoto.isPending}
             onClick={() => deletePhoto.mutate(type)}
           >
             <Trash2 className="h-3.5 w-3.5" />
@@ -218,6 +241,7 @@ function RepairPhotoSlot({
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="sr-only"
+        disabled={uploadLocked || !canMutate}
         onChange={(event) => {
           void selectFile(event.target.files?.[0])
           event.target.value = ''
