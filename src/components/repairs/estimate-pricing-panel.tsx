@@ -95,7 +95,9 @@ export function EstimatePricingPanel({
 
   React.useEffect(() => {
     if (mode !== 'finalize' && isUnlocked) {
-      setUnlocked(false)
+      queueMicrotask(() => {
+        setUnlocked(false)
+      })
     }
   }, [mode, isUnlocked, setUnlocked])
 
