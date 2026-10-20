@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -32,9 +33,14 @@ export function TrackPageShell({
       href="/track"
       className="mb-5 flex w-full min-w-0 items-center justify-center gap-3 text-lg font-semibold tracking-tight sm:mb-6 sm:text-xl"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-bold text-accent-foreground">
-        RT
-      </span>
+      <Image
+        src="/icon.png"
+        alt="RepairTrack"
+        width={36}
+        height={36}
+        className="h-9 w-9 shrink-0 object-contain"
+        priority
+      />
       <span className="truncate">RepairTrack</span>
     </Link>
   )
