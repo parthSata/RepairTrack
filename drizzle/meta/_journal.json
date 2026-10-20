@@ -239,6 +239,13 @@
       "when": 1791968545486,
       "tag": "0033_calm_rogue",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1792514194254,
+      "tag": "0034_tiresome_omega_sentinel",
+      "breakpoints": true
     }
   ]
 }
