@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -79,9 +80,7 @@ export function MobileNav({ role }: { role: string }) {
           >
             <div className="flex items-center justify-between border-b border-border pb-5">
               <div className="flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-xs font-bold text-accent-foreground">
-                  RT
-                </span>
+                <Image src="/icon.png" alt="RepairTrack" width={32} height={32} className="h-8 w-8 object-contain" />
                 <span className="font-semibold">RepairTrack</span>
               </div>
               <Button

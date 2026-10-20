@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Image from 'next/image'
 import { Bell } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
@@ -25,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     <div className="flex min-h-screen bg-background print:block print:min-h-0 print:bg-white">
       <aside className="hidden w-64 shrink-0 border-r border-border bg-card md:block print:hidden">
         <div className="flex h-16 items-center gap-3 border-b border-border px-6">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-accent text-xs font-bold text-accent-foreground">RT</span>
+          <Image src="/icon.png" alt="RepairTrack" width={32} height={32} className="h-8 w-8 object-contain" priority />
           <span className="font-semibold tracking-tight">RepairTrack</span>
         </div>
         <SidebarNav role={role} />
