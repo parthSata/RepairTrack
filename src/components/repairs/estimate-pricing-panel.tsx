@@ -30,6 +30,8 @@ type EstimatePricingPanelProps = {
   estimatedTotal: number | null
   finalTotal: number | null
   isInvoiced?: boolean
+  /** Called when finalize-mode unlock state changes so sibling sections (parts) can stay in sync. */
+  onUnlockedChange?: (unlocked: boolean) => void
 }
 
 function getPricingState(isFinalized: boolean, approvalStatus: ApprovalStatus | null): PricingState | null {
@@ -76,11 +78,28 @@ export function EstimatePricingPanel({
   estimatedTotal,
   finalTotal,
   isInvoiced = false,
+  onUnlockedChange,
 }: EstimatePricingPanelProps) {
   const pricing = usePricingForm({ parts, saved: { laborCharges, additionalCharges, taxPercent } })
   const saveMutation = useUpdateEstimate(repairId)
   const finalizeMutation = useConfirmFinalTotal(repairId)
   const [isUnlocked, setIsUnlocked] = React.useState(false)
+
+  const setUnlocked = React.useCallback(
+    (unlocked: boolean) => {
+      setIsUnlocked(unlocked)
+      onUnlockedChange?.(unlocked)
+    },
+    [onUnlockedChange],
+  )
+
+  React.useEffect(() => {
+    if (mode !== 'finalize' && isUnlocked) {
+      queueMicrotask(() => {
+        setUnlocked(false)
+      })
+    }
+  }, [mode, isUnlocked, setUnlocked])
 
   const isFinalized = finalTotal != null
   const isEditing = mode === 'editEstimate' || (mode === 'finalize' && isUnlocked)
@@ -88,6 +107,7 @@ export function EstimatePricingPanel({
   const { isDirty, isValid } = pricing.form.formState
   const canSubmit = mode === 'finalize' ? isValid : isDirty && isValid
 
+  // When locked, show the saved total as-is so line items stay consistent with the stored bill.
   const storedTotal = isFinalized ? finalTotal : estimatedTotal
   const viewTotals =
     pricing.savedTotals && storedTotal != null
@@ -100,13 +120,13 @@ export function EstimatePricingPanel({
 
   const handleCancel = () => {
     pricing.resetToSaved()
-    setIsUnlocked(false)
+    setUnlocked(false)
   }
 
   const onSubmit = pricing.form.handleSubmit(async (values) => {
     try {
       await activeMutation.mutateAsync(values)
-      setIsUnlocked(false)
+      setUnlocked(false)
     } catch {
       // Toast + 409 resync are handled by the mutation; keep the form open with the user's input.
     }
@@ -165,7 +185,7 @@ export function EstimatePricingPanel({
               isFinalized={isFinalized}
               isPending={activeMutation.isPending}
               canSubmit={canSubmit}
-              onUnlock={() => setIsUnlocked(true)}
+              onUnlock={() => setUnlocked(true)}
               onCancel={handleCancel}
             />
           )}

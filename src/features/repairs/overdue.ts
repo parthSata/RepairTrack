@@ -17,6 +17,14 @@ export function formatDateInputValue(now = new Date()): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
+/** Converts an ISO timestamp to a `YYYY-MM-DD` value for `<input type="date">`. */
+export function toDateInputValue(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const dateObj = new Date(iso)
+  if (Number.isNaN(dateObj.getTime())) return ''
+  return formatDateInputValue(dateObj)
+}
+
 export function isExpectedCompletionDateInPast(
   expectedCompletionDate: string | null | undefined,
   now = new Date(),
