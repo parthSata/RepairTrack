@@ -21,9 +21,9 @@ const STATE_COOKIE_OPTIONS = {
   path: '/api/settings/gmail',
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
-  sameSite: 'Lax',
+  sameSite: 'Lax' as const,
   maxAge: 10 * 60,
-} as const
+}
 
 const gmailRouter = new Hono()
 
@@ -34,6 +34,18 @@ function getStateSecret() {
   const secret = process.env.BETTER_AUTH_SECRET
   if (!secret) throw new Error('BETTER_AUTH_SECRET is not set')
   return secret
+}
+
+/** Signed cookie payload: `<nonce>.<shopId>` (nonce is base64url; shopId is a UUID). */
+function encodeStateCookie(nonce: string, shopId: string) {
+  return `${nonce}.${shopId}`
+}
+
+function decodeStateCookie(value: string | undefined | false): { nonce: string; shopId: string } | null {
+  if (!value) return null
+  const separator = value.indexOf('.')
+  if (separator <= 0 || separator === value.length - 1) return null
+  return { nonce: value.slice(0, separator), shopId: value.slice(separator + 1) }
 }
 
 const redirectToSettings = (c: Context, result: GmailCallbackResult) =>
@@ -62,10 +74,16 @@ gmailRouter.get('/', async (c) => {
 
 gmailRouter.get('/connect', (c) =>
   redirectOnError(c, async () => {
-    await requireOwner(c.req.raw)
-    const state = randomBytes(32).toString('base64url')
-    const authUrl = buildGmailAuthUrl(state)
-    await setSignedCookie(c, STATE_COOKIE, state, getStateSecret(), STATE_COOKIE_OPTIONS)
+    const { shopId } = await requireOwner(c.req.raw)
+    const nonce = randomBytes(32).toString('base64url')
+    const authUrl = buildGmailAuthUrl(nonce)
+    await setSignedCookie(
+      c,
+      STATE_COOKIE,
+      encodeStateCookie(nonce, shopId),
+      getStateSecret(),
+      STATE_COOKIE_OPTIONS,
+    )
     return c.redirect(authUrl)
   }),
 )
@@ -77,16 +95,17 @@ gmailRouter.get(
   }),
   (c) =>
     redirectOnError(c, async () => {
-      const { shopId } = await requireOwner(c.req.raw)
+      // Owner was verified on /connect; shopId is bound into the signed state cookie so the
+      // callback still works if the session cookie is missing after the Google redirect.
       const { code, state, error } = c.req.valid('query')
-      const expectedState = await getSignedCookie(c, getStateSecret(), STATE_COOKIE)
+      const expected = decodeStateCookie(await getSignedCookie(c, getStateSecret(), STATE_COOKIE))
       deleteCookie(c, STATE_COOKIE, { path: STATE_COOKIE_OPTIONS.path })
 
       if (error) return redirectToSettings(c, 'denied')
-      if (!code || !state || !expectedState || state !== expectedState) {
+      if (!code || !state || !expected || state !== expected.nonce) {
         throw new Error('Gmail OAuth state mismatch')
       }
-      return redirectToSettings(c, await connectGmail(shopId, code))
+      return redirectToSettings(c, await connectGmail(expected.shopId, code))
     }),
 )
 

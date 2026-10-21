@@ -40,3 +40,4 @@ coverage/
 context/progress-tracker.md
 progress-tracker.md
 
+.env*
