@@ -249,11 +249,9 @@ export function PartTable() {
             placeholder="Name or SKU…"
             className="min-w-0"
           />
-          {data ? (
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {data.total} {data.total === 1 ? 'Part' : 'Parts'}
-            </span>
-          ) : null}
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+            {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Part' : 'Parts'}
+          </span>
         </div>
         <Button
           variant="accent"

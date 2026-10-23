@@ -205,22 +205,19 @@ export function PaymentTable() {
         </div>
       </div>
 
-      {/* Filtered Total Banner */}
-      {data ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2.5 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Filtered Total:
-            </span>
-            <span className="text-base font-bold tabular-nums text-foreground">
-              {formatRupees(data.totalAmount)}
-            </span>
-          </div>
-          <span className="text-xs font-medium text-muted-foreground">
-            {data.total} {data.total === 1 ? 'payment recorded' : 'payments recorded'}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-2.5 shadow-2xs">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Filtered Total:
+          </span>
+          <span className="text-base font-bold tabular-nums text-foreground">
+            {formatRupees(data?.totalAmount ?? 0)}
           </span>
         </div>
-      ) : null}
+        <span className="text-xs font-medium text-muted-foreground tabular-nums">
+          {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'payment recorded' : 'payments recorded'}
+        </span>
+      </div>
 
       {/* Error or Table */}
       {isError ? (

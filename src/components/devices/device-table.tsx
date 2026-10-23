@@ -201,11 +201,9 @@ export function DeviceTable() {
             ]}
           />
 
-          {data && (
-            <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {data.total} {data.total === 1 ? 'Device' : 'Devices'}
-            </span>
-          )}
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+            {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Device' : 'Devices'}
+          </span>
         </div>
 
         <Button variant="accent" className="w-full shrink-0 gap-2 sm:w-auto" onClick={() => setCreateOpen(true)}>

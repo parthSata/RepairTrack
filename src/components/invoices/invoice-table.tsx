@@ -125,11 +125,9 @@ export function InvoiceTable() {
           onChange={handleSearchChange}
           placeholder="Search by invoice #, customer name or phone…"
         />
-        {data ? (
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {data.total} {data.total === 1 ? 'Invoice' : 'Invoices'}
-          </span>
-        ) : null}
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+          {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Invoice' : 'Invoices'}
+        </span>
       </div>
 
       {isError ? (

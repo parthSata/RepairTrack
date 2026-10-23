@@ -158,11 +158,9 @@ export function CustomerTable() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <CustomerSearchBar value={filters.search ?? ''} onChange={handleSearchChange} />
-          {data && (
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {data.total} {data.total === 1 ? 'Customer' : 'Customers'}
-            </span>
-          )}
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+            {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Customer' : 'Customers'}
+          </span>
         </div>
         <Button variant="accent" className="gap-2 shrink-0" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" />
