@@ -2,13 +2,14 @@
 
 import * as React from 'react'
 import { ColumnDef } from '@tanstack/react-table'
-import { Check, Copy, Search, ShieldAlert, UserCheck, UserX, Users, X } from 'lucide-react'
+import { Check, Copy, ShieldAlert, UserCheck, UserX, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/data-table/data-table'
-import { Input } from '@/components/ui/input'
+import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import {
   useChangeStaffRole,
   useResumeAssignments,
@@ -288,16 +289,6 @@ export function StaffListStub() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Team Members</h2>
-          <p className="text-sm text-muted-foreground">
-            Manage your shop staff and technician access permissions.
-          </p>
-        </div>
-        <AddStaffDialog />
-      </div>
-
       {resumeBanners.map((banner) => (
         <div
           key={banner.memberId}
@@ -334,50 +325,32 @@ export function StaffListStub() {
       ))}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center rounded-lg border border-border bg-card p-1">
-          <button
-            type="button"
-            onClick={() => setRoleFilter('ALL')}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              roleFilter === 'ALL'
-                ? 'bg-accent text-accent-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <DebouncedSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Name or email…"
+            className="w-full max-w-none sm:w-64 sm:shrink-0"
+          />
+
+          <ListFilterSelect
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as 'ALL' | 'STAFF' | 'TECHNICIAN')}
+            aria-label="Filter by role"
+            className="w-full sm:w-48 sm:shrink-0"
           >
-            All Team ({staffList.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setRoleFilter('STAFF')}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              roleFilter === 'STAFF'
-                ? 'bg-accent text-accent-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Staff ({staffList.filter((m) => m.role === 'STAFF').length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setRoleFilter('TECHNICIAN')}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              roleFilter === 'TECHNICIAN'
-                ? 'bg-accent text-accent-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Technicians ({staffList.filter((m) => m.role === 'TECHNICIAN').length})
-          </button>
+            <option value="ALL">All Team ({staffList.length})</option>
+            <option value="STAFF">
+              Staff ({staffList.filter((m) => m.role === 'STAFF').length})
+            </option>
+            <option value="TECHNICIAN">
+              Technicians ({staffList.filter((m) => m.role === 'TECHNICIAN').length})
+            </option>
+          </ListFilterSelect>
         </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 text-xs"
-          />
+        <div className="shrink-0 sm:self-auto">
+          <AddStaffDialog />
         </div>
       </div>
 

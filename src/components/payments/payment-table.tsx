@@ -10,14 +10,8 @@ import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { Input } from '@/components/ui/input'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { QueryErrorState } from '@/components/ui/query-error-state'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { usePayments, type PaymentListItem } from '@/features/payments/queries'
 import {
@@ -159,26 +153,24 @@ export function PaymentTable() {
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
-            placeholder="Search by ticket #, customer name or phone…"
+            placeholder="Ticket #, customer, phone…"
             debounceMs={250}
-            className="w-full sm:max-w-xs"
+            className="min-w-0"
           />
 
-          <div className="w-full sm:w-44">
-            <Select value={filters.method ?? 'ALL'} onValueChange={handleMethodChange}>
-              <SelectTrigger aria-label="Filter by payment method">
-                <SelectValue placeholder="All methods" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All methods</SelectItem>
-                {PAYMENT_FILTER_METHODS.map((m) => (
-                  <SelectItem key={m} value={m}>
-                    {PAYMENT_METHOD_LABELS[m]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <ListFilterSelect
+            value={filters.method ?? 'ALL'}
+            onChange={(e) => handleMethodChange(e.target.value)}
+            aria-label="Filter by payment method"
+            className="sm:w-44"
+          >
+            <option value="ALL">All methods</option>
+            {PAYMENT_FILTER_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {PAYMENT_METHOD_LABELS[m]}
+              </option>
+            ))}
+          </ListFilterSelect>
 
           <div className="flex items-center gap-2">
             <Input
