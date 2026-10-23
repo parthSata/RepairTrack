@@ -22,7 +22,7 @@ type ShopTimeSelectProps = {
 export function ShopTimeSelect({ id, value, onValueChange, 'aria-label': ariaLabel }: ShopTimeSelectProps) {
   return (
     <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger id={id} aria-label={ariaLabel} className="h-11 bg-background font-semibold">
+      <SelectTrigger id={id} aria-label={ariaLabel} className="h-10 bg-background font-semibold">
         <SelectValue placeholder="Select time" />
       </SelectTrigger>
       <SelectContent className="max-h-64">
