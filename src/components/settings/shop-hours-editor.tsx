@@ -3,10 +3,9 @@
 import { Plus, Trash2 } from 'lucide-react'
 import {
   type FieldErrors,
-      type UseFormSetValue,
+  type UseFormSetValue,
 } from 'react-hook-form'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import {
   BUSINESS_HOUR_DAYS,
   type BusinessHourDay,
@@ -27,6 +26,10 @@ const DAY_LABELS: Record<BusinessHourDay, string> = {
 
 const DEFAULT_INTERVAL = { from: '10:00', to: '19:00' }
 type BusinessHoursErrors = FieldErrors<ShopProfile>['businessHours']
+
+/** Shared day-row track: day | open/closed | from | to | closing | actions */
+const DAY_ROW_GRID =
+  'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 md:grid-cols-[7rem_5.75rem_minmax(0,1fr)_auto_minmax(0,1fr)_2.75rem]'
 
 function FieldError({ message }: { message?: string }) {
   return message ? <p className="animate-in fade-in text-sm text-destructive">{message}</p> : null
@@ -122,93 +125,105 @@ function HoursDayRow({
     )
   }
 
-  return (
-    <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-6">
-      <div className="flex min-w-0 items-center justify-between gap-3 lg:w-36 lg:shrink-0">
-        <p className="font-semibold text-foreground">{DAY_LABELS[day]}</p>
-        <Button
-          type="button"
-          variant={hours.open ? 'accent' : 'outline'}
-          size="sm"
-          aria-pressed={hours.open}
-          onClick={onToggle}
-        >
-          {hours.open ? 'Open' : 'Closed'}
-        </Button>
+  const openToggle = (
+    <Button
+      type="button"
+      variant={hours.open ? 'accent' : 'outline'}
+      size="sm"
+      className="h-10 shrink-0"
+      aria-pressed={hours.open}
+      onClick={onToggle}
+    >
+      {hours.open ? 'Open' : 'Closed'}
+    </Button>
+  )
+
+  if (!hours.open) {
+    return (
+      <div className={`${DAY_ROW_GRID} p-4 sm:p-5`}>
+        <p className="min-w-0 font-semibold text-foreground">{DAY_LABELS[day]}</p>
+        {openToggle}
+        <p className="col-span-2 text-sm text-muted-foreground md:col-span-4">
+          Customers cannot visit on this day.
+        </p>
       </div>
-      {hours.open ? (
-        <div className="min-w-0 flex-1 space-y-3">
-          {hours.intervals.map((_, index) => (
-            <div
-              key={`${day}-${index}`}
-              className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end"
-            >
-              <div className="min-w-0 flex-1 space-y-1">
-                <Label
-                  htmlFor={`${day}-${index}-from`}
-                  className="text-xs text-muted-foreground"
-                >
-                  Opening time
-                </Label>
-                <ShopTimeSelect
-                  id={`${day}-${index}-from`}
-                  value={hours.intervals[index]?.from ?? ''}
-                  onValueChange={(value) =>
-                    setValue(`businessHours.${day}.intervals.${index}.from`, value, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                  aria-label={`${DAY_LABELS[day]} opening time`}
-                />
-              </div>
-              <span className="hidden pb-2 text-muted-foreground sm:block">to</span>
-              <div className="min-w-0 flex-1 space-y-1">
-                <Label htmlFor={`${day}-${index}-to`} className="text-xs text-muted-foreground">
-                  Closing time
-                </Label>
-                <ShopTimeSelect
-                  id={`${day}-${index}-to`}
-                  value={hours.intervals[index]?.to ?? ''}
-                  onValueChange={(value) =>
-                    setValue(`businessHours.${day}.intervals.${index}.to`, value, {
-                      shouldDirty: true,
-                      shouldValidate: true,
-                    })
-                  }
-                  aria-label={`${DAY_LABELS[day]} closing time`}
-                />
-              </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3 p-4 sm:p-5">
+      {hours.intervals.map((_, index) => (
+        <div key={`${day}-${index}`} className={DAY_ROW_GRID}>
+          {index === 0 ? (
+            <>
+              <p className="min-w-0 font-semibold text-foreground">{DAY_LABELS[day]}</p>
+              {openToggle}
+            </>
+          ) : (
+            <>
+              <span className="hidden md:block" aria-hidden />
+              <span className="hidden md:block" aria-hidden />
+            </>
+          )}
+
+          {/* Mobile: keep from / to / actions on one wrapping row via contents on md */}
+          <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-4 md:contents">
+            <div className="min-w-0 flex-1 md:min-w-0">
+              <ShopTimeSelect
+                id={`${day}-${index}-from`}
+                value={hours.intervals[index]?.from ?? ''}
+                onValueChange={(value) =>
+                  setValue(`businessHours.${day}.intervals.${index}.from`, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                aria-label={`${DAY_LABELS[day]} opening time`}
+              />
+            </div>
+            <span className="shrink-0 text-sm text-muted-foreground">to</span>
+            <div className="min-w-0 flex-1 md:min-w-0">
+              <ShopTimeSelect
+                id={`${day}-${index}-to`}
+                value={hours.intervals[index]?.to ?? ''}
+                onValueChange={(value) =>
+                  setValue(`businessHours.${day}.intervals.${index}.to`, value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+                aria-label={`${DAY_LABELS[day]} closing time`}
+              />
+            </div>
+            <div className="flex h-10 w-9 shrink-0 items-center justify-center">
               {hours.intervals.length > 1 ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
+                  className="h-10 w-9"
                   aria-label={`Remove ${DAY_LABELS[day]} interval ${index + 1}`}
                   onClick={() => removeInterval(index)}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-9 text-accent hover:text-accent/80"
+                  aria-label={`Add another time for ${DAY_LABELS[day]}`}
+                  onClick={addInterval}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
             </div>
-          ))}
-          {hours.intervals.length < 2 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="gap-1 px-0 text-accent hover:bg-transparent hover:text-accent/80"
-              onClick={addInterval}
-            >
-              <Plus className="h-4 w-4" />
-              Add another time
-            </Button>
-          ) : null}
-          <FieldError message={error?.intervals?.message} />
+          </div>
         </div>
-      ) : (
-        <p className="text-sm text-muted-foreground">Customers cannot visit on this day.</p>
-      )}
+      ))}
+      <FieldError message={error?.intervals?.message} />
     </div>
   )
 }
