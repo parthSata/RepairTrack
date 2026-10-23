@@ -335,18 +335,21 @@ export function StaffListStub() {
 
           <ListFilterSelect
             value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as 'ALL' | 'STAFF' | 'TECHNICIAN')}
+            onValueChange={(value) => setRoleFilter(value as 'ALL' | 'STAFF' | 'TECHNICIAN')}
             aria-label="Filter by role"
             className="w-full sm:w-48 sm:shrink-0"
-          >
-            <option value="ALL">All Team ({staffList.length})</option>
-            <option value="STAFF">
-              Staff ({staffList.filter((m) => m.role === 'STAFF').length})
-            </option>
-            <option value="TECHNICIAN">
-              Technicians ({staffList.filter((m) => m.role === 'TECHNICIAN').length})
-            </option>
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: `All Team (${staffList.length})` },
+              {
+                value: 'STAFF',
+                label: `Staff (${staffList.filter((m) => m.role === 'STAFF').length})`,
+              },
+              {
+                value: 'TECHNICIAN',
+                label: `Technicians (${staffList.filter((m) => m.role === 'TECHNICIAN').length})`,
+              },
+            ]}
+          />
         </div>
 
         <div className="shrink-0 sm:self-auto">

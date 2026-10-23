@@ -250,70 +250,73 @@ export function RepairList() {
           />
 
           <ListFilterSelect
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value)
+            value={status || 'ALL'}
+            onValueChange={(value) => {
+              setStatus(value === 'ALL' ? '' : value)
               setPage(1)
             }}
             aria-label="Filter by status"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">Active (In Progress)</option>
-            <option value="RECEIVED">Received</option>
-            <option value="DIAGNOSING">Diagnosing</option>
-            <option value="WAITING_FOR_APPROVAL">Waiting for Approval</option>
-            <option value="APPROVED">Approved</option>
-            <option value="WAITING_FOR_PARTS">Waiting for Parts</option>
-            <option value="IN_REPAIR">In Repair</option>
-            <option value="QUALITY_CHECK">Quality Check</option>
-            <option value="READY_FOR_PICKUP">Ready for Pickup</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: 'All Statuses' },
+              { value: 'ACTIVE', label: 'Active (In Progress)' },
+              { value: 'RECEIVED', label: 'Received' },
+              { value: 'DIAGNOSING', label: 'Diagnosing' },
+              { value: 'WAITING_FOR_APPROVAL', label: 'Waiting for Approval' },
+              { value: 'APPROVED', label: 'Approved' },
+              { value: 'WAITING_FOR_PARTS', label: 'Waiting for Parts' },
+              { value: 'IN_REPAIR', label: 'In Repair' },
+              { value: 'QUALITY_CHECK', label: 'Quality Check' },
+              { value: 'READY_FOR_PICKUP', label: 'Ready for Pickup' },
+              { value: 'COMPLETED', label: 'Completed' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ]}
+          />
 
           <ListFilterSelect
-            value={priority}
-            onChange={(e) => {
-              setPriority(e.target.value)
+            value={priority || 'ALL'}
+            onValueChange={(value) => {
+              setPriority(value === 'ALL' ? '' : value)
               setPage(1)
             }}
             aria-label="Filter by priority"
-          >
-            <option value="">All Priorities</option>
-            <option value="LOW">Low</option>
-            <option value="MEDIUM">Medium</option>
-            <option value="HIGH">High</option>
-            <option value="URGENT">Urgent</option>
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: 'All Priorities' },
+              { value: 'LOW', label: 'Low' },
+              { value: 'MEDIUM', label: 'Medium' },
+              { value: 'HIGH', label: 'High' },
+              { value: 'URGENT', label: 'Urgent' },
+            ]}
+          />
 
           <ListFilterSelect
-            value={overdue}
-            onChange={(e) => {
-              setOverdue(e.target.value)
+            value={overdue || 'ALL'}
+            onValueChange={(value) => {
+              setOverdue(value === 'ALL' ? '' : value)
               setPage(1)
             }}
             aria-label="Filter by deadline"
-          >
-            <option value="">All Deadlines</option>
-            <option value="true">Overdue Only</option>
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: 'All Deadlines' },
+              { value: 'true', label: 'Overdue Only' },
+            ]}
+          />
 
           {userRole !== 'TECHNICIAN' && (
             <ListFilterSelect
-              value={technicianId}
-              onChange={(e) => {
-                setTechnicianId(e.target.value)
+              value={technicianId || 'ALL'}
+              onValueChange={(value) => {
+                setTechnicianId(value === 'ALL' ? '' : value)
                 setPage(1)
               }}
               aria-label="Filter by technician"
-            >
-              <option value="">All Technicians</option>
-              {technicians?.map((tech) => (
-                <option key={tech.id} value={tech.id}>
-                  {tech.name}
-                </option>
-              ))}
-            </ListFilterSelect>
+              options={[
+                { value: 'ALL', label: 'All Technicians' },
+                ...(technicians?.map((tech) => ({
+                  value: tech.id,
+                  label: tech.name,
+                })) ?? []),
+              ]}
+            />
           )}
 
           {/* Reset Filters */}
@@ -573,13 +576,13 @@ export function RepairList() {
                 size="sm"
                 disabled={pagination.page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="h-8 gap-1 px-2.5 font-medium"
+                className="h-8 gap-1 px-2.5 font-medium leading-none"
               >
-                <ChevronLeft className="h-3.5 w-3.5" />
+                <ChevronLeft className="size-3.5 shrink-0" aria-hidden />
                 Previous
               </Button>
 
-              <span className="font-semibold text-foreground px-1.5">
+              <span className="px-1.5 font-semibold text-foreground">
                 Page {pagination.page} of {pagination.totalPages}
               </span>
 
@@ -588,10 +591,10 @@ export function RepairList() {
                 size="sm"
                 disabled={pagination.page >= pagination.totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-8 gap-1 px-2.5 font-medium"
+                className="h-8 gap-1 px-2.5 font-medium leading-none"
               >
                 Next
-                <ChevronRight className="h-3.5 w-3.5" />
+                <ChevronRight className="size-3.5 shrink-0" aria-hidden />
               </Button>
             </div>
           </div>
