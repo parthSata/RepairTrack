@@ -55,6 +55,15 @@ export function SidebarNav({ role }: SidebarNavProps) {
     if (href === '/dashboard') {
       return pathname === '/dashboard'
     }
+    // Settings nav points at /settings/shop but covers all shop-settings tabs
+    // (shop, email, …). Staff is a separate nav item under /settings/staff.
+    if (href === '/settings/shop') {
+      return (
+        pathname.startsWith('/settings/') &&
+        pathname !== '/settings/staff' &&
+        !pathname.startsWith('/settings/staff/')
+      )
+    }
     return pathname === href || pathname.startsWith(`${href}/`)
   }
 
