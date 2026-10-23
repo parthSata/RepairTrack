@@ -1,23 +1,58 @@
 'use client'
 
 import * as React from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 
-/** Native select styled for list filter rows (Repairs-style). */
+export type ListFilterOption = {
+  value: string
+  label: React.ReactNode
+}
+
+type ListFilterSelectProps = {
+  value: string
+  onValueChange: (value: string) => void
+  options: readonly ListFilterOption[]
+  className?: string
+  placeholder?: string
+  'aria-label'?: string
+  id?: string
+  disabled?: boolean
+}
+
+/** Shared list-filter dropdown — wraps Radix Select so the chevron matches form selects. */
 export function ListFilterSelect({
+  value,
+  onValueChange,
+  options,
   className,
-  children,
-  ...props
-}: React.ComponentProps<'select'>) {
+  placeholder,
+  'aria-label': ariaLabel,
+  id,
+  disabled,
+}: ListFilterSelectProps) {
   return (
-    <select
-      className={cn(
-        'h-10 w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-sm font-medium text-foreground shadow-xs transition-colors hover:border-accent-foreground/20 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </select>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <SelectTrigger
+        id={id}
+        aria-label={ariaLabel}
+        className={cn('bg-background shadow-xs', className)}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }

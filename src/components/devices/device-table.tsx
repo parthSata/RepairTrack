@@ -189,17 +189,17 @@ export function DeviceTable() {
 
           <ListFilterSelect
             value={filters.deviceType ?? 'ALL'}
-            onChange={(e) => handleDeviceTypeChange(e.target.value)}
+            onValueChange={handleDeviceTypeChange}
             aria-label="Filter by device type"
             className="w-full sm:w-40 sm:shrink-0"
-          >
-            <option value="ALL">All types</option>
-            {DEVICE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type.charAt(0) + type.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: 'All types' },
+              ...DEVICE_TYPES.map((type) => ({
+                value: type,
+                label: type.charAt(0) + type.slice(1).toLowerCase(),
+              })),
+            ]}
+          />
 
           {data && (
             <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

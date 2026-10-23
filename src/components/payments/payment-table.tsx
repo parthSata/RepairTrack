@@ -160,17 +160,17 @@ export function PaymentTable() {
 
           <ListFilterSelect
             value={filters.method ?? 'ALL'}
-            onChange={(e) => handleMethodChange(e.target.value)}
+            onValueChange={handleMethodChange}
             aria-label="Filter by payment method"
             className="sm:w-44"
-          >
-            <option value="ALL">All methods</option>
-            {PAYMENT_FILTER_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {PAYMENT_METHOD_LABELS[m]}
-              </option>
-            ))}
-          </ListFilterSelect>
+            options={[
+              { value: 'ALL', label: 'All methods' },
+              ...PAYMENT_FILTER_METHODS.map((m) => ({
+                value: m,
+                label: PAYMENT_METHOD_LABELS[m],
+              })),
+            ]}
+          />
 
           <div className="flex items-center gap-2">
             <Input
