@@ -11,11 +11,9 @@ import {
   Monitor,
   Pencil,
   Plus,
-  Search,
   Smartphone,
   Tablet,
   Trash2,
-  X,
 } from 'lucide-react'
 
 export function ModelVerificationBadge({
@@ -46,7 +44,11 @@ export function ModelVerificationBadge({
   return null
 }
 import { useDevices, type Device, type LinkedCustomer } from '@/features/devices/queries'
-import type { DeviceFilterInput, DeviceType } from '@/features/devices/schemas'
+import {
+  DEVICE_TYPES,
+  type DeviceFilterInput,
+  type DeviceType,
+} from '@/features/devices/schemas'
 import {
   Table,
   TableBody,
@@ -56,8 +58,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { DeviceForm } from './device-form'
@@ -121,19 +124,6 @@ export function DeviceTable() {
 
   const { data, isLoading, isError, refetch } = useDevices(filters)
 
-  const [searchTerm, setSearchTerm] = React.useState(filters.search ?? '')
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setFilters((prev) => {
-        if (prev.search === searchTerm) return prev
-        return { ...prev, search: searchTerm, page: 1 }
-      })
-    }, 300)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm])
-
   // Group devices by customer ID
   const deviceItems = data?.items
   const groupedData = React.useMemo(() => {
@@ -165,8 +155,12 @@ export function DeviceTable() {
     }))
   }
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value)
+  const handleSearchChange = React.useCallback((search: string) => {
+    setFilters((prev) => ({ ...prev, search, page: 1 }))
+  }, [])
+
+  const handleDeviceTypeChange = (value: string) => {
+    setFilters((prev) => ({ ...prev, deviceType: value, page: 1 }))
   }
 
   const handlePageChange = (pageIndex: number) => {
@@ -184,38 +178,37 @@ export function DeviceTable() {
   return (
     <div className="space-y-6">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by brand, model, serial..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="pl-9 pr-8 h-10 text-sm"
-            />
-            {searchTerm && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchTerm('')
-                  setFilters((prev) => ({ ...prev, search: '', page: 1 }))
-                }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+          <DebouncedSearchInput
+            value={filters.search ?? ''}
+            onChange={handleSearchChange}
+            placeholder="Brand, model, serial…"
+            className="w-full max-w-none sm:w-64 sm:shrink-0"
+          />
+
+          <ListFilterSelect
+            value={filters.deviceType ?? 'ALL'}
+            onChange={(e) => handleDeviceTypeChange(e.target.value)}
+            aria-label="Filter by device type"
+            className="w-full sm:w-40 sm:shrink-0"
+          >
+            <option value="ALL">All types</option>
+            {DEVICE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type.charAt(0) + type.slice(1).toLowerCase()}
+              </option>
+            ))}
+          </ListFilterSelect>
 
           {data && (
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {data.total} {data.total === 1 ? 'Device' : 'Devices'}
             </span>
           )}
         </div>
 
-        <Button variant="accent" className="gap-2 shrink-0" onClick={() => setCreateOpen(true)}>
+        <Button variant="accent" className="w-full shrink-0 gap-2 sm:w-auto" onClick={() => setCreateOpen(true)}>
           <Plus className="h-4 w-4" />
           Add Device
         </Button>
@@ -387,14 +380,14 @@ export function DeviceTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-48 text-center">
-                    {filters.search ? (
+                    {filters.search || (filters.deviceType && filters.deviceType !== 'ALL') ? (
                       <div className="flex flex-col items-center justify-center p-8 text-center">
                         <Smartphone className="h-10 w-10 text-muted-foreground/50 mb-2" />
                         <p className="text-sm font-semibold text-foreground">
-                          No devices match your search.
+                          No devices match your filters.
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Try searching for a different brand, model, or serial number.
+                          Try a different brand, model, serial, or device type.
                         </p>
                       </div>
                     ) : (

@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Wrench,
   Plus,
-  Search, 
   User,
   AlertCircle,
   ChevronLeft,
@@ -18,7 +17,8 @@ import {
   Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { useRepairs, useTechnicians } from '@/features/repairs/queries'
 import { RepairListCard } from '@/components/repairs/repair-list-card'
 import { useSession } from '@/lib/auth-client'
@@ -159,7 +159,6 @@ export function RepairList() {
   const searchParams = useSearchParams()
 
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [status, setStatus] = useState<string>(() => searchParams.get('status') ?? '')
   const [priority, setPriority] = useState<string>(() => searchParams.get('priority') ?? '')
   const [overdue, setOverdue] = useState<string>(() =>
@@ -179,18 +178,14 @@ export function RepairList() {
     setPage(1)
   }
 
-  // Debounce search input by 300ms to eliminate instant keystroke DB queries
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search)
-      setPage(1)
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [search])
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value)
+    setPage(1)
+  }, [])
 
   const { data: technicians } = useTechnicians()
   const { data, isLoading, isFetching, isError, error, refetch } = useRepairs({
-    search: debouncedSearch || undefined,
+    search: search || undefined,
     status: status || undefined,
     priority: priority || undefined,
     overdue: overdue === 'true' ? true : undefined,
@@ -247,28 +242,20 @@ export function RepairList() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Ticket #, Customer, Phone..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-8 h-10 text-sm rounded-lg bg-background"
-            />
-            {isFetching && (
-              <Loader2 className="absolute right-3 top-3 h-4 w-4 text-primary animate-spin" />
-            )}
-          </div>
+          <DebouncedSearchInput
+            value={search}
+            onChange={handleSearchChange}
+            placeholder="Ticket #, customer, phone…"
+            className="max-w-none min-w-0"
+          />
 
-          {/* Status Filter */}
-          <select
+          <ListFilterSelect
             value={status}
             onChange={(e) => {
               setStatus(e.target.value)
               setPage(1)
             }}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
+            aria-label="Filter by status"
           >
             <option value="">All Statuses</option>
             <option value="ACTIVE">Active (In Progress)</option>
@@ -282,46 +269,43 @@ export function RepairList() {
             <option value="READY_FOR_PICKUP">Ready for Pickup</option>
             <option value="COMPLETED">Completed</option>
             <option value="CANCELLED">Cancelled</option>
-          </select>
+          </ListFilterSelect>
 
-          {/* Priority Filter */}
-          <select
+          <ListFilterSelect
             value={priority}
             onChange={(e) => {
               setPriority(e.target.value)
               setPage(1)
             }}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
+            aria-label="Filter by priority"
           >
             <option value="">All Priorities</option>
             <option value="LOW">Low</option>
             <option value="MEDIUM">Medium</option>
             <option value="HIGH">High</option>
             <option value="URGENT">Urgent</option>
-          </select>
+          </ListFilterSelect>
 
-          {/* Overdue Filter */}
-          <select
+          <ListFilterSelect
             value={overdue}
             onChange={(e) => {
               setOverdue(e.target.value)
               setPage(1)
             }}
-            className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
+            aria-label="Filter by deadline"
           >
             <option value="">All Deadlines</option>
             <option value="true">Overdue Only</option>
-          </select>
+          </ListFilterSelect>
 
-          {/* Technician Filter (Visible to Owner & Staff) */}
           {userRole !== 'TECHNICIAN' && (
-            <select
+            <ListFilterSelect
               value={technicianId}
               onChange={(e) => {
                 setTechnicianId(e.target.value)
                 setPage(1)
               }}
-              className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-colors hover:border-accent-foreground/20 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer text-foreground font-medium"
+              aria-label="Filter by technician"
             >
               <option value="">All Technicians</option>
               {technicians?.map((tech) => (
@@ -329,7 +313,7 @@ export function RepairList() {
                   {tech.name}
                 </option>
               ))}
-            </select>
+            </ListFilterSelect>
           )}
 
           {/* Reset Filters */}

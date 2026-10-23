@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { Search, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 
 interface DebouncedSearchInputProps {
   value: string
@@ -41,9 +41,14 @@ export function DebouncedSearchInput({
   }, [searchTerm, value, onChange, debounceMs])
 
   return (
-    <div className={className ?? 'relative w-full max-w-sm'}>
-      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-      <Input
+    <div
+      className={cn(
+        'flex h-10 w-full max-w-sm items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-foreground transition-colors focus-within:border-foreground focus-within:ring-2 focus-within:ring-foreground/10',
+        className,
+      )}
+    >
+      <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      <input
         type="text"
         value={searchTerm}
         onChange={(e) => {
@@ -51,7 +56,7 @@ export function DebouncedSearchInput({
           setSearchTerm(e.target.value)
         }}
         placeholder={placeholder}
-        className="pl-9 pr-8"
+        className="h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
       />
       {searchTerm ? (
         <button
@@ -61,7 +66,7 @@ export function DebouncedSearchInput({
             setSearchTerm('')
             onChange('')
           }}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
           aria-label="Clear search"
         >
           <X className="h-4 w-4" />

@@ -11,9 +11,14 @@ interface CustomerSearchBarProps {
 export function CustomerSearchBar({
   value,
   onChange,
-  placeholder = 'Search by name or phone...',
+  placeholder = 'Search by name or phone…',
 }: CustomerSearchBarProps) {
   return (
-    <DebouncedSearchInput value={value} onChange={onChange} placeholder={placeholder} />
+    <DebouncedSearchInput
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className="min-w-0"
+    />
   )
 }

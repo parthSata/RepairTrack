@@ -246,7 +246,8 @@ export function PartTable() {
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
-            placeholder="Search by name or SKU…"
+            placeholder="Name or SKU…"
+            className="min-w-0"
           />
           {data ? (
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
