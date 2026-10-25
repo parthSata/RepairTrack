@@ -18,7 +18,10 @@ import {
   requirePendingInvitation,
 } from '@/server/auth/invite-oauth'
 import { readInviteToken, readShopName } from '@/server/auth/registration-logic'
-import { sendAccountVerificationEmail } from '@/server/services/gmail.service'
+import {
+  sendAccountVerificationEmail,
+  sendPasswordResetEmail,
+} from '@/server/services/gmail.service'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -184,7 +187,24 @@ export const auth = betterAuth({
       },
     },
   },
-  emailAndPassword: { enabled: true, requireEmailVerification: true },
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true,
+    resetPasswordTokenExpiresIn: 60 * 60,
+    sendResetPassword: async ({ user, url }) => {
+      const result = await sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        url,
+      })
+      if (!result.sent) {
+        throw new APIError('SERVICE_UNAVAILABLE', {
+          message:
+            'We could not deliver a password reset email to this address. Check the address and try again.',
+        })
+      }
+    },
+  },
   emailVerification: {
     sendOnSignUp: true,
     autoSignInAfterVerification: true,

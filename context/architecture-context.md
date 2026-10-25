@@ -672,7 +672,7 @@ Rules:
   sender (`GmailSender = { name, email, refreshToken, shopEmail? }`) as a parameter
   and never hard-codes one. The `.env` sender is private to
   `gmail.service.ts` and reachable only through
-  `sendAccountVerificationEmail`.
+  `sendAccountVerificationEmail` and `sendPasswordResetEmail`.
 - `sendEmail` returns `{ sent: true, messageId }` or
   `{ sent: false, reason: 'not_configured' | 'invalid_grant' | 'send_failed', error }`
   and never throws; `invalid_grant` means the shop must reconnect.

@@ -25,6 +25,20 @@ export function buildVerificationEmailHtml({ name, url }: { name: string; url: s
   })
 }
 
+export function buildPasswordResetEmailHtml({ name, url }: { name: string; url: string }) {
+  return renderEmailLayout({
+    shopName: PLATFORM_NAME,
+    title: 'Reset your RepairTrack password',
+    bodyHtml: `
+              ${heading('Reset your password')}
+              <p style="margin:0 0 20px 0;">Hi <strong>${escapeHtml(name)}</strong>,</p>
+              <p style="margin:0 0 24px 0;color:#475569;">We received a request to reset your RepairTrack password. Click the button below to choose a new password. This link expires in one hour.</p>
+              ${ctaButton('Reset Password', url)}
+              ${linkFallback("If the button above doesn't work, copy and paste this link into your browser:", url)}
+              ${closingNote('If you did not request a password reset, you can safely ignore this email.')}`,
+  })
+}
+
 export function buildGmailTestEmailHtml({ shopName, senderEmail }: { shopName: string; senderEmail: string }) {
   return renderEmailLayout({
     shopName,
