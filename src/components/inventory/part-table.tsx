@@ -245,7 +245,7 @@ export function PartTable() {
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
-            placeholder="Name or SKU…"
+            placeholder="Name or SKU"
             className="w-full max-w-none sm:w-72 sm:shrink-0"
           />
           <span className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">

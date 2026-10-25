@@ -123,7 +123,7 @@ export function InvoiceTable() {
         <DebouncedSearchInput
           value={filters.search ?? ''}
           onChange={handleSearchChange}
-          placeholder="Search by invoice #, customer name or phone…"
+          placeholder="Search by invoice #, customer name or phone"
         />
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
           {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Invoice' : 'Invoices'}

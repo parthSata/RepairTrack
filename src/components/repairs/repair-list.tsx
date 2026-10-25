@@ -246,7 +246,7 @@ export function RepairList() {
           <DebouncedSearchInput
             value={search}
             onChange={handleSearchChange}
-            placeholder="Ticket #, customer, phone…"
+            placeholder="Ticket #, customer, phone"
             className="max-w-none min-w-0"
           />
 

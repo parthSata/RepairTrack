@@ -509,13 +509,17 @@ Empty states should explain:
 List screens use **one create control** in the page header or toolbar.
 Empty states explain the state only — do **not** add a second create
 button inside the empty (use `TableEmptyState`: icon + title +
-description).
+description). Same rule for embedded empties (e.g. new-repair device
+step, dashboard work queue).
 
 Payment lists: Pending empty matches All payments empty — always show
 the summary bar and the DataTable (with column headers), and pass
 `emptyState` into the table. Do not early-return a bare empty outside
 the table. Payments has no list-level create-payment button.
 
+Form textareas use the shared `Textarea` (`resize-none` + vertical
+scroll). Form/filter dropdowns use `ListFilterSelect` (or an existing
+Select wrapper like `ShopTimeSelect`) — do not add native `<select>`.
 Example:
 
 "No repairs yet"

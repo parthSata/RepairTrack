@@ -118,12 +118,6 @@ export function DashboardWorkQueue() {
             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
               Create your first repair ticket to start tracking bench progress and turnaround times.
             </p>
-            <Link href="/repairs/new" className="mt-4">
-              <Button size="sm" className="gap-1.5 text-xs">
-                <Plus className="h-3.5 w-3.5" />
-                Create first ticket
-              </Button>
-            </Link>
           </div>
         ) : (
           <div className="overflow-x-auto">
