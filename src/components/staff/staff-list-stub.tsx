@@ -204,15 +204,19 @@ export function StaffListStub() {
         cell: ({ row }) => {
           const member = row.original
           return (
-            <select
+            <ListFilterSelect
               value={member.role}
-              onChange={(e) => handleRoleChange(member, e.target.value as 'STAFF' | 'TECHNICIAN')}
+              onValueChange={(value) =>
+                handleRoleChange(member, value as 'STAFF' | 'TECHNICIAN')
+              }
               disabled={changeRoleMutation.isPending}
-              className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            >
-              <option value="STAFF">Staff Member</option>
-              <option value="TECHNICIAN">Technician</option>
-            </select>
+              aria-label={`Role for ${member.name}`}
+              className="h-8 w-[9.5rem] text-xs font-medium"
+              options={[
+                { value: 'STAFF', label: 'Staff Member' },
+                { value: 'TECHNICIAN', label: 'Technician' },
+              ]}
+            />
           )
         },
       },
@@ -326,7 +330,7 @@ export function StaffListStub() {
           <DebouncedSearchInput
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Name or email…"
+            placeholder="Name or email"
             className="w-full max-w-none sm:w-64 sm:shrink-0"
           />
 

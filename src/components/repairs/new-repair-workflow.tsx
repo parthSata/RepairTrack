@@ -24,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -354,7 +355,7 @@ export function NewRepairWorkflow() {
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
                       <Input
-                        placeholder="Search by customer name, phone, or email address..."
+                        placeholder="Search by customer name, phone, or email address"
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         className="pr-10"
@@ -545,19 +546,11 @@ export function NewRepairWorkflow() {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-3">
+                    <div className="rounded-lg border border-dashed border-border p-6 text-center">
                       <p className="text-sm text-muted-foreground">
-                        No devices registered for this customer yet.
+                        No devices registered for this customer yet. Use Add New Device above to
+                        register one.
                       </p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setDeviceDialogOpen(true)}
-                        className="gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add New Device
-                      </Button>
                     </div>
                   )}
                 </div>
@@ -610,7 +603,7 @@ export function NewRepairWorkflow() {
                     </Label>
                     <Textarea
                       id="problemDescription"
-                      placeholder="Describe the complaint reported by the customer (e.g. Screen flickering, phone won't turn on)..."
+                      placeholder="Describe the complaint reported by the customer (e.g. Screen flickering, phone won't turn on)"
                       rows={3}
                       {...register('problemDescription')}
                       className={errors.problemDescription ? 'border-destructive' : ''}
@@ -650,17 +643,18 @@ export function NewRepairWorkflow() {
                       <Label htmlFor="priority" className="text-sm font-medium">
                         Priority Level
                       </Label>
-                      <select
+                      <ListFilterSelect
                         id="priority"
-                        {...register('priority')}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      >
-                        {repairPriorityValues.map((p: RepairPriority) => (
-                          <option key={p} value={p}>
-                            {p}
-                          </option>
-                        ))}
-                      </select>
+                        value={watchPriority ?? 'MEDIUM'}
+                        onValueChange={(value) =>
+                          setValue('priority', value as RepairPriority, { shouldValidate: true })
+                        }
+                        aria-label="Priority level"
+                        options={repairPriorityValues.map((p: RepairPriority) => ({
+                          value: p,
+                          label: p,
+                        }))}
+                      />
                     </div>
 
                     <div className="space-y-1.5">
@@ -734,7 +728,7 @@ export function NewRepairWorkflow() {
                     </Label>
                     <Textarea
                       id="initialNote"
-                      placeholder="Special customer instructions, passcode, or internal shop notes..."
+                      placeholder="Special customer instructions, passcode, or internal shop notes"
                       rows={2}
                       {...register('initialNote')}
                     />

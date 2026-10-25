@@ -82,7 +82,7 @@ export function CustomerPicker({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search customer by name or phone..."
+              placeholder="Search customer by name or phone"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 pr-8"
@@ -99,40 +99,44 @@ export function CustomerPicker({
             )}
           </div>
 
-          <div className="max-h-48 overflow-y-auto rounded-md border border-border bg-card shadow-sm divide-y divide-border">
-            {searchQuery.trim().length < 3 ? (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                Type at least 3 letters to see customer suggestions (up to 5).
-              </div>
-            ) : isLoading ? (
-              <div className="p-3 text-center text-xs text-muted-foreground">Searching customers...</div>
-            ) : data?.items && data.items.length > 0 ? (
-              data.items.slice(0, 5).map((customer) => (
-                <button
-                  key={customer.id}
-                  type="button"
-                  onClick={() => handleSelect(customer)}
-                  className={cn(
-                    'w-full flex items-center justify-between p-2.5 text-left text-xs hover:bg-muted/50 transition-colors',
-                    value === customer.id && 'bg-accent/10 font-medium text-accent',
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <div>
-                      <span className="font-semibold text-foreground">{customer.name}</span>
-                      <span className="ml-2 text-muted-foreground">{customer.phone}</span>
+          {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 ? (
+            <p className="text-xs text-muted-foreground">
+              At least 3 letters required to see customer suggestions.
+            </p>
+          ) : null}
+
+          {searchQuery.trim().length >= 3 ? (
+            <div className="max-h-48 overflow-y-auto rounded-md border border-border bg-card shadow-sm divide-y divide-border">
+              {isLoading ? (
+                <div className="p-3 text-center text-xs text-muted-foreground">Searching customers...</div>
+              ) : data?.items && data.items.length > 0 ? (
+                data.items.slice(0, 5).map((customer) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => handleSelect(customer)}
+                    className={cn(
+                      'w-full flex items-center justify-between p-2.5 text-left text-xs hover:bg-muted/50 transition-colors',
+                      value === customer.id && 'bg-accent/10 font-medium text-accent',
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <div>
+                        <span className="font-semibold text-foreground">{customer.name}</span>
+                        <span className="ml-2 text-muted-foreground">{customer.phone}</span>
+                      </div>
                     </div>
-                  </div>
-                  {value === customer.id && <Check className="h-4 w-4 text-accent shrink-0" />}
-                </button>
-              ))
-            ) : (
-              <div className="p-3 text-center text-xs text-muted-foreground">
-                No customers found matching &quot;{searchQuery}&quot;.
-              </div>
-            )}
-          </div>
+                    {value === customer.id && <Check className="h-4 w-4 text-accent shrink-0" />}
+                  </button>
+                ))
+              ) : (
+                <div className="p-3 text-center text-xs text-muted-foreground">
+                  No customers found matching &quot;{searchQuery}&quot;.
+                </div>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
 

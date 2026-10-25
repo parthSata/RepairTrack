@@ -184,7 +184,7 @@ export function DeviceTable() {
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
-            placeholder="Brand, model, serial…"
+            placeholder="Brand, model, serial"
             className="w-full max-w-none sm:w-64 sm:shrink-0"
           />
 

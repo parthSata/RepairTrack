@@ -7,6 +7,7 @@ import { AlertCircle } from 'lucide-react'
 import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   deviceSchema,
@@ -62,6 +63,7 @@ export function DeviceForm({
   })
 
   const currentDeviceType = useWatch({ control, name: 'deviceType' })
+  const currentCondition = useWatch({ control, name: 'condition' })
   const customerId = useWatch({ control, name: 'customerId' })
   const watchedModel = useWatch({ control, name: 'model' })
 
@@ -166,28 +168,31 @@ export function DeviceForm({
           <label htmlFor="deviceType" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Device Type <span className="text-destructive">*</span>
           </label>
-          <select
+          <ListFilterSelect
             id="deviceType"
-            {...register('deviceType')}
+            value={currentDeviceType}
+            onValueChange={(value) =>
+              setValue('deviceType', value as DeviceFormInput['deviceType'], { shouldValidate: true })
+            }
             disabled={isPending}
-            className={`w-full h-10 rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-              errors.deviceType ? 'border-destructive focus:ring-destructive' : 'border-input'
-            }`}
-          >
-            {DEVICE_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type === 'PHONE'
+            aria-label="Device type"
+            className={
+              errors.deviceType ? 'border-destructive focus:ring-destructive' : undefined
+            }
+            options={DEVICE_TYPES.map((type) => ({
+              value: type,
+              label:
+                type === 'PHONE'
                   ? 'Phone / Mobile'
                   : type === 'LAPTOP'
-                  ? 'Laptop'
-                  : type === 'TABLET'
-                  ? 'Tablet'
-                  : type === 'DESKTOP'
-                  ? 'Desktop / PC'
-                  : 'Other'}
-              </option>
-            ))}
-          </select>
+                    ? 'Laptop'
+                    : type === 'TABLET'
+                      ? 'Tablet'
+                      : type === 'DESKTOP'
+                        ? 'Desktop / PC'
+                        : 'Other',
+            }))}
+          />
           {errors.deviceType && (
             <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />
@@ -201,20 +206,27 @@ export function DeviceForm({
           <label htmlFor="condition" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Condition <span className="text-destructive">*</span>
           </label>
-          <select
+          <ListFilterSelect
             id="condition"
-            {...register('condition')}
+            value={currentCondition}
+            onValueChange={(value) =>
+              setValue('condition', value as DeviceFormInput['condition'], { shouldValidate: true })
+            }
             disabled={isPending}
-            className={`w-full h-10 rounded-md border bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${
-              errors.condition ? 'border-destructive focus:ring-destructive' : 'border-input'
-            }`}
-          >
-            {DEVICE_CONDITIONS.map((cond) => (
-              <option key={cond} value={cond}>
-                {cond === 'GOOD' ? 'Good (Minor wear)' : cond === 'FAIR' ? 'Fair (Scratches/Dents)' : 'Poor (Damaged/Broken)'}
-              </option>
-            ))}
-          </select>
+            aria-label="Device condition"
+            className={
+              errors.condition ? 'border-destructive focus:ring-destructive' : undefined
+            }
+            options={DEVICE_CONDITIONS.map((cond) => ({
+              value: cond,
+              label:
+                cond === 'GOOD'
+                  ? 'Good (Minor wear)'
+                  : cond === 'FAIR'
+                    ? 'Fair (Scratches/Dents)'
+                    : 'Poor (Damaged/Broken)',
+            }))}
+          />
           {errors.condition && (
             <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
               <AlertCircle className="h-3.5 w-3.5 shrink-0" />

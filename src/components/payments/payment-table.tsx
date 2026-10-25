@@ -153,7 +153,7 @@ export function PaymentTable() {
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
-            placeholder="Ticket #, customer, phone…"
+            placeholder="Ticket #, customer, phone"
             debounceMs={250}
             className="min-w-0"
           />

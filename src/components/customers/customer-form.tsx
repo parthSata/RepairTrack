@@ -246,7 +246,7 @@ export function CustomerForm({
         </div>
         <Textarea
           id="notes"
-          placeholder="Internal notes for shop staff..."
+          placeholder="Internal notes for shop staff"
           rows={3}
           disabled={isPending}
           className={errors.notes ? 'border-destructive focus-visible:ring-destructive' : ''}
