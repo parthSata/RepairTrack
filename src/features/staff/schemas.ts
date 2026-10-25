@@ -22,7 +22,7 @@ export const acceptInvitationSchema = z
 
 export type AcceptInvitationInput = z.infer<typeof acceptInvitationSchema>
 
-export type InvitationState = 'pending' | 'expired' | 'accepted'
+export type InvitationState = 'pending' | 'accepted'
 
 /** Codes returned to `/invite/[token]?error=` when "Continue with Google" is rejected. */
 export const INVITE_GOOGLE_ERRORS = {
@@ -48,7 +48,6 @@ export interface InvitationDetails {
   email: string
   role: 'STAFF' | 'TECHNICIAN'
   shopName: string
-  expiresAt: string
 }
 
 /** Whether the invitation email went out from the Owner's Gmail; the link works either way. */
@@ -57,7 +56,6 @@ export type InviteEmailStatus = 'sent' | 'not_connected' | 'reconnect_needed' | 
 export interface InviteStaffResponse {
   token: string
   inviteLink: string
-  expiresAt: string
   emailStatus: InviteEmailStatus
 }
 
@@ -105,10 +103,9 @@ export interface UnifiedStaffMember {
   name: string
   email: string
   role: 'STAFF' | 'TECHNICIAN'
-  status: 'ACTIVE' | 'INACTIVE' | 'INVITED' | 'EXPIRED'
+  status: 'ACTIVE' | 'INACTIVE' | 'INVITED'
   isInvitation: boolean
   token?: string
-  expiresAt?: string
   createdAt: string
   heldAssignmentCount?: number
 }

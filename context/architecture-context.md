@@ -408,7 +408,8 @@ Core entities may include:
 - users
 - shops
 - staff_invitations (Sprint 1: token, email, invited role, invited_by,
-  status [`pending` | `accepted` | `expired` | `revoked`], expires_at)
+  status [`pending` | `accepted` | `expired` | `revoked`]; pending invites
+  stay valid until accepted or revoked — no time-based expiry)
 - gmail_connections (Sprint 3: one row per shop — unique `shop_id` FK,
   connected Google account `email`, `refresh_token_encrypted`,
   `status` [`CONNECTED` | `NEEDS_RECONNECT`], `connected_at`). No row
@@ -602,8 +603,8 @@ internal repair query.
 `/invite/[token]` is public — no session.
 
 - Looks up `staff_invitations` by the single-use token only (never by
-  email or a guessable ID). Reject expired, already-accepted, or
-  revoked tokens with a generic message.
+  email or a guessable ID). Reject already-accepted or revoked tokens
+  with a generic message. Pending invites do not expire by time.
 - Returns only what's needed to render the "accept invite" form: the
   invited name, email, role, and the inviting shop's display name.
   Never return the shop's internal id list, other staff, or any
@@ -615,7 +616,7 @@ internal repair query.
 - Google OAuth acceptance: "Continue with Google" sends the token as
   OAuth `additionalData` (`inviteToken`), with the invite page as
   `errorCallbackURL`. `src/server/auth/invite-oauth.ts` re-validates it in
-  Better Auth hooks: `user.create.before` requires a pending, unexpired
+  Better Auth hooks: `user.create.before` requires a pending
   invitation whose email equals the Google email and takes `role`/`shop_id`
   from it (otherwise no user or shop is created); `user.create.after`
   marks it `accepted`; `session.create.before` refuses an existing account

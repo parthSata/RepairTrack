@@ -241,21 +241,21 @@ export function PartTable() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           <DebouncedSearchInput
             value={filters.search ?? ''}
             onChange={handleSearchChange}
             placeholder="Name or SKU…"
-            className="min-w-0"
+            className="w-full max-w-none sm:w-72 sm:shrink-0"
           />
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
+          <span className="shrink-0 whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-muted-foreground tabular-nums">
             {data?.total ?? 0} {(data?.total ?? 0) === 1 ? 'Part' : 'Parts'}
           </span>
         </div>
         <Button
           variant="accent"
-          className="shrink-0 gap-2"
+          className="w-full shrink-0 gap-2 sm:w-auto"
           onClick={() => setCreateOpen(true)}
         >
           <Plus className="h-4 w-4" />

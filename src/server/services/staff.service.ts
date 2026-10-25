@@ -25,9 +25,6 @@ import {
   syncAssignmentOnReassign,
 } from '@/server/services/repair-assignment.helpers'
 
-const INVITE_TTL_MINUTES = 10
-const INVITE_TTL_MS = INVITE_TTL_MINUTES * 60 * 1000
-
 function getAppUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || 'http://localhost:3000'
 }
@@ -255,7 +252,6 @@ function buildInvitationDetails(
     name: string
     email: string
     role: 'STAFF' | 'TECHNICIAN'
-    expiresAt: Date
     shop?: { name: string } | null
   },
   state: InvitationDetails['state'],
@@ -266,7 +262,6 @@ function buildInvitationDetails(
     email: invitation.email,
     role: invitation.role,
     shopName: invitation.shop?.name ?? 'Repair Shop',
-    expiresAt: invitation.expiresAt.toISOString(),
   }
 }
 
@@ -311,7 +306,6 @@ export async function inviteStaff(
   }
 
   const token = crypto.randomUUID()
-  const expiresAt = new Date(Date.now() + INVITE_TTL_MS)
 
   const [invitation] = await db
     .insert(staffInvitations)
@@ -323,7 +317,6 @@ export async function inviteStaff(
       token,
       status: 'pending',
       invitedBy,
-      expiresAt,
     })
     .returning({ id: staffInvitations.id })
 
@@ -341,7 +334,6 @@ export async function inviteStaff(
         shopName,
         role: input.role,
         inviteUrl: `${getAppUrl()}${inviteLink}`,
-        expiresIn: `${INVITE_TTL_MINUTES} minutes`,
       }),
     },
   })
@@ -349,7 +341,6 @@ export async function inviteStaff(
   return {
     token,
     inviteLink,
-    expiresAt: expiresAt.toISOString(),
     emailStatus: toInviteEmailStatus(emailOutcome),
   }
 }
@@ -367,8 +358,6 @@ export async function listStaff(shopId: string): Promise<UnifiedStaffMember[]> {
     getAssignmentCountsByTechnicianStatus(shopId, 'ON_HOLD'),
   ])
 
-  const now = new Date()
-
   const userItems: UnifiedStaffMember[] = staffUsers.map((u) => ({
       id: u.id,
       name: u.name,
@@ -385,10 +374,9 @@ export async function listStaff(shopId: string): Promise<UnifiedStaffMember[]> {
     name: inv.name,
     email: inv.email,
     role: inv.role,
-    status: now > inv.expiresAt ? 'EXPIRED' : 'INVITED',
+    status: 'INVITED' as const,
     isInvitation: true,
     token: inv.token,
-    expiresAt: inv.expiresAt.toISOString(),
     createdAt: inv.createdAt.toISOString(),
   }))
 
@@ -619,16 +607,12 @@ export async function getInvitationByToken(token: string): Promise<InvitationDet
     },
   })
 
-  if (!invitation || invitation.status === 'revoked') {
+  if (!invitation || invitation.status === 'revoked' || invitation.status === 'expired') {
     return null
   }
 
   if (invitation.status === 'accepted') {
     return buildInvitationDetails(invitation, 'accepted')
-  }
-
-  if (invitation.status === 'expired' || new Date() > invitation.expiresAt) {
-    return buildInvitationDetails(invitation, 'expired')
   }
 
   return buildInvitationDetails(invitation, 'pending')
@@ -706,14 +690,6 @@ export async function acceptInvitation(token: string, input: AcceptInvitationInp
 
     if (!invitation || invitation.status !== 'pending') {
       throw new HTTPException(400, { message: 'Invalid or inactive invitation' })
-    }
-
-    if (new Date() > invitation.expiresAt) {
-      await tx
-        .update(staffInvitations)
-        .set({ status: 'expired' })
-        .where(eq(staffInvitations.id, invitation.id))
-      throw new HTTPException(400, { message: 'Invitation has expired' })
     }
 
     const reactivated = await reactivateInactiveStaffUser(tx, invitation, input)

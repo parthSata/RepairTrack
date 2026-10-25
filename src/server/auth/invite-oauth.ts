@@ -31,10 +31,10 @@ async function findInvitation(token: string): Promise<Invitation | undefined> {
   return db.query.staffInvitations.findFirst({ where: eq(staffInvitations.token, token) })
 }
 
-/** New Google user from an invite: the invitation must be pending, unexpired and for this email. */
+/** New Google user from an invite: the invitation must be pending and for this email. */
 export async function requirePendingInvitation(token: string, email: string): Promise<Invitation> {
   const invitation = await findInvitation(token)
-  if (!invitation || invitation.status !== 'pending' || new Date() > invitation.expiresAt) {
+  if (!invitation || invitation.status !== 'pending') {
     throw inviteError('INVITE_INVALID')
   }
   if (!sameEmail(invitation.email, email)) throw inviteError('INVITE_EMAIL_MISMATCH')

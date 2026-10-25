@@ -150,7 +150,6 @@ async function verify() {
     // -------------------------------------------------------------
     console.log('[Scenario 3] Testing email/password invite acceptance...')
     const inviteToken = `test-inv-token-${Date.now()}`
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
     await db.insert(staffInvitations).values({
       shopId: testShopId,
@@ -160,7 +159,6 @@ async function verify() {
       token: inviteToken,
       status: 'pending',
       invitedBy: createdOwner!.id,
-      expiresAt,
     })
 
     const acceptResult = await acceptInvitation(inviteToken, {
@@ -203,7 +201,6 @@ async function verify() {
       token: oauthToken,
       status: 'pending',
       invitedBy: createdOwner!.id,
-      expiresAt,
     })
 
     const resolvedInvitation = await requirePendingInvitation(oauthToken, emailOAuth)

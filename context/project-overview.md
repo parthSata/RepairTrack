@@ -315,7 +315,8 @@ Management.
   email yet in Sprint 1 (Gmail connects in Sprint 3 — see below), so
   invitations are delivered as a **copyable invite link** that the
   Owner shares manually (e.g. WhatsApp, SMS, in person). The link
-  contains a single-use, expiring invitation token.
+  contains a single-use invitation token that stays valid until accepted
+  or revoked.
 - Invitation emails are sent **only** from the Owner's own connected
   Gmail — never from the RepairTrack platform sender. A connected Owner
   gets both the link and an automatic invitation email. When Gmail is
