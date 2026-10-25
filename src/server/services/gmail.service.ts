@@ -1,7 +1,10 @@
 import 'server-only'
 import { google } from 'googleapis'
 import { buildRawEmail } from '@/server/email/raw-message'
-import { buildVerificationEmailHtml } from '@/server/services/email-templates'
+import {
+  buildPasswordResetEmailHtml,
+  buildVerificationEmailHtml,
+} from '@/server/services/email-templates'
 
 /** `shopEmail` is the shop's public contact address, used as Reply-To on customer emails. */
 export type GmailSender = { name: string; email: string; refreshToken: string; shopEmail?: string | null }
@@ -51,8 +54,8 @@ export async function sendEmail(sender: GmailSender, message: EmailMessage): Pro
   }
 }
 
-// The .env mailbox is the platform sender, reserved for account verification.
-// Shop emails must use that shop's connected Gmail, never this sender.
+// The .env mailbox is the platform sender, reserved for auth emails
+// (verification + password reset). Shop emails use that shop's connected Gmail.
 function getPlatformSender(): GmailSender | null {
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN
   const email = process.env.GMAIL_USER
@@ -78,5 +81,27 @@ export async function sendAccountVerificationEmail({
     to,
     subject: 'Verify your RepairTrack email',
     html: buildVerificationEmailHtml({ name, url }),
+  })
+}
+
+export async function sendPasswordResetEmail({
+  to,
+  name,
+  url,
+}: {
+  to: string
+  name: string
+  url: string
+}): Promise<SendEmailResult> {
+  const sender = getPlatformSender()
+  if (!sender) {
+    console.warn('Password reset email not sent: platform Gmail sender is not configured')
+    return { sent: false, reason: 'not_configured', error: NOT_CONFIGURED_ERROR }
+  }
+
+  return sendEmail(sender, {
+    to,
+    subject: 'Reset your RepairTrack password',
+    html: buildPasswordResetEmailHtml({ name, url }),
   })
 }
