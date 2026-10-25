@@ -18,7 +18,7 @@ export function CustomerSearchBar({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className="min-w-0"
+      className="w-full max-w-none sm:w-72 sm:shrink-0"
     />
   )
 }

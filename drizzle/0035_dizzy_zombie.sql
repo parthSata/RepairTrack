@@ -1,0 +1,1 @@
+ALTER TABLE "staff_invitations" DROP COLUMN "expires_at";

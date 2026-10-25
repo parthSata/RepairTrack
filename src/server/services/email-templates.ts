@@ -46,13 +46,11 @@ export function buildStaffInvitationEmailHtml({
   shopName,
   role,
   inviteUrl,
-  expiresIn,
 }: {
   inviterName: string
   shopName: string
   role: 'STAFF' | 'TECHNICIAN'
   inviteUrl: string
-  expiresIn: string
 }) {
   const safeShopName = escapeHtml(shopName)
   const roleDisplay = ROLE_DISPLAY[role]
@@ -65,8 +63,7 @@ export function buildStaffInvitationEmailHtml({
               <p style="margin:0 0 20px 0;color:#475569;"><strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${safeShopName}</strong> on RepairTrack as a team member.</p>
               ${detailsCard([
                 detailRow('Shop:', safeShopName, 'font-size:14px;font-weight:600;color:#0f172a;'),
-                detailRow('Role:', roleDisplay.title, `font-size:13px;font-weight:600;color:${roleDisplay.color};`),
-                detailRow('Expires in:', escapeHtml(expiresIn), 'font-size:13px;font-weight:500;color:#64748b;', true),
+                detailRow('Role:', roleDisplay.title, `font-size:13px;font-weight:600;color:${roleDisplay.color};`, true),
               ])}
               ${ctaButton('Accept Invitation', inviteUrl)}
               ${linkFallback('Or copy and paste this link into your browser:', inviteUrl)}

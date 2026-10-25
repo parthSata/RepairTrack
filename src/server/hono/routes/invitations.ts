@@ -10,7 +10,7 @@ invitationsRouter.get('/:token', async (c) => {
   const token = c.req.param('token')
   const invitation = await getInvitationByToken(token)
   if (!invitation) {
-    throw new HTTPException(404, { message: 'Invitation not found or expired' })
+    throw new HTTPException(404, { message: 'Invitation not found or no longer valid' })
   }
   return c.json(invitation)
 })

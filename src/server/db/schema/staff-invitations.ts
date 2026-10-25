@@ -26,7 +26,6 @@ export const staffInvitations = pgTable(
     invitedBy: text('invited_by')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
