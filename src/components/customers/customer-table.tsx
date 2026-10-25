@@ -10,6 +10,7 @@ import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { CustomerSearchBar } from './customer-search-bar'
 import { CustomerForm } from './customer-form'
 import { CustomerDeleteDialog } from './customer-delete-dialog'
@@ -186,25 +187,17 @@ export function CustomerTable() {
           onSortingChangeManual={handleSortingChange}
           emptyState={
             filters.search ? (
-              <div className="flex flex-col items-center justify-center p-8 text-center">
-                <Users className="h-10 w-10 text-muted-foreground/50 mb-2" />
-                <p className="text-sm font-semibold text-foreground">No customers match your search.</p>
-                <p className="text-xs text-muted-foreground mt-1">Try searching for a different name or phone number.</p>
-              </div>
+              <TableEmptyState
+                icon={Users}
+                title="No customers match your search."
+                description="Try searching for a different name or phone number."
+              />
             ) : (
-              <div className="flex flex-col items-center justify-center p-8 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
-                  <Users className="h-6 w-6" />
-                </div>
-                <h3 className="text-base font-semibold text-foreground">No customers yet</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  Add your first customer to start tracking repairs and device histories.
-                </p>
-                <Button variant="accent" className="mt-4 gap-2" onClick={() => setCreateOpen(true)}>
-                  <Plus className="h-4 w-4" />
-                  Add First Customer
-                </Button>
-              </div>
+              <TableEmptyState
+                icon={Users}
+                title="No customers yet"
+                description="Add your first customer to start tracking repairs and device histories."
+              />
             )
           }
         />
