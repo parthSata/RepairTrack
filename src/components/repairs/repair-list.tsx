@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { ListFilterSelect } from '@/components/ui/list-filter-select'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { useRepairs, useTechnicians } from '@/features/repairs/queries'
 import { RepairListCard } from '@/components/repairs/repair-list-card'
 import { useSession } from '@/lib/auth-client'
@@ -402,28 +403,18 @@ export function RepairList() {
 
       {/* Empty State */}
       {!isLoading && !isError && items.length === 0 && (
-        <div className="rounded-xl border border-border bg-card p-12 text-center shadow-xs">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-4">
-            <Wrench className="h-7 w-7" />
-          </div>
-          <h3 className="text-lg font-bold text-foreground">No Repair Tickets Found</h3>
-          <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
-            {search || status || priority || overdue || technicianId
-              ? 'No tickets matched your filter criteria. Try resetting your search filters.'
-              : userRole === 'TECHNICIAN'
-              ? 'You currently have no assigned repair tickets.'
-              : 'Get started by creating your first repair service ticket.'}
-          </p>
-          {['OWNER', 'STAFF'].includes(userRole) && !search && !status && !priority && (
-            <div className="mt-6">
-              <Link href="/repairs/new">
-                <Button className="gap-2 font-semibold">
-                  <Plus className="h-4 w-4" />
-                  Create Repair Ticket
-                </Button>
-              </Link>
-            </div>
-          )}
+        <div className="rounded-xl border border-border bg-card shadow-xs">
+          <TableEmptyState
+            icon={Wrench}
+            title="No Repair Tickets Found"
+            description={
+              search || status || priority || overdue || technicianId
+                ? 'No tickets matched your filter criteria. Try resetting your search filters.'
+                : userRole === 'TECHNICIAN'
+                  ? 'You currently have no assigned repair tickets.'
+                  : 'Get started by creating your first repair service ticket.'
+            }
+          />
         </div>
       )}
 

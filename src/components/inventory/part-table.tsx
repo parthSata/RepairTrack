@@ -32,7 +32,6 @@ import { PartDeleteDialog } from '@/components/inventory/part-delete-dialog'
 import { PartForm } from '@/components/inventory/part-form'
 import { formatRupees } from '@/lib/format-money'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { cn } from '@/lib/utils'
 
 function StockStatusBadge({ quantity, stockAlert }: { quantity: number; stockAlert: number }) {
   const status = getPartStockStatus(quantity, stockAlert)
@@ -302,17 +301,9 @@ export function PartTable() {
             ) : (
               <TableEmptyState
                 icon={Package}
-                title="No parts yet — add your first part to start tracking inventory."
-              >
-                <Button
-                  variant="accent"
-                  className={cn('mt-4 gap-2')}
-                  onClick={() => setCreateOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Add First Part
-                </Button>
-              </TableEmptyState>
+                title="No parts yet"
+                description="Add your first part to start tracking inventory."
+              />
             )
           }
         />

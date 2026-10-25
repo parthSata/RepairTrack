@@ -63,6 +63,7 @@ import { DebouncedSearchInput } from '@/components/ui/debounced-search-input'
 import { ListFilterSelect } from '@/components/ui/list-filter-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { DeviceForm } from './device-form'
 import { DeviceDeleteDialog } from './device-delete-dialog'
 import { DeviceGroupHeader } from './device-group-header'
@@ -379,35 +380,17 @@ export function DeviceTable() {
                 <TableRow>
                   <TableCell colSpan={5} className="h-48 text-center">
                     {filters.search || (filters.deviceType && filters.deviceType !== 'ALL') ? (
-                      <div className="flex flex-col items-center justify-center p-8 text-center">
-                        <Smartphone className="h-10 w-10 text-muted-foreground/50 mb-2" />
-                        <p className="text-sm font-semibold text-foreground">
-                          No devices match your filters.
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Try a different brand, model, serial, or device type.
-                        </p>
-                      </div>
+                      <TableEmptyState
+                        icon={Smartphone}
+                        title="No devices match your filters."
+                        description="Try a different brand, model, serial, or device type."
+                      />
                     ) : (
-                      <div className="flex flex-col items-center justify-center p-8 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
-                          <Smartphone className="h-6 w-6" />
-                        </div>
-                        <h3 className="text-base font-semibold text-foreground">
-                          No devices yet — register a device to start a repair.
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                          Register customer devices to manage repairs, track service histories, and link tickets.
-                        </p>
-                        <Button
-                          variant="accent"
-                          className="mt-4 gap-2"
-                          onClick={() => setCreateOpen(true)}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add First Device
-                        </Button>
-                      </div>
+                      <TableEmptyState
+                        icon={Smartphone}
+                        title="No devices yet"
+                        description="Register customer devices to manage repairs, track service histories, and link tickets."
+                      />
                     )}
                   </TableCell>
                 </TableRow>

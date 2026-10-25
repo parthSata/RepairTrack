@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table/data-table'
 import { DataTableColumnHeader } from '@/components/ui/data-table/data-table-column-header'
 import { QueryErrorState } from '@/components/ui/query-error-state'
-import { Skeleton } from '@/components/ui/skeleton'
 import { TableEmptyState } from '@/components/ui/table-empty-state'
 import {
   usePendingPayments,
@@ -116,35 +115,10 @@ export function PendingPaymentsTable() {
     [handleRecordPayment],
   )
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-14 w-full rounded-lg" />
-        <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-md" />
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (isError) {
-    return (
-      <QueryErrorState
-        error={error}
-        fallback="Failed to load pending payments. Please try again."
-        forbiddenMessage="You don't have access to pending payments."
-        onRetry={() => void refetch()}
-      />
-    )
-  }
-
   const items = data?.items ?? []
 
   return (
     <div className="space-y-4">
-      {/* Total Outstanding Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card/60 px-4 py-3 shadow-2xs">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -159,38 +133,33 @@ export function PendingPaymentsTable() {
         </span>
       </div>
 
-      {items.length === 0 ? (
-        <TableEmptyState
-          icon={Receipt}
-          title="No pending payments"
-          description="All active repairs are fully settled or have no outstanding balance."
+      {isError ? (
+        <QueryErrorState
+          error={error}
+          fallback="Failed to load pending payments. Please try again."
+          forbiddenMessage="You don't have access to pending payments."
+          onRetry={() => void refetch()}
         />
       ) : (
-        <>
-          {/* Desktop Table View */}
-          <div className="hidden md:block">
-            <DataTable
-              columns={columns}
-              data={items}
-              isLoading={false}
-              pageCount={1}
-              pageIndex={0}
-              pageSize={items.length}
-              totalItems={items.length}
+        <DataTable
+          columns={columns}
+          data={items}
+          isLoading={isLoading}
+          pageCount={1}
+          pageIndex={0}
+          pageSize={items.length || 1}
+          totalItems={items.length}
+          renderMobileCard={(item) => (
+            <PendingPaymentCard item={item} onRecordPayment={handleRecordPayment} />
+          )}
+          emptyState={
+            <TableEmptyState
+              icon={Receipt}
+              title="No pending payments"
+              description="All active repairs are fully settled or have no outstanding balance."
             />
-          </div>
-
-          {/* Mobile Card View (375px+) */}
-          <div className="space-y-3 md:hidden">
-            {items.map((item) => (
-              <PendingPaymentCard
-                key={item.repairId}
-                item={item}
-                onRecordPayment={handleRecordPayment}
-              />
-            ))}
-          </div>
-        </>
+          }
+        />
       )}
 
       {selectedRepair ? (

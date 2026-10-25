@@ -504,7 +504,17 @@ Empty states should explain:
 
 - What is empty
 - Why it may be empty
-- What the user can do next
+- What the user can do next (in copy only)
+
+List screens use **one create control** in the page header or toolbar.
+Empty states explain the state only — do **not** add a second create
+button inside the empty (use `TableEmptyState`: icon + title +
+description).
+
+Payment lists: Pending empty matches All payments empty — always show
+the summary bar and the DataTable (with column headers), and pass
+`emptyState` into the table. Do not early-return a bare empty outside
+the table. Payments has no list-level create-payment button.
 
 Example:
 
