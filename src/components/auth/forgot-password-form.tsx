@@ -23,7 +23,6 @@ function formatDuration(totalSeconds: number): string {
 export function ForgotPasswordForm() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
-  const [rateLimitResetAt, setRateLimitResetAt] = useState<number | null>(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
 
   const {
@@ -35,38 +34,20 @@ export function ForgotPasswordForm() {
   })
 
   useEffect(() => {
-    if (!rateLimitResetAt) {
-      setSecondsLeft(0)
-      return
-    }
+    if (secondsLeft <= 0) return
 
-    const tick = () => {
-      const remaining = Math.max(
-        0,
-        Math.ceil((rateLimitResetAt - Date.now()) / 1000),
-      )
-      setSecondsLeft(remaining)
-      if (remaining <= 0) {
-        setRateLimitResetAt(null)
-        setFormError(null)
-      }
-      return remaining
-    }
-
-    if (tick() <= 0) return
-
-    const interval = setInterval(() => {
-      if (tick() <= 0) clearInterval(interval)
+    const timer = setTimeout(() => {
+      setSecondsLeft((prev) => (prev > 0 ? prev - 1 : 0))
     }, 1000)
 
-    return () => clearInterval(interval)
-  }, [rateLimitResetAt])
+    return () => clearTimeout(timer)
+  }, [secondsLeft])
 
   async function onSubmit(values: ForgotPasswordInput) {
     if (secondsLeft > 0) return
 
     setFormError(null)
-    setRateLimitResetAt(null)
+    setSecondsLeft(0)
 
     try {
       await apiClient.post<{ sent: true }>('forgot-password', {
@@ -76,7 +57,7 @@ export function ForgotPasswordForm() {
     } catch (err: unknown) {
       const rateLimit = getRateLimitInfo(err)
       if (rateLimit?.isRateLimited) {
-        setRateLimitResetAt(rateLimit.resetAt)
+        setSecondsLeft(rateLimit.retryAfter)
         setFormError(null)
         return
       }
