@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { auth } from '@/server/auth'
 import { shopsRouter } from '@/server/hono/routes/shops'
 import { emailCheckRouter } from '@/server/hono/routes/email-check'
+import { forgotPasswordRouter } from '@/server/hono/routes/forgot-password'
 import { registrationRouter } from '@/server/hono/routes/registration'
 import { customersRouter } from '@/server/hono/routes/customers'
 import { devicesRouter } from '@/server/hono/routes/devices'
@@ -22,6 +23,7 @@ export const app = new Hono()
   .get('/api/health', (context) => context.json({ status: 'ok' }))
   .on(['POST', 'GET'], '/api/auth/*', (c) => auth.handler(c.req.raw))
   .route('/api/email-check', emailCheckRouter)
+  .route('/api/forgot-password', forgotPasswordRouter)
   .route('/api/registration', registrationRouter)
   .route('/api/track', trackRouter)
   .route('/api/shops', shopsRouter)

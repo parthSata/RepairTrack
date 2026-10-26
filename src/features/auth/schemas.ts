@@ -50,6 +50,38 @@ export const registrationTokenSchema = z.object({
 export const registrationResendSchema = z.object({ email: emailSchema })
 export const forgotPasswordSchema = z.object({ email: emailSchema })
 
+/** Shared password + confirmPassword object (no match refine yet). */
+export const passwordConfirmObject = z.object({
+  password: passwordSchema,
+  confirmPassword: z
+    .string({ error: 'Confirm password is required' })
+    .min(1, 'Confirm password is required'),
+})
+
+type PasswordConfirmShape = {
+  password: string
+  confirmPassword: string
+}
+
+/** Apply match refine to any object that includes password + confirmPassword. */
+export function withPasswordConfirmation<
+  T extends z.ZodType<PasswordConfirmShape>,
+>(schema: T) {
+  return schema.refine(
+    (data) => data.password === data.confirmPassword,
+    {
+      message: 'Passwords do not match',
+      path: ['confirmPassword'],
+    },
+  )
+}
+
+export const passwordConfirmSchema = withPasswordConfirmation(
+  passwordConfirmObject,
+)
+export const resetPasswordSchema = passwordConfirmSchema
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>

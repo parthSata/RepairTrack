@@ -328,6 +328,14 @@ handler. Both layers.
 
 Do not hand-roll JWTs. Do not store sessions in localStorage.
 
+Password reset uses Better Auth’s built-in tokens (1h TTL,
+single-use) and the platform Gmail sender (`sendPasswordResetEmail`).
+`POST /api/forgot-password` validates the email, requires an existing
+`users` row for that address, and only then calls Better Auth
+`requestPasswordReset` (unknown emails get 404 and no email is sent).
+`emailAndPassword.revokeSessionsOnPasswordReset` is enabled so a
+successful reset ends all other sessions for that user.
+
 **Note:** Better Auth's Google OAuth client (login) and the separate
 Gmail-sending OAuth client (§14) must use distinct OAuth client
 credentials/config, even though both may authorize against the same
@@ -661,7 +669,7 @@ Rules:
   - "Account-verification emails" means verification and authentication
     emails only: Owner registration, staff/technician signup after
     accepting an invite (Better Auth `signUpEmail`), reactivated-staff
-    verification, and future auth emails such as password reset.
+    verification, and password-reset emails.
   - Staff/technician invitations, repair updates, invoice and payment
     emails are shop emails: Owner's Gmail only. When it isn't connected,
     the UI shows `ConnectGmailPrompt` before the action instead of

@@ -76,6 +76,8 @@ Do not copy visual trends simply because they are popular.
 - Login
 - Register
 - Forgot Password
+- Reset Password (`/reset-password` — token from Better Auth email
+  redirect; new + confirm password; success → login)
 - Authentication states
 
 Google OAuth should be available where appropriate.
