@@ -48,6 +48,8 @@ export const registrationTokenSchema = z.object({
   token: z.string().min(1).max(200),
 })
 export const registrationResendSchema = z.object({ email: emailSchema })
+export const forgotPasswordSchema = z.object({ email: emailSchema })
 
 export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
