@@ -12,6 +12,7 @@ import { authClient } from '@/lib/auth-client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useAcceptInvitation } from '@/features/staff/mutations'
 import { acceptInvitationSchema, type AcceptInvitationInput, type InvitationDetails } from '@/features/staff/schemas'
+import { PasswordConfirmFields } from '@/components/auth/password-confirm-fields'
 import { VerifyEmailCard } from '@/components/auth/verify-email-card'
 
 export function InviteAcceptForm({
@@ -97,34 +98,14 @@ export function InviteAcceptForm({
         {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="accept-password">Set Password</Label>
-        <Input
-          id="accept-password"
-          type="password"
-          autoComplete="new-password"
-          placeholder="At least 8 characters"
-          {...register('password')}
-        />
-        {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-        <p className="text-[11px] text-muted-foreground leading-4">
-          Must be at least 8 characters with upper & lowercase letters, a number, and a special character.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="accept-confirm-password">Confirm Password</Label>
-        <Input
-          id="accept-confirm-password"
-          type="password"
-          autoComplete="new-password"
-          placeholder="Re-enter password"
-          {...register('confirmPassword')}
-        />
-        {errors.confirmPassword && (
-          <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
-        )}
-      </div>
+      <PasswordConfirmFields
+        idPrefix="accept"
+        passwordLabel="Set Password"
+        passwordRegister={register('password')}
+        confirmRegister={register('confirmPassword')}
+        passwordError={errors.password?.message}
+        confirmError={errors.confirmPassword?.message}
+      />
 
       <Button type="submit" disabled={isSubmitting || isGooglePending} className="w-full gap-2">
         {isSubmitting ? (

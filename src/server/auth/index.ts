@@ -191,6 +191,7 @@ export const auth = betterAuth({
     enabled: true,
     requireEmailVerification: true,
     resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       const result = await sendPasswordResetEmail({
         to: user.email,
