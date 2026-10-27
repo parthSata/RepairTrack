@@ -14,7 +14,8 @@ import { buildRepairCompletedEmail } from '@/server/email/templates/repair-compl
 import { buildRepairReceivedEmail } from '@/server/email/templates/repair-received'
 import { buildRepairStartedEmail } from '@/server/email/templates/repair-started'
 import { queueShopEmail } from '@/server/services/email.service'
-import type { CreateRepairInput } from '@/features/repairs/schemas'
+import { applyConfirmModelVerification } from '@/features/devices/model-verification'
+import type { ConfirmRepairModelInput, CreateRepairInput } from '@/features/repairs/schemas'
 import {
   normalizeStoredCostToPaise,
   rupeesInputToStoredPaise,
@@ -1244,6 +1245,96 @@ export async function updateDiagnosis({
     .limit(1)
 
   return updated!
+}
+
+export async function confirmRepairModel({
+  shopId,
+  userRole,
+  userId,
+  id,
+  data,
+}: {
+  shopId: string
+  userRole: string
+  userId: string
+  id: string
+  data: ConfirmRepairModelInput
+}) {
+  if (userRole === 'OWNER') {
+    throw new HTTPException(403, {
+      message:
+        'Owner cannot confirm device model on a repair. Confirmation belongs to staff and the assigned technician.',
+    })
+  }
+
+  const [existing] = await db
+    .select({
+      id: repairs.id,
+      deviceId: repairs.deviceId,
+      assignedTechnicianId: repairs.assignedTechnicianId,
+    })
+    .from(repairs)
+    .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
+
+  if (!existing) {
+    throw new HTTPException(404, { message: 'Repair ticket not found' })
+  }
+
+  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+    throw new HTTPException(403, {
+      message: 'Forbidden: Technicians can only confirm the model on repairs assigned to them.',
+    })
+  }
+
+  const [device] = await db
+    .select({
+      id: devices.id,
+      brand: devices.brand,
+      model: devices.model,
+      serialNumber: devices.serialNumber,
+      deviceType: devices.deviceType,
+      condition: devices.condition,
+    })
+    .from(devices)
+    .where(and(eq(devices.id, existing.deviceId), eq(devices.shopId, shopId)))
+
+  if (!device) {
+    throw new HTTPException(404, { message: 'Device not found' })
+  }
+
+  const verification = applyConfirmModelVerification({
+    existing: { brand: device.brand, model: device.model },
+    data,
+  })
+
+  const [updated] = await db
+    .update(devices)
+    .set({
+      brand: verification.brand,
+      model: verification.model,
+      modelVerified: verification.modelVerified,
+      modelVerificationOverridden: verification.modelVerificationOverridden,
+      modelVerificationNote: verification.modelVerificationNote,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(devices.id, device.id), eq(devices.shopId, shopId)))
+    .returning({
+      id: devices.id,
+      brand: devices.brand,
+      model: devices.model,
+      serialNumber: devices.serialNumber,
+      deviceType: devices.deviceType,
+      condition: devices.condition,
+      modelVerified: devices.modelVerified,
+      modelVerificationOverridden: devices.modelVerificationOverridden,
+      modelVerificationNote: devices.modelVerificationNote,
+    })
+
+  if (!updated) {
+    throw new HTTPException(500, { message: 'Failed to confirm device model' })
+  }
+
+  return updated
 }
 
 export async function updateEstimatedCost({

@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  deviceBrandSchema,
+  modelVerificationOverrideReasonSchema,
+} from '@/features/devices/schemas'
 import { repairPricingFieldsSchema } from '@/features/repairs/pricing-schemas'
 
 export const repairPriorityValues = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
@@ -133,3 +137,37 @@ export const updateRepairPartSchema = z.object({
 })
 
 export type UpdateRepairPartInput = z.infer<typeof updateRepairPartSchema>
+
+export const confirmRepairModelSchema = z
+  .object({
+    brand: deviceBrandSchema.optional(),
+    model: z
+      .string()
+      .trim()
+      .max(100, { message: 'Model name cannot exceed 100 characters' })
+      .optional()
+      .nullable(),
+    modelVerificationOverrideReason: modelVerificationOverrideReasonSchema.optional().nullable(),
+  })
+  .superRefine((data, ctx) => {
+    const isOverride = Boolean(data.modelVerificationOverrideReason?.trim())
+    if (isOverride) return
+
+    if (!data.brand?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['brand'],
+        message: 'Brand name must be at least 2 characters',
+      })
+    }
+
+    if (!data.model?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['model'],
+        message: 'Model is required to confirm the device model',
+      })
+    }
+  })
+
+export type ConfirmRepairModelInput = z.infer<typeof confirmRepairModelSchema>

@@ -4,8 +4,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { apiClient } from '@/lib/api-client'
 import { getApiErrorMessage } from '@/lib/api-error'
-import { repairKeys, type Repair } from './queries'
-import type { CreateRepairInput, ReopenRepairInput } from './schemas'
+import { deviceKeys } from '@/features/devices/queries'
+import { repairKeys, type Repair, type RepairDevice } from './queries'
+import type { ConfirmRepairModelInput, CreateRepairInput, ReopenRepairInput } from './schemas'
 
 export function useCreateRepair() {
   const queryClient = useQueryClient()
@@ -157,6 +158,31 @@ export function useUpdateDiagnosis(repairId: string) {
         message = error.message
       }
       toast.error(message)
+    },
+  })
+}
+
+export function useConfirmRepairModel(repairId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation<RepairDevice, Error, ConfirmRepairModelInput>({
+    mutationFn: async (data) => {
+      const response = await apiClient.post<RepairDevice>(`/repairs/${repairId}/confirm-model`, data)
+      return response.data
+    },
+    onSuccess: (device, variables) => {
+      queryClient.invalidateQueries({ queryKey: repairKeys.all })
+      queryClient.invalidateQueries({ queryKey: repairKeys.detail(repairId) })
+      queryClient.invalidateQueries({ queryKey: deviceKeys.all })
+      queryClient.invalidateQueries({ queryKey: deviceKeys.detail(device.id) })
+
+      const wasOverride = Boolean(variables.modelVerificationOverrideReason?.trim())
+      toast.success(
+        wasOverride ? 'Model verification overridden' : 'Device model confirmed successfully',
+      )
+    },
+    onError: (error: unknown) => {
+      toast.error(getApiErrorMessage(error, 'Failed to confirm device model'))
     },
   })
 }

@@ -6,24 +6,33 @@ export type DeviceType = (typeof DEVICE_TYPES)[number]
 export const DEVICE_CONDITIONS = ['GOOD', 'FAIR', 'POOR'] as const
 export type DeviceCondition = (typeof DEVICE_CONDITIONS)[number]
 
+export const deviceBrandSchema = z
+  .string()
+  .trim()
+  .min(2, { message: 'Brand name must be at least 2 characters' })
+  .max(50, { message: 'Brand name cannot exceed 50 characters' })
+
+export const deviceModelSchema = z
+  .string()
+  .trim()
+  .max(100, { message: 'Model name cannot exceed 100 characters' })
+  .optional()
+  .nullable()
+
+export const modelVerificationOverrideReasonSchema = z
+  .string()
+  .trim()
+  .min(1, { message: 'Override reason is required' })
+
 export const deviceSchema = z.object({
   customerId: z
     .string()
     .trim()
     .min(1, { message: 'Customer selection is required' }),
-  brand: z
-    .string()
-    .trim()
-    .min(2, { message: 'Brand name must be at least 2 characters' })
-    .max(50, { message: 'Brand name cannot exceed 50 characters' }),
-  model: z
-    .string()
-    .trim()
-    .max(100, { message: 'Model name cannot exceed 100 characters' })
-    .optional()
-    .nullable(),
+  brand: deviceBrandSchema,
+  model: deviceModelSchema,
   markUnverified: z.boolean().optional(),
-  modelVerificationOverrideReason: z.string().trim().min(1, { message: 'Override reason is required' }).optional().nullable(),
+  modelVerificationOverrideReason: modelVerificationOverrideReasonSchema.optional().nullable(),
   serialNumber: z
     .string()
     .trim()
