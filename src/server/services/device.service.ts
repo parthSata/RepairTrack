@@ -156,7 +156,9 @@ export async function createDevice({
   }
 
   const modelVal = data.model?.trim() || null
-  const modelVerified = true
+  const isModelProvided = Boolean(modelVal)
+  const markUnverified = Boolean(data.markUnverified)
+  const modelVerified = isModelProvided && !markUnverified
 
   const id = crypto.randomUUID()
   const [created] = await db
