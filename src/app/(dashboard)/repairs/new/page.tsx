@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
+import { AccessDenied } from '@/components/dashboard/access-denied'
 import { NewRepairWorkflow } from '@/components/repairs/new-repair-workflow'
 import { RepairPageShell } from '@/components/repairs/repair-page-shell'
 
@@ -16,7 +17,7 @@ export default async function NewRepairPage() {
 
   const role = session.user.role ?? 'OWNER'
   if (role === 'TECHNICIAN') {
-    redirect('/dashboard')
+    return <AccessDenied resource="repair ticket creation" />
   }
 
   return (

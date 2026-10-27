@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
+import { AccessDenied } from '@/components/dashboard/access-denied'
 import { CustomerTable } from '@/components/customers/customer-table'
 
 export const metadata: Metadata = {
@@ -15,7 +16,7 @@ export default async function CustomersPage() {
 
   const role = session.user.role ?? 'OWNER'
   if (role === 'TECHNICIAN') {
-    redirect('/dashboard')
+    return <AccessDenied resource="customers" />
   }
 
   return (
