@@ -27,6 +27,18 @@ export async function getShopById(shopId: string) {
   return shop ? { ...shop, businessHours: parseBusinessHours(shop.businessHours) } : null
 }
 
+/** Trimmed shop display name, or null when missing / blank. */
+export async function getShopName(shopId: string): Promise<string | null> {
+  const [shop] = await db
+    .select({ shopName: shops.name })
+    .from(shops)
+    .where(eq(shops.id, shopId))
+    .limit(1)
+
+  const name = shop?.shopName?.trim()
+  return name || null
+}
+
 export async function getShopUpi(shopId: string): Promise<ShopUpi | null> {
   const [shop] = await db
     .select({ upiId: shops.upiId, upiPayeeName: shops.upiPayeeName, shopName: shops.name })

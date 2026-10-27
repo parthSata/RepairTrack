@@ -4,7 +4,9 @@ import { Bell } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/server/auth'
+import { getShopName } from '@/server/services/shop.service'
 import { LogoutButton } from '@/components/auth/logout-button'
+import { HeaderUserIdentity } from '@/components/dashboard/header-user-identity'
 import { MobileNav } from '@/components/dashboard/mobile-nav'
 import { SidebarNav } from '@/components/dashboard/sidebar-nav'
 
@@ -21,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   const role = session.user.role ?? 'OWNER'
+  const shopName = session.user.shopId ? await getShopName(session.user.shopId) : null
 
   return (
     <div className="flex min-h-screen bg-background print:block print:min-h-0 print:bg-white">
@@ -38,8 +41,23 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       </aside>
       <section className="min-w-0 flex-1">
         <header className="flex h-16 items-center justify-between border-b border-border bg-card px-4 sm:px-8 print:hidden">
-          <div className="flex items-center gap-3"><MobileNav role={role} /><span className="text-sm font-medium md:hidden">RepairTrack</span><span className="hidden text-sm text-muted-foreground md:block">Operations overview</span></div>
-          <div className="flex items-center gap-2"><button type="button" aria-label="Notifications" className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground"><Bell className="h-4 w-4" /></button><span className="mx-1 h-5 w-px bg-border" /><p className="hidden text-sm text-muted-foreground sm:block">{session.user.name}</p><LogoutButton /></div>
+          <div className="flex items-center gap-3">
+            <MobileNav role={role} />
+            <span className="text-sm font-medium md:hidden">RepairTrack</span>
+            <span className="hidden text-sm text-muted-foreground md:block">Operations overview</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Notifications"
+              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground"
+            >
+              <Bell className="h-4 w-4" />
+            </button>
+            <span className="mx-1 h-5 w-px bg-border" />
+            <HeaderUserIdentity userName={session.user.name} shopName={shopName} role={role} />
+            <LogoutButton />
+          </div>
         </header>
         <main className="page-enter p-4 sm:p-8 print:p-0">{children}</main>
       </section>
