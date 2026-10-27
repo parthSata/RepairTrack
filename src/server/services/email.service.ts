@@ -146,7 +146,11 @@ export async function sendGmailTestEmail(shopId: string, to: string): Promise<vo
     to,
     email: {
       subject: `${shop.shopName}: Gmail connection test`,
-      html: buildGmailTestEmailHtml({ shopName: shop.shopName, senderEmail: connection.email ?? '' }),
+      html: buildGmailTestEmailHtml({
+        shopName: shop.shopName,
+        senderEmail: connection.email ?? '',
+        logoKey: shop.logoUrl,
+      }),
     },
   })
   if (outcome.status === 'SENT') return

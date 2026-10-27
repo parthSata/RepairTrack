@@ -140,7 +140,13 @@ async function rebuildInvoiceGenerated({ shopId, repairId, entityId, repair }: R
       invoiceNumber: invoice.invoiceNumber,
       issuedAt: invoice.createdAt,
       ticketNumber: invoice.ticketNumber,
-      shop: { name: repair.shopName, address: repair.shopAddress, phone: repair.shopPhone, email: repair.shopEmail },
+      shop: {
+        name: repair.shopName,
+        logoKey: repair.shopLogoKey,
+        address: repair.shopAddress,
+        phone: repair.shopPhone,
+        email: repair.shopEmail,
+      },
       customer: invoice.customer,
       device: invoice.device,
       items: invoice.items,
@@ -163,11 +169,12 @@ async function rebuildPaymentReceived({ shopId, repairId, entityId, repair }: Re
   const payment = payments.find((row) => row.id === entityId)
   if (!payment) fail(404, REPAIR_EMAIL_MESSAGES.paymentNotFound)
 
-  const { shopName, customerName, ticketNumber, trackingToken } = repairEmailBase(repair)
+  const { shopName, logoKey, customerName, ticketNumber, trackingToken } = repairEmailBase(repair)
   return {
     to: repair.customerEmail,
     email: buildPaymentReceivedEmail({
       shopName,
+      logoKey,
       customerName,
       ticketNumber,
       payment,

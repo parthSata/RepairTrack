@@ -240,6 +240,7 @@ async function findPaymentEmailContext(client: DbClient, { shopId, repairId }: R
       customerName: customers.name,
       customerEmail: customers.email,
       shopName: shops.name,
+      shopLogoKey: shops.logoKey,
     })
     .from(repairs)
     .innerJoin(customers, eq(customers.id, repairs.customerId))
@@ -328,6 +329,7 @@ export async function recordPayment({
 
     const email: PaymentReceivedEmailData = {
       shopName: context.shopName,
+      logoKey: context.shopLogoKey,
       customerName: context.customerName,
       ticketNumber: context.ticketNumber,
       payment,

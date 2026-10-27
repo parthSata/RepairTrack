@@ -39,9 +39,18 @@ export function buildPasswordResetEmailHtml({ name, url }: { name: string; url: 
   })
 }
 
-export function buildGmailTestEmailHtml({ shopName, senderEmail }: { shopName: string; senderEmail: string }) {
+export function buildGmailTestEmailHtml({
+  shopName,
+  senderEmail,
+  logoKey,
+}: {
+  shopName: string
+  senderEmail: string
+  logoKey?: string | null
+}) {
   return renderEmailLayout({
     shopName,
+    logoKey,
     title: 'Gmail connection test',
     bodyHtml: `
               ${heading('Your Gmail is connected')}
@@ -60,17 +69,20 @@ export function buildStaffInvitationEmailHtml({
   shopName,
   role,
   inviteUrl,
+  logoKey,
 }: {
   inviterName: string
   shopName: string
   role: 'STAFF' | 'TECHNICIAN'
   inviteUrl: string
+  logoKey?: string | null
 }) {
   const safeShopName = escapeHtml(shopName)
   const roleDisplay = ROLE_DISPLAY[role]
 
   return renderEmailLayout({
     shopName,
+    logoKey,
     title: `You've been invited to join ${shopName}`,
     bodyHtml: `
               ${heading('Team Invitation')}

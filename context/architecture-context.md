@@ -681,6 +681,22 @@ Rules:
   and never hard-codes one. The `.env` sender is private to
   `gmail.service.ts` and reachable only through
   `sendAccountVerificationEmail` and `sendPasswordResetEmail`.
+- Platform auth emails set MIME `From` display name to
+  `PLATFORM_FROM_NAME = "RepairTrack"` in `gmail.service.ts`. Do not
+  add a `GMAIL_FROM_NAME` env var. The app does **not** patch Gmail
+  **Send mail as** (that would rename all mail from the platform
+  mailbox). Gmail's inbox sender label follows the account's own
+  Send mail as / profile name.
+- Shop email HTML headers use the shop's `logoKey` → Cloudinary public
+  URL when set; otherwise `DEFAULT_EMAIL_LOGO_URL`
+  (`RepairTrack/assets/email-logo` on Cloudinary — no spaces in the path,
+  because Gmail's image proxy double-encodes `%20` and breaks the image)
+  via `resolveEmailLogoUrl`. Platform auth emails always use that default.
+  Absolute HTTPS URLs only — never filesystem paths in the HTML `img` src.
+- Gmail's circular sender avatar is separate from the MIME `From`
+  display name and the logo embedded in the email body. Changing the
+  avatar may require updating the Google account profile photo or an
+  applicable email-branding mechanism; the app cannot force it via HTML.
 - `sendEmail` returns `{ sent: true, messageId }` or
   `{ sent: false, reason: 'not_configured' | 'invalid_grant' | 'send_failed', error }`
   and never throws; `invalid_grant` means the shop must reconnect.

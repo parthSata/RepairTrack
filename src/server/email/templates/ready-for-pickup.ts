@@ -19,6 +19,7 @@ import { buildTrackingUrl } from '@/server/services/email.service'
 
 export type ReadyForPickupEmailData = {
   shopName: string
+  logoKey?: string | null
   customerName: string
   ticketNumber: string
   device: EmailDevice
@@ -50,6 +51,7 @@ export function buildReadyForPickupEmail(data: ReadyForPickupEmailData): { subje
 
   const html = renderEmailLayout({
     shopName: data.shopName,
+    logoKey: data.logoKey,
     title: `Ready for pickup - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${statusPill('Ready for pickup', 'green')}

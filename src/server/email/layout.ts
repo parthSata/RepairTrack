@@ -1,10 +1,12 @@
 import { escapeHtml } from '@/server/email/escape-html'
+import { resolveEmailLogoUrl } from '@/server/email/logo-url'
 
 type EmailLayoutInput = {
   shopName: string
   title: string
   bodyHtml: string
   footerHtml?: string
+  logoKey?: string | null
 }
 
 function defaultFooterHtml() {
@@ -17,7 +19,11 @@ export function renderEmailLayout({
   title,
   bodyHtml,
   footerHtml = defaultFooterHtml(),
+  logoKey,
 }: EmailLayoutInput) {
+  const logoUrl = resolveEmailLogoUrl(logoKey)
+  const safeShopName = escapeHtml(shopName)
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -35,8 +41,10 @@ export function renderEmailLayout({
             <td style="background-color:#0f172a;padding:28px 32px;text-align:left;">
               <table role="presentation" border="0" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td style="background-color:#2563eb;color:#ffffff;font-weight:bold;font-size:14px;border-radius:6px;padding:6px 10px;">RT</td>
-                  <td style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.5px;padding-left:10px;">${escapeHtml(shopName)}</td>
+                  <td style="vertical-align:middle;background-color:#ffffff;border-radius:8px;padding:4px;">
+                    <img src="${escapeHtml(logoUrl)}" alt="${safeShopName}" width="36" height="36" style="display:block;width:36px;height:36px;border-radius:4px;object-fit:contain;background-color:#ffffff;" />
+                  </td>
+                  <td style="color:#ffffff;font-size:18px;font-weight:700;letter-spacing:-0.5px;padding-left:12px;vertical-align:middle;">${safeShopName}</td>
                 </tr>
               </table>
             </td>

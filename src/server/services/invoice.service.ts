@@ -79,7 +79,13 @@ export async function createInvoiceFromRepair({
         trackingToken: repairs.trackingToken,
         customer: { name: customers.name, phone: customers.phone, email: customers.email },
         device: { brand: devices.brand, model: devices.model, serialNumber: devices.serialNumber },
-        shop: { name: shops.name, address: shops.address, phone: shops.phone, email: shops.email },
+        shop: {
+          name: shops.name,
+          logoKey: shops.logoKey,
+          address: shops.address,
+          phone: shops.phone,
+          email: shops.email,
+        },
       })
       .from(repairs)
       .innerJoin(customers, eq(customers.id, repairs.customerId))

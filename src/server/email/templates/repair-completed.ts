@@ -16,6 +16,7 @@ import { buildTrackingUrl } from '@/server/services/email.service'
 
 export type RepairCompletedEmailData = {
   shopName: string
+  logoKey?: string | null
   customerName: string
   ticketNumber: string
   device: EmailDevice
@@ -29,6 +30,7 @@ export function buildRepairCompletedEmail(data: RepairCompletedEmailData): { sub
 
   const html = renderEmailLayout({
     shopName: data.shopName,
+    logoKey: data.logoKey,
     title: `Repair completed - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${statusPill('Completed', 'green')}
