@@ -4,64 +4,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import {
-  Boxes,
-  CircleDollarSign,
-  CreditCard,
-  LayoutDashboard,
-  Menu,
-  Settings,
-  Smartphone,
-  UserPlus,
-  Users,
-  Wrench,
-  X,
-} from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { getPrimaryNavItems, isPrimaryNavLinkActive } from './primary-nav'
 
 export function MobileNav({ role }: { role: string }) {
   const [open, setOpen] = useState(false)
   const pathname = usePathname()
-  const restricted = role === 'TECHNICIAN'
-  const owner = role === 'OWNER'
+  const links = getPrimaryNavItems(role)
   const close = () => setOpen(false)
-
-  const links = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/repairs', label: 'Repairs', icon: Wrench },
-    { href: '/customers', label: 'Customers', icon: Users },
-    { href: '/devices', label: 'Devices', icon: Smartphone },
-    ...(!restricted
-      ? [
-          { href: '/inventory', label: 'Inventory', icon: Boxes },
-          { href: '/invoices', label: 'Invoices', icon: CircleDollarSign },
-          { href: '/payments', label: 'Payments', icon: CreditCard },
-          ...(owner
-            ? [
-                { href: '/settings/staff', label: 'Staff', icon: UserPlus },
-                { href: '/settings/shop', label: 'Settings', icon: Settings },
-              ]
-            : []),
-        ]
-      : []),
-  ]
-
-  const isLinkActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard'
-    }
-    // Settings nav points at /settings/shop but covers all shop-settings tabs
-    // (shop, email, …). Staff is a separate nav item under /settings/staff.
-    if (href === '/settings/shop') {
-      return (
-        pathname.startsWith('/settings/') &&
-        pathname !== '/settings/staff' &&
-        !pathname.startsWith('/settings/staff/')
-      )
-    }
-    return pathname === href || pathname.startsWith(`${href}/`)
-  }
 
   return (
     <div className="md:hidden">
@@ -104,7 +56,7 @@ export function MobileNav({ role }: { role: string }) {
             </div>
             <div className="mt-6 space-y-1">
               {links.map(({ href, label, icon: Icon }) => {
-                const active = isLinkActive(href)
+                const active = isPrimaryNavLinkActive(pathname, href)
                 return (
                   <Link
                     key={href}

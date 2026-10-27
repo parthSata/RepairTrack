@@ -43,7 +43,12 @@ const STATUS_BADGE_VARIANTS: Record<string, 'default' | 'secondary' | 'outline' 
   COMPLETED: 'secondary',
 }
 
-export function DashboardWorkQueue() {
+type DashboardWorkQueueProps = {
+  role?: string
+}
+
+export function DashboardWorkQueue({ role }: DashboardWorkQueueProps) {
+  const isTechnician = role === 'TECHNICIAN'
   const { data, isLoading, isError, refetch, isFetching } = useRepairs({
     limit: 6,
     page: 1,
@@ -72,7 +77,9 @@ export function DashboardWorkQueue() {
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
-                Recent repairs and actionable items
+                {isTechnician
+                  ? 'Your recent assigned repairs'
+                  : 'Recent repairs and actionable items'}
               </p>
             </div>
           </div>
@@ -81,12 +88,14 @@ export function DashboardWorkQueue() {
             {isFetching && !isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
             ) : null}
-            <Link href="/repairs/new">
-              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-                <Plus className="h-3.5 w-3.5" />
-                New ticket
-              </Button>
-            </Link>
+            {!isTechnician ? (
+              <Link href="/repairs/new">
+                <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  New ticket
+                </Button>
+              </Link>
+            ) : null}
             <Link href="/repairs">
               <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs">
                 View all
@@ -114,9 +123,13 @@ export function DashboardWorkQueue() {
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <ClipboardList className="h-5 w-5" />
             </div>
-            <p className="mt-4 text-sm font-medium text-foreground">No repairs logged yet</p>
+            <p className="mt-4 text-sm font-medium text-foreground">
+              {isTechnician ? 'No assigned repairs yet' : 'No repairs logged yet'}
+            </p>
             <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-              Create your first repair ticket to start tracking bench progress and turnaround times.
+              {isTechnician
+                ? 'When tickets are assigned to you, they will show up here.'
+                : 'Create your first repair ticket to start tracking bench progress and turnaround times.'}
             </p>
           </div>
         ) : (

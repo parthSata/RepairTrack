@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { auth } from '@/server/auth'
+import { AccessDenied } from '@/components/dashboard/access-denied'
 import { DeviceDetails } from '@/components/devices/device-details'
 
 export const metadata: Metadata = {
@@ -19,7 +20,7 @@ export default async function DeviceDetailPage({
 
   const role = session.user.role ?? 'OWNER'
   if (role === 'TECHNICIAN') {
-    redirect('/dashboard')
+    return <AccessDenied resource="devices" />
   }
 
   const { id } = await params
