@@ -4,12 +4,11 @@ import { Bell } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/server/auth'
-  import { getShopName } from '@/server/services/shop.service'
+import { getShopName } from '@/server/services/shop.service'
 import { LogoutButton } from '@/components/auth/logout-button'
+import { HeaderUserIdentity } from '@/components/dashboard/header-user-identity'
 import { MobileNav } from '@/components/dashboard/mobile-nav'
 import { SidebarNav } from '@/components/dashboard/sidebar-nav'
-
-const FALLBACK_SHOP_LABEL = 'Shop Profile Management'
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -25,7 +24,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   const role = session.user.role ?? 'OWNER'
   const shopName = session.user.shopId ? await getShopName(session.user.shopId) : null
-  const headerLabel = shopName ?? FALLBACK_SHOP_LABEL
 
   return (
     <div className="flex min-h-screen bg-background print:block print:min-h-0 print:bg-white">
@@ -57,7 +55,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               <Bell className="h-4 w-4" />
             </button>
             <span className="mx-1 h-5 w-px bg-border" />
-            <p className="hidden text-sm text-muted-foreground sm:block">{headerLabel}</p>
+            <HeaderUserIdentity userName={session.user.name} shopName={shopName} role={role} />
             <LogoutButton />
           </div>
         </header>
