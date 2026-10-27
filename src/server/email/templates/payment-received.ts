@@ -19,6 +19,7 @@ import { buildTrackingUrl } from '@/server/services/email.service'
 /** Amounts in integer paise. `totalPaid` includes this payment. */
 export type PaymentReceivedEmailData = {
   shopName: string
+  logoKey?: string | null
   customerName: string
   ticketNumber: string
   payment: {
@@ -48,6 +49,7 @@ export function buildPaymentReceivedEmail(data: PaymentReceivedEmailData): { sub
 
   const html = renderEmailLayout({
     shopName: data.shopName,
+    logoKey: data.logoKey,
     title: `Payment received - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${statusPill('Payment received', isComplete ? 'green' : 'blue')}

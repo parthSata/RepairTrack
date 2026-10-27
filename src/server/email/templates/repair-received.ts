@@ -14,6 +14,7 @@ import { buildTrackingUrl } from '@/server/services/email.service'
 
 export type RepairReceivedEmailData = {
   shopName: string
+  logoKey?: string | null
   customerName: string
   ticketNumber: string
   device: EmailDevice
@@ -27,6 +28,7 @@ export function buildRepairReceivedEmail(data: RepairReceivedEmailData): { subje
 
   const html = renderEmailLayout({
     shopName: data.shopName,
+    logoKey: data.logoKey,
     title: `Repair received - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${heading("We've received your device")}

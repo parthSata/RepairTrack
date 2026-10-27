@@ -321,7 +321,8 @@ export async function inviteStaff(
     .returning({ id: staffInvitations.id })
 
   const inviteLink = `/invite/${token}`
-  const shopName = (await getShopById(shopId))?.shopName ?? 'RepairTrack'
+  const shop = await getShopById(shopId)
+  const shopName = shop?.shopName ?? 'RepairTrack'
   const emailOutcome = await sendAndLogShopEmail({
     shopId,
     type: 'STAFF_INVITATION',
@@ -332,6 +333,7 @@ export async function inviteStaff(
       html: buildStaffInvitationEmailHtml({
         inviterName: inviter?.name ?? shopName,
         shopName,
+        logoKey: shop?.logoUrl,
         role: input.role,
         inviteUrl: `${getAppUrl()}${inviteLink}`,
       }),

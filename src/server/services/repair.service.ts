@@ -71,7 +71,13 @@ export async function createRepairTicket({
 }) {
   // 1. Verify Customer exists in current shop (403 if cross-shop or missing)
   const [customer] = await db
-    .select({ id: customers.id, name: customers.name, email: customers.email, shopName: shops.name })
+    .select({
+      id: customers.id,
+      name: customers.name,
+      email: customers.email,
+      shopName: shops.name,
+      shopLogoKey: shops.logoKey,
+    })
     .from(customers)
     .innerJoin(shops, eq(shops.id, customers.shopId))
     .where(and(eq(customers.id, data.customerId), eq(customers.shopId, shopId)))
@@ -211,6 +217,7 @@ export async function createRepairTicket({
     dedupeKey: `REPAIR_RECEIVED:${createdRepair.id}`,
     email: () => buildRepairReceivedEmail({
       shopName: customer.shopName,
+      logoKey: customer.shopLogoKey,
       customerName: customer.name,
       ticketNumber: createdRepair.ticketNumber,
       device,
@@ -684,6 +691,7 @@ export async function findRepairEmailContext(shopId: string, id: string) {
       deviceBrand: devices.brand,
       deviceModel: devices.model,
       shopName: shops.name,
+      shopLogoKey: shops.logoKey,
       shopAddress: shops.address,
       shopPhone: shops.phone,
       shopEmail: shops.email,
@@ -704,6 +712,7 @@ export type RepairEmailContext = NonNullable<Awaited<ReturnType<typeof findRepai
 export function repairEmailBase(repair: RepairEmailContext) {
   return {
     shopName: repair.shopName,
+    logoKey: repair.shopLogoKey,
     customerName: repair.customerName,
     ticketNumber: repair.ticketNumber,
     device: { brand: repair.deviceBrand, model: repair.deviceModel },
@@ -895,6 +904,7 @@ export async function requestCustomerApproval({
       deviceBrand: devices.brand,
       deviceModel: devices.model,
       shopName: shops.name,
+      shopLogoKey: shops.logoKey,
     })
     .from(repairs)
     .innerJoin(customers, eq(customers.id, repairs.customerId))
@@ -979,6 +989,7 @@ export async function requestCustomerApproval({
     dedupeKey: `APPROVAL_REQUIRED:${approvalId}`,
     email: () => buildApprovalRequiredEmail({
       shopName: existing.shopName,
+      logoKey: existing.shopLogoKey,
       customerName: existing.customerName,
       ticketNumber: existing.ticketNumber,
       device: { brand: existing.deviceBrand, model: existing.deviceModel },

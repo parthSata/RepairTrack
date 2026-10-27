@@ -54,12 +54,16 @@ export async function sendEmail(sender: GmailSender, message: EmailMessage): Pro
   }
 }
 
+const PLATFORM_FROM_NAME = 'RepairTrack'
+
 // The .env mailbox is the platform sender, reserved for auth emails
 // (verification + password reset). Shop emails use that shop's connected Gmail.
+// Gmail inbox display name follows the account's Send mail as / profile — we do not
+// patch that via the Settings API (would rename all mail from this mailbox).
 function getPlatformSender(): GmailSender | null {
   const refreshToken = process.env.GMAIL_REFRESH_TOKEN
   const email = process.env.GMAIL_USER
-  return refreshToken && email ? { name: 'RepairTrack', email, refreshToken } : null
+  return refreshToken && email ? { name: PLATFORM_FROM_NAME, email, refreshToken } : null
 }
 
 export async function sendAccountVerificationEmail({

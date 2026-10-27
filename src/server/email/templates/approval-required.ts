@@ -17,6 +17,7 @@ import { buildTrackingUrl } from '@/server/services/email.service'
 
 export type ApprovalRequiredEmailData = {
   shopName: string
+  logoKey?: string | null
   customerName: string
   ticketNumber: string
   device: EmailDevice
@@ -33,6 +34,7 @@ export function buildApprovalRequiredEmail(data: ApprovalRequiredEmailData): { s
 
   const html = renderEmailLayout({
     shopName: data.shopName,
+    logoKey: data.logoKey,
     title: `Approval needed - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${statusPill('Action needed', 'amber')}

@@ -17,6 +17,23 @@ function encodeWord(value: string) {
   return `=?UTF-8?B?${Buffer.from(headerValue(value), 'utf8').toString('base64')}?=`
 }
 
+// Formats display-name <email> per RFC 5322 and RFC 2047.
+// ASCII names use standard quoted-string format ("Name" <email>) so that Gmail
+// and other mail clients recognize and display the custom sender name (e.g. "RepairTrack")
+// instead of rejecting the encoded-word and falling back to the account profile name.
+function formatAddress(name: string, email: string): string {
+  const cleanEmail = headerValue(email)
+  const cleanName = headerValue(name)
+  if (!cleanName) return cleanEmail
+
+  if (/[^\x20-\x7E]/.test(cleanName)) {
+    return `${encodeWord(cleanName)} <${cleanEmail}>`
+  }
+
+  const sanitized = cleanName.replace(/["\\]/g, '')
+  return `"${sanitized}" <${cleanEmail}>`
+}
+
 // RFC 2045 limits base64 body lines to 76 characters.
 function toWrappedBase64(value: string) {
   return (Buffer.from(value, 'utf8').toString('base64').match(/.{1,76}/g) ?? []).join('\r\n')
@@ -24,7 +41,7 @@ function toWrappedBase64(value: string) {
 
 export function buildRawEmail({ fromName, fromEmail, to, replyTo, subject, html }: RawEmailInput) {
   const headers = [
-    `From: ${encodeWord(fromName)} <${headerValue(fromEmail)}>`,
+    `From: ${formatAddress(fromName, fromEmail)}`,
     `To: ${headerValue(to)}`,
     ...(replyTo ? [`Reply-To: ${headerValue(replyTo)}`] : []),
     `Subject: ${encodeWord(subject)}`,

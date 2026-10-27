@@ -23,7 +23,13 @@ export type InvoiceGeneratedEmailData = {
   invoiceNumber: string
   issuedAt: Date
   ticketNumber: string
-  shop: { name: string; address: string | null; phone: string | null; email: string | null }
+  shop: {
+    name: string
+    logoKey?: string | null
+    address: string | null
+    phone: string | null
+    email: string | null
+  }
   customer: { name: string; phone: string | null; email: string | null }
   device: EmailDevice & { serialNumber: string | null }
   items: { partName: string; quantity: number; unitPrice: number }[]
@@ -113,6 +119,7 @@ export function buildInvoiceGeneratedEmail(data: InvoiceGeneratedEmailData): { s
 
   const html = renderEmailLayout({
     shopName: data.shop.name,
+    logoKey: data.shop.logoKey,
     title: `Invoice ${data.invoiceNumber} - Ticket #${data.ticketNumber}`,
     bodyHtml: `
               ${statusPill('Invoice', 'blue')}
