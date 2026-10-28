@@ -58,7 +58,9 @@ export function useRepairDetails(id: string) {
   }
 
   const access = repair ? getRepairDetailsAccess(userRole, userId, repair) : null
-  const view = repair ? getRepairDetailsViewModel(repair, userRole, isPricingUnlocked) : null
+  const view = repair
+    ? getRepairDetailsViewModel(repair, userRole, userId, isPricingUnlocked)
+    : null
 
   const handleReassign = async () => {
     await reassignMutation.mutateAsync({ technicianId: selectedTechId || null })

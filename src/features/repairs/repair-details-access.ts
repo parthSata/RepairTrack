@@ -1,3 +1,4 @@
+import { isDeviceModelIdentified } from '@/features/devices/model-verification'
 import { getIssuedInvoice, type Repair } from '@/features/repairs/queries'
 import {
   getPricingPanelMode,
@@ -26,7 +27,9 @@ export type RepairDetailsViewModel = {
     additionalCharges: number
     taxPercent: number
   }
-  showModelConfirmationCard: boolean
+  /** Assigned TECH on DIAGNOSING may open confirm-model dialog. */
+  canConfirmModel: boolean
+  deviceModelIdentified: boolean
   partsLockedReason: string | null
 }
 
@@ -53,6 +56,7 @@ export function getRepairDetailsAccess(
 export function getRepairDetailsViewModel(
   repair: Repair,
   userRole: string,
+  userId: string | undefined,
   isPricingUnlocked: boolean,
 ): RepairDetailsViewModel {
   const approvalStatus: ApprovalStatus | null = repair.approval?.status ?? null
@@ -65,11 +69,18 @@ export function getRepairDetailsViewModel(
     hasIssuedInvoice,
   })
 
-  const partsLockedReason = hasIssuedInvoice
-    ? PRICING_MESSAGES.invoiceIssued
-    : pricingPanelMode === 'finalize' && !isPricingUnlocked
-      ? PRICING_MESSAGES.partsLockedUntilUnlock
-      : null
+  const deviceModelIdentified = isDeviceModelIdentified(repair.device)
+
+  const partsLockedReason = !deviceModelIdentified
+    ? PRICING_MESSAGES.modelNotIdentified
+    : hasIssuedInvoice
+      ? PRICING_MESSAGES.invoiceIssued
+      : pricingPanelMode === 'finalize' && !isPricingUnlocked
+        ? PRICING_MESSAGES.partsLockedUntilUnlock
+        : null
+
+  const isAssignedTechnician =
+    userRole === 'TECHNICIAN' && repair.assignedTechnicianId === userId
 
   return {
     approvalStatus,
@@ -81,10 +92,12 @@ export function getRepairDetailsViewModel(
       additionalCharges: repair.additionalCharges ?? 0,
       taxPercent: repair.taxPercent ?? 0,
     },
-    showModelConfirmationCard:
+    // TECH-only dialog; OWNER/STAFF confirm via Device Details edit.
+    canConfirmModel:
+      isAssignedTechnician &&
       repair.status === 'DIAGNOSING' &&
-      repair.device.modelVerified === false &&
-      Boolean(repair.assignedTechnicianId),
+      !deviceModelIdentified,
+    deviceModelIdentified,
     partsLockedReason,
   }
 }

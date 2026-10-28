@@ -57,6 +57,7 @@ export function RepairStatusApprovalPanel({
         estimatedTotal={repair.estimatedTotal ?? null}
         intakeEstimatedCost={repair.estimatedCost}
         hasIssuedInvoice={hasIssuedInvoice}
+        device={repair.device}
         onRequested={onRefetch}
       />
     </div>

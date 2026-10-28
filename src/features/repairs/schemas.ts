@@ -151,21 +151,21 @@ export const confirmRepairModelSchema = z
   })
   .superRefine((data, ctx) => {
     const isOverride = Boolean(data.modelVerificationOverrideReason?.trim())
-    if (isOverride) return
 
-    if (!data.brand?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['brand'],
-        message: 'Brand name must be at least 2 characters',
-      })
-    }
-
+    // Verification always needs a model name (override is a note, not a skip).
     if (!data.model?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['model'],
         message: 'Model is required to confirm the device model',
+      })
+    }
+
+    if (!isOverride && !data.brand?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['brand'],
+        message: 'Brand name must be at least 2 characters',
       })
     }
   })

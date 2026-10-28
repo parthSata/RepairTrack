@@ -1,6 +1,9 @@
 import { and, asc, eq } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
+import { isDeviceModelIdentified } from '@/features/devices/model-verification'
+import { PRICING_MESSAGES } from '@/features/repairs/pricing-rules'
 import { db, type DbClient } from '@/server/db'
+import { devices } from '@/server/db/schema/repairs'
 import { inventory } from '@/server/db/schema/inventory'
 import { repairParts } from '@/server/db/schema/repair-parts'
 import { repairs } from '@/server/db/schema/repairs'
@@ -23,8 +26,11 @@ async function assertCanRecordParts({
       id: repairs.id,
       assignedTechnicianId: repairs.assignedTechnicianId,
       status: repairs.status,
+      deviceModel: devices.model,
+      deviceModelVerified: devices.modelVerified,
     })
     .from(repairs)
+    .innerJoin(devices, eq(devices.id, repairs.deviceId))
     .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
     .limit(1)
 
@@ -41,6 +47,15 @@ async function assertCanRecordParts({
     throw new HTTPException(403, {
       message: 'Forbidden: Technicians can only record parts on repairs assigned to them.',
     })
+  }
+
+  if (
+    !isDeviceModelIdentified({
+      model: repair.deviceModel,
+      modelVerified: repair.deviceModelVerified,
+    })
+  ) {
+    throw new HTTPException(409, { message: PRICING_MESSAGES.modelNotIdentified })
   }
 
   await assertNoIssuedInvoice({ shopId, repairId })

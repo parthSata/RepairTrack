@@ -6,6 +6,14 @@ export type ModelVerificationResult = {
   modelVerificationNote: string | null
 }
 
+/** True when the device has a model name and has been verified (or overridden with a model). */
+export function isDeviceModelIdentified(device: {
+  model: string | null | undefined
+  modelVerified: boolean
+}): boolean {
+  return device.modelVerified && Boolean(device.model?.trim())
+}
+
 type ExistingDeviceModel = {
   brand: string
   model: string | null
@@ -31,26 +39,23 @@ export function applyConfirmModelVerification({
   const overrideReason = data.modelVerificationOverrideReason?.trim() || null
   const isOverride = Boolean(overrideReason)
 
-  if (isOverride) {
-    const brand = data.brand?.trim() || existing.brand
-    const model =
-      data.model !== undefined ? data.model?.trim() || null : existing.model
+  const brand = (data.brand?.trim() || existing.brand).trim()
+  const model =
+    data.model !== undefined ? data.model?.trim() || null : existing.model
 
+  if (isOverride) {
     return {
       brand,
       model,
-      modelVerified: true,
+      modelVerified: Boolean(model),
       modelVerificationOverridden: true,
       modelVerificationNote: overrideReason,
     }
   }
 
-  const brand = data.brand!.trim()
-  const model = data.model!.trim()
-
   return {
-    brand,
-    model,
+    brand: data.brand!.trim(),
+    model: data.model!.trim(),
     modelVerified: true,
     modelVerificationOverridden: false,
     modelVerificationNote: null,

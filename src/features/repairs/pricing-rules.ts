@@ -43,6 +43,8 @@ export const PRICING_MESSAGES = {
     'An invoice has been issued for this repair. Cancel the invoice to change charges or parts.',
   partsLockedUntilUnlock:
     'Unlock to edit on the estimate to add or remove parts. The total stays as saved until then.',
+  modelNotIdentified:
+    'Confirm the device model before adding parts or sending an estimate. Incorrect models risk wrong parts and repairs.',
 } as const
 
 const CLOSED_STATUSES = new Set(['COMPLETED', 'CANCELLED'])
@@ -131,6 +133,7 @@ export function getSendApprovalViolation({
   status,
   approvalStatus,
   hasIssuedInvoice = false,
+  deviceModelIdentified = true,
 }: {
   userRole: string
   userId: string | null | undefined
@@ -138,6 +141,8 @@ export function getSendApprovalViolation({
   status: string
   approvalStatus: ApprovalStatus | null | undefined
   hasIssuedInvoice?: boolean
+  /** Ticket creation may omit model; estimate/parts work must not. */
+  deviceModelIdentified?: boolean
 }): PricingRuleViolation | null {
   if (userRole === 'OWNER') return forbidden(PRICING_MESSAGES.approvalOwnerForbidden)
   if (userRole === 'TECHNICIAN' && assignedTechnicianId !== userId) {
@@ -159,6 +164,7 @@ export function getSendApprovalViolation({
         : PRICING_MESSAGES.approvalNeedsDiagnosing,
     )
   }
+  if (!deviceModelIdentified) return conflict(PRICING_MESSAGES.modelNotIdentified)
   return null
 }
 

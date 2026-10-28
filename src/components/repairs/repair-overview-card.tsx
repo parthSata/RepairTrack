@@ -54,8 +54,8 @@ export function RepairOverviewCard({
 }: Props) {
   return (
     <Card className="w-full min-w-0 overflow-hidden border-border/80 shadow-sm">
-      <CardContent className="flex w-full min-w-0 flex-col gap-6 pt-6">
-        <div className="flex w-full min-w-0 flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <CardContent className="flex w-full min-w-0 flex-col gap-4 pt-5 sm:gap-5 sm:pt-6">
+        <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
           <RepairTicketIdentity repair={repair} />
           <RepairStatusApprovalPanel
             repair={repair}
@@ -67,8 +67,13 @@ export function RepairOverviewCard({
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 pt-1 md:grid-cols-2">
-          <RepairLinkedDeviceCard device={repair.device} />
+        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
+          <RepairLinkedDeviceCard
+            device={repair.device}
+            repairId={repair.id}
+            canConfirmModel={view.canConfirmModel}
+            onModelConfirmed={onRefetch}
+          />
           <RepairLinkedCustomerCard customer={repair.customer} />
           <RepairTechnicianCard
             repair={repair}

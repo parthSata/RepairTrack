@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { CustomerTrackingSection } from '@/components/repairs/customer-tracking-section'
 import { EstimatePricingPanel } from '@/components/repairs/estimate-pricing-panel'
-import { ModelConfirmationCard } from '@/components/repairs/model-confirmation-card'
 import { PaymentSummaryCard } from '@/components/repairs/payment-summary-card'
 import { RepairDiagnosisSection } from '@/components/repairs/repair-diagnosis-section'
 import { RepairDetailsError, RepairDetailsLoading } from '@/components/repairs/repair-details-states'
@@ -49,10 +48,6 @@ export function RepairDetails({ id }: { id: string }) {
           </Button>
         </Link>
       </header>
-
-      {view.showModelConfirmationCard ? (
-        <ModelConfirmationCard device={repair.device} onConfirmed={() => void details.refetch()} />
-      ) : null}
 
       <RepairOverviewCard
         repair={repair}

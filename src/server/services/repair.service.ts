@@ -904,6 +904,7 @@ export async function requestCustomerApproval({
       customerEmail: customers.email,
       deviceBrand: devices.brand,
       deviceModel: devices.model,
+      deviceModelVerified: devices.modelVerified,
       shopName: shops.name,
       shopLogoKey: shops.logoKey,
     })
@@ -926,6 +927,8 @@ export async function requestCustomerApproval({
       status: existing.status,
       approvalStatus: latestApproval?.status,
       hasIssuedInvoice: invoiced,
+      deviceModelIdentified:
+        existing.deviceModelVerified && Boolean(existing.deviceModel?.trim()),
     }),
   )
 
@@ -1260,13 +1263,6 @@ export async function confirmRepairModel({
   id: string
   data: ConfirmRepairModelInput
 }) {
-  if (userRole === 'OWNER') {
-    throw new HTTPException(403, {
-      message:
-        'Owner cannot confirm device model on a repair. Confirmation belongs to staff and the assigned technician.',
-    })
-  }
-
   const [existing] = await db
     .select({
       id: repairs.id,
@@ -1280,9 +1276,11 @@ export async function confirmRepairModel({
     throw new HTTPException(404, { message: 'Repair ticket not found' })
   }
 
-  if (userRole === 'TECHNICIAN' && existing.assignedTechnicianId !== userId) {
+  // TECH-only ticket-floor confirm; OWNER/STAFF edit models from Device Details.
+  if (userRole !== 'TECHNICIAN' || existing.assignedTechnicianId !== userId) {
     throw new HTTPException(403, {
-      message: 'Forbidden: Technicians can only confirm the model on repairs assigned to them.',
+      message:
+        'Only the assigned technician can confirm the device model on a repair. Staff and owners can update the model from Device Details.',
     })
   }
 
