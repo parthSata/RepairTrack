@@ -5,6 +5,7 @@ import { HTTPException } from 'hono/http-exception'
 import { requireRole } from '@/server/hono/session'
 import {
   addRepairNote,
+  confirmRepairModel,
   createRepairTicket,
   getRepairById,
   listRepairs,
@@ -38,6 +39,7 @@ import { REPAIR_EMAIL_MESSAGES } from '@/features/emails/schemas'
 import { repairStatusEnum } from '@/server/db/schema/repairs'
 import {
   addRepairPartSchema,
+  confirmRepairModelSchema,
   createRepairSchema,
   reopenRepairSchema,
   requestCustomerApprovalSchema,
@@ -235,6 +237,25 @@ export const repairsRouter = new Hono()
         diagnosis,
       })
       return c.json(updated)
+    },
+  )
+  .post(
+    '/:id/confirm-model',
+    zValidator('param', idParamSchema, validationHook),
+    zValidator('json', confirmRepairModelSchema, validationHook),
+    async (c) => {
+      const { shopId, userRole, userId } = await requireRepairAccess(c.req.raw)
+      const id = c.req.valid('param').id
+      const data = c.req.valid('json')
+
+      const device = await confirmRepairModel({
+        shopId,
+        userRole,
+        userId,
+        id,
+        data,
+      })
+      return c.json(device)
     },
   )
   .patch(

@@ -223,6 +223,7 @@ sign in; they use the public tracking page only.
 | Create repair ticket | yes | yes | no |
 | Assign technician | yes | yes | no |
 | Update repair status | NO* | yes | assigned repairs only |
+| Confirm device model on repair | NO* | yes | assigned repairs only |
 | Edit diagnosis, add repair notes | yes | yes | assigned repairs only |
 | Reopen COMPLETED ticket | yes | yes | no |
 | Restore CANCELLED ticket | yes | yes | no |
@@ -241,7 +242,7 @@ sign in; they use the public tracking page only.
 
 Repair photos become customer-visible only when both before and after exist, repair status is `READY_FOR_PICKUP` or `COMPLETED`, and `customer_photos_hidden` is false. There is no per-ticket Share action.
 
-* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from direct status changes and manages the shop by reassigning, not by editing ticket state. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
+* **Exception:** repair status changes and confirming a device model on a repair are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from those ticket-floor actions and manages the shop by reassigning, not by editing ticket state. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions. OWNER/STAFF can still confirm models from Device Details via device edit.
 * **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.
 * **Action semantics:** Reopen/Restore are actions, not repair statuses. The existing repair status enum remains the source of truth.
 * **History note:** Recovery activity uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
