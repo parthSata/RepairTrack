@@ -73,17 +73,14 @@ type PartChargeRow = {
   quantity: number
 }
 
-function toRupeesOrZero(stored: number): number {
-  return storedCostToRupees(stored) ?? 0
-}
-
 function paiseToPublicRupees(paise: number): number {
   return paiseToRupees(paise)
 }
 
+/** Approvals store costs in paise — convert with paiseToRupees only (no legacy heuristic). */
 function toPublicApproval(approval: ApprovalRow) {
-  const initialEstimate = toRupeesOrZero(approval.initialEstimatedCost)
-  const additionalCost = toRupeesOrZero(approval.additionalEstimatedCost)
+  const initialEstimate = paiseToPublicRupees(approval.initialEstimatedCost)
+  const additionalCost = paiseToPublicRupees(approval.additionalEstimatedCost)
   const revisedTotal = initialEstimate + additionalCost
 
   return {
