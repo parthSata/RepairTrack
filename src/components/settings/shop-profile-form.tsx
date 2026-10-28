@@ -54,7 +54,8 @@ function ShopProfileEditor({ profile }: { profile: ShopProfileResponse }) {
     mode: 'onChange',
     defaultValues: profile,
   })
-  const hours = useWatch({ control, name: 'businessHours' })
+  const watchedHours = useWatch({ control, name: 'businessHours' })
+  const hours = watchedHours ?? profile.businessHours
   const shopName = useWatch({ control, name: 'shopName' })
 
   async function onSubmit(values: ShopProfile) {

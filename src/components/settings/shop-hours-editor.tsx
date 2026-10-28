@@ -1,10 +1,12 @@
 'use client'
 
-import { Plus, Trash2 } from 'lucide-react'
+import * as React from 'react'
+import { Check, Copy, Plus, Trash2 } from 'lucide-react'
 import {
   type FieldErrors,
   type UseFormSetValue,
 } from 'react-hook-form'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   BUSINESS_HOUR_DAYS,
@@ -12,7 +14,10 @@ import {
   type BusinessHours,
 } from '@/features/shop/business-hours'
 import type { ShopProfile } from '@/features/shop/schemas'
+import { cn } from '@/lib/utils'
 import { ShopTimeSelect } from './shop-time-select'
+
+const WEEKDAY_DAYS = BUSINESS_HOUR_DAYS.slice(0, 5)
 
 const DAY_LABELS: Record<BusinessHourDay, string> = {
   monday: 'Monday',
@@ -31,6 +36,23 @@ type BusinessHoursErrors = FieldErrors<ShopProfile>['businessHours']
 const DAY_ROW_GRID =
   'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 md:grid-cols-[7rem_5.75rem_minmax(0,1fr)_auto_minmax(0,1fr)_2.75rem]'
 
+function dayHoursEqual(
+  a: BusinessHours[BusinessHourDay],
+  b: BusinessHours[BusinessHourDay],
+): boolean {
+  if (a.open !== b.open) return false
+  if (a.intervals.length !== b.intervals.length) return false
+  return a.intervals.every(
+    (interval, index) =>
+      interval.from === b.intervals[index]?.from && interval.to === b.intervals[index]?.to,
+  )
+}
+
+function weekdaysMatchMonday(hours: BusinessHours): boolean {
+  const monday = hours.monday
+  return WEEKDAY_DAYS.every((day) => dayHoursEqual(hours[day], monday))
+}
+
 function FieldError({ message }: { message?: string }) {
   return message ? <p className="animate-in fade-in text-sm text-destructive">{message}</p> : null
 }
@@ -44,6 +66,15 @@ export function ShopHoursEditor({
   setValue: UseFormSetValue<ShopProfile>
   errors?: BusinessHoursErrors
 }) {
+  const [justApplied, setJustApplied] = React.useState(false)
+  const appliedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  React.useEffect(() => {
+    return () => {
+      if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current)
+    }
+  }, [])
+
   function updateDay(day: BusinessHourDay, value: BusinessHours[BusinessHourDay]) {
     setValue(`businessHours.${day}`, value, { shouldDirty: true, shouldValidate: true })
   }
@@ -56,30 +87,45 @@ export function ShopHoursEditor({
     )
   }
 
-  function applyToWeekdays() {
-    const weekdayHours = hours.monday
-    for (const day of BUSINESS_HOUR_DAYS.slice(0, 5)) {
-      updateDay(day, {
-        ...weekdayHours,
-        intervals: weekdayHours.intervals.map((interval) => ({ ...interval })),
-      })
+  function applyMondayToWeekdays() {
+    const mondayHours = hours.monday
+    const mondayCopy: BusinessHours[BusinessHourDay] = {
+      open: mondayHours.open,
+      intervals: mondayHours.intervals.map((interval) => ({ ...interval })),
     }
+
+    const nextHours = { ...hours }
+    for (const day of WEEKDAY_DAYS) {
+      nextHours[day] = {
+        open: mondayCopy.open,
+        intervals: mondayCopy.intervals.map((interval) => ({ ...interval })),
+      }
+    }
+
+    setValue('businessHours', nextHours, { shouldDirty: true, shouldValidate: true })
+    setJustApplied(true)
+    if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current)
+    appliedTimerRef.current = setTimeout(() => setJustApplied(false), 1600)
+
+    toast.success(
+      mondayCopy.open
+        ? 'Copied Monday hours to Tue–Fri'
+        : 'Tue–Fri set to closed (same as Monday)',
+    )
   }
+
+  const alreadySynced = weekdaysMatchMonday(hours)
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">Shop Hours</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Set when customers can visit your shop for pickup and support.
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={applyToWeekdays}>
-          Apply to weekdays
-        </Button>
+      <div className="border-b border-border pb-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-steel">Shop Hours</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Set when customers can visit your shop for pickup and support.
+        </p>
       </div>
-      <div className="divide-y divide-border rounded-lg border border-border">
+
+      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
         {BUSINESS_HOUR_DAYS.map((day) => (
           <HoursDayRow
             key={day}
@@ -88,10 +134,71 @@ export function ShopHoursEditor({
             setValue={setValue}
             error={errors?.[day]}
             onToggle={() => toggleDay(day)}
+            highlight={justApplied && WEEKDAY_DAYS.includes(day)}
+            weekdayAction={
+              day === 'monday' ? (
+                <CopyWeekdaysAction
+                  alreadySynced={alreadySynced}
+                  mondayOpen={hours.monday.open}
+                  onApply={applyMondayToWeekdays}
+                />
+              ) : null
+            }
           />
         ))}
       </div>
     </section>
+  )
+}
+
+function CopyWeekdaysAction({
+  alreadySynced,
+  mondayOpen,
+  onApply,
+}: {
+  alreadySynced: boolean
+  mondayOpen: boolean
+  onApply: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border/80 bg-muted/25 px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-foreground">Same hours Mon–Fri?</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            {alreadySynced
+              ? mondayOpen
+                ? 'Tue–Fri already match Monday.'
+                : 'Weekdays are already closed like Monday.'
+              : 'Copy Monday’s schedule to Tuesday through Friday in one click.'}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant={alreadySynced ? 'outline' : 'accent'}
+          size="sm"
+          disabled={alreadySynced}
+          className="h-9 shrink-0 gap-1.5"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onApply()
+          }}
+        >
+          {alreadySynced ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Weekdays synced
+            </>
+          ) : (
+            <>
+              <Copy className="h-3.5 w-3.5" />
+              Copy to Tue–Fri
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -101,12 +208,16 @@ function HoursDayRow({
   setValue,
   error,
   onToggle,
+  highlight,
+  weekdayAction,
 }: {
   day: BusinessHourDay
   hours: BusinessHours[BusinessHourDay]
   setValue: UseFormSetValue<ShopProfile>
   error?: NonNullable<BusinessHoursErrors>[BusinessHourDay]
   onToggle: () => void
+  highlight?: boolean
+  weekdayAction?: React.ReactNode
 }) {
   function addInterval() {
     if (hours.intervals.length >= 2) return
@@ -138,20 +249,28 @@ function HoursDayRow({
     </Button>
   )
 
+  const rowShell = cn(
+    'space-y-3 p-4 transition-colors duration-300 sm:p-5',
+    highlight && 'bg-accent/10',
+  )
+
   if (!hours.open) {
     return (
-      <div className={`${DAY_ROW_GRID} p-4 sm:p-5`}>
-        <p className="min-w-0 font-semibold text-foreground">{DAY_LABELS[day]}</p>
-        {openToggle}
-        <p className="col-span-2 text-sm text-muted-foreground md:col-span-4">
-          Customers cannot visit on this day.
-        </p>
+      <div className={cn(rowShell, 'space-y-3')}>
+        <div className={DAY_ROW_GRID}>
+          <p className="min-w-0 font-semibold text-foreground">{DAY_LABELS[day]}</p>
+          {openToggle}
+          <p className="col-span-2 text-sm text-muted-foreground md:col-span-4">
+            Customers cannot visit on this day.
+          </p>
+        </div>
+        {weekdayAction}
       </div>
     )
   }
 
   return (
-    <div className="space-y-3 p-4 sm:p-5">
+    <div className={rowShell}>
       {hours.intervals.map((_, index) => (
         <div key={`${day}-${index}`} className={DAY_ROW_GRID}>
           {index === 0 ? (
@@ -166,7 +285,6 @@ function HoursDayRow({
             </>
           )}
 
-          {/* Mobile: keep from / to / actions on one wrapping row via contents on md */}
           <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-4 md:contents">
             <div className="min-w-0 flex-1 md:min-w-0">
               <ShopTimeSelect
@@ -224,6 +342,7 @@ function HoursDayRow({
         </div>
       ))}
       <FieldError message={error?.intervals?.message} />
+      {weekdayAction}
     </div>
   )
 }

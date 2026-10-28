@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, ShieldAlert } from 'lucide-react'
 import { toast } from '@/components/ui/sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,7 @@ import {
   type DeviceFormInput,
 } from '@/features/devices/schemas'
 import { useCreateDevice, useUpdateDevice } from '@/features/devices/mutations'
+import { cn } from '@/lib/utils'
 import { CustomerPicker } from './customer-picker'
 import type { Device, LinkedCustomer } from '@/features/devices/queries'
 
@@ -26,6 +27,43 @@ interface DeviceFormProps {
   initialCustomer?: LinkedCustomer | null
   onSuccess: (device?: Device) => void
   onCancel: () => void
+}
+
+function FieldLabel({
+  htmlFor,
+  required,
+  children,
+  hint,
+}: {
+  htmlFor: string
+  required?: boolean
+  children: React.ReactNode
+  hint?: string
+}) {
+  return (
+    <label
+      htmlFor={htmlFor}
+      className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+    >
+      {children}
+      {required ? <span className="text-destructive"> *</span> : null}
+      {hint ? (
+        <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground/80">
+          ({hint})
+        </span>
+      ) : null}
+    </label>
+  )
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return (
+    <p className="flex items-center gap-1 text-xs font-medium text-destructive">
+      <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+      {message}
+    </p>
+  )
 }
 
 export function DeviceForm({
@@ -66,11 +104,14 @@ export function DeviceForm({
   const currentCondition = useWatch({ control, name: 'condition' })
   const customerId = useWatch({ control, name: 'customerId' })
   const watchedModel = useWatch({ control, name: 'model' })
+  const markUnverified = useWatch({ control, name: 'markUnverified' })
 
   const createMutation = useCreateDevice()
   const updateMutation = useUpdateDevice()
 
   const isPending = createMutation.isPending || updateMutation.isPending || isSubmitting
+  const hasModel = Boolean(watchedModel?.trim())
+  const serialLabel = currentDeviceType === 'PHONE' ? 'IMEI / Serial Number' : 'Serial Number'
 
   const onSubmit = async (data: DeviceFormInput) => {
     try {
@@ -84,17 +125,20 @@ export function DeviceForm({
       }
       onSuccess(savedDevice)
     } catch (err: unknown) {
-      const errorObj = err as { response?: { data?: { error?: { message?: string } } }; message?: string }
-      const message = errorObj?.response?.data?.error?.message || errorObj?.message || 'An unexpected error occurred'
+      const errorObj = err as {
+        response?: { data?: { error?: { message?: string } } }
+        message?: string
+      }
+      const message =
+        errorObj?.response?.data?.error?.message ||
+        errorObj?.message ||
+        'An unexpected error occurred'
       toast.error(message)
     }
   }
 
-  const serialLabel = currentDeviceType === 'PHONE' ? 'IMEI / Serial Number' : 'Serial Number'
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2" noValidate>
-      {/* Customer Picker */}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-2" noValidate>
       <CustomerPicker
         value={customerId}
         selectedCustomer={selectedCustomer}
@@ -105,12 +149,12 @@ export function DeviceForm({
         error={errors.customerId?.message}
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Brand */}
-        <div className="space-y-1">
-          <label htmlFor="brand" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Brand <span className="text-destructive">*</span>
-          </label>
+      {/* Brand + Model stay equal height — verification lives on its own row below */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="brand" required>
+            Brand
+          </FieldLabel>
           <Input
             id="brand"
             placeholder="e.g. Apple, Samsung, Dell"
@@ -118,56 +162,64 @@ export function DeviceForm({
             disabled={isPending}
             className={errors.brand ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
-          {errors.brand && (
-            <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {errors.brand.message}
-            </p>
-          )}
+          <FieldError message={errors.brand?.message} />
         </div>
 
-        {/* Model */}
-        <div className="space-y-1">
-          <label htmlFor="model" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Model <span className="text-xs font-normal text-muted-foreground">(Optional at intake)</span>
-          </label>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="model" hint="optional at intake">
+            Model
+          </FieldLabel>
           <Input
             id="model"
-            placeholder="e.g. iPhone 14 Pro, XPS 15 (leave empty if unconfirmed)"
+            placeholder="e.g. iPhone 14 Pro, XPS 15"
             {...register('model')}
             disabled={isPending}
             className={errors.model ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
-          {errors.model && (
-            <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {errors.model.message}
-            </p>
-          )}
-
-          {watchedModel?.trim() ? (
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="markUnverified"
-                {...register('markUnverified')}
-                disabled={isPending}
-                className="h-3.5 w-3.5 rounded border-input bg-background text-accent focus:ring-accent"
-              />
-              <label htmlFor="markUnverified" className="text-xs text-muted-foreground cursor-pointer select-none">
-                Low confidence — mark as unverified
-              </label>
-            </div>
-          ) : null}
+          <FieldError message={errors.model?.message} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Device Type */}
-        <div className="space-y-1">
-          <label htmlFor="deviceType" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Device Type <span className="text-destructive">*</span>
-          </label>
+      {hasModel ? (
+        <label
+          htmlFor="markUnverified"
+          className={cn(
+            'flex cursor-pointer items-start gap-3 rounded-lg border px-3.5 py-3 transition-colors',
+            markUnverified
+              ? 'border-amber-300/80 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/25'
+              : 'border-border/80 bg-muted/30 hover:bg-muted/50',
+          )}
+        >
+          <input
+            type="checkbox"
+            id="markUnverified"
+            {...register('markUnverified')}
+            disabled={isPending}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-input bg-background text-accent focus:ring-accent"
+          />
+          <span className="min-w-0 space-y-0.5">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <ShieldAlert
+                className={cn(
+                  'h-3.5 w-3.5 shrink-0',
+                  markUnverified ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
+                )}
+              />
+              Low confidence — mark as unverified
+            </span>
+            <span className="block text-xs leading-relaxed text-muted-foreground">
+              Use when the model might be wrong. Staff or the assigned tech must confirm it before
+              parts or estimates.
+            </span>
+          </span>
+        </label>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="deviceType" required>
+            Device Type
+          </FieldLabel>
           <ListFilterSelect
             id="deviceType"
             value={currentDeviceType}
@@ -176,9 +228,7 @@ export function DeviceForm({
             }
             disabled={isPending}
             aria-label="Device type"
-            className={
-              errors.deviceType ? 'border-destructive focus:ring-destructive' : undefined
-            }
+            className={errors.deviceType ? 'border-destructive focus:ring-destructive' : undefined}
             options={DEVICE_TYPES.map((type) => ({
               value: type,
               label:
@@ -193,19 +243,13 @@ export function DeviceForm({
                         : 'Other',
             }))}
           />
-          {errors.deviceType && (
-            <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {errors.deviceType.message}
-            </p>
-          )}
+          <FieldError message={errors.deviceType?.message} />
         </div>
 
-        {/* Condition */}
-        <div className="space-y-1">
-          <label htmlFor="condition" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Condition <span className="text-destructive">*</span>
-          </label>
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor="condition" required>
+            Condition
+          </FieldLabel>
           <ListFilterSelect
             id="condition"
             value={currentCondition}
@@ -214,9 +258,7 @@ export function DeviceForm({
             }
             disabled={isPending}
             aria-label="Device condition"
-            className={
-              errors.condition ? 'border-destructive focus:ring-destructive' : undefined
-            }
+            className={errors.condition ? 'border-destructive focus:ring-destructive' : undefined}
             options={DEVICE_CONDITIONS.map((cond) => ({
               value: cond,
               label:
@@ -227,57 +269,40 @@ export function DeviceForm({
                     : 'Poor (Damaged/Broken)',
             }))}
           />
-          {errors.condition && (
-            <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              {errors.condition.message}
-            </p>
-          )}
+          <FieldError message={errors.condition?.message} />
         </div>
       </div>
 
-      {/* Serial Number */}
-      <div className="space-y-1">
-        <label htmlFor="serialNumber" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {serialLabel}
-        </label>
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor="serialNumber">{serialLabel}</FieldLabel>
         <Input
           id="serialNumber"
           placeholder="e.g. SN1234567890 or IMEI"
           {...register('serialNumber')}
           disabled={isPending}
-          className={errors.serialNumber ? 'border-destructive focus-visible:ring-destructive' : ''}
+          className={
+            errors.serialNumber ? 'border-destructive focus-visible:ring-destructive' : ''
+          }
         />
-        {errors.serialNumber && (
-          <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            {errors.serialNumber.message}
-          </p>
-        )}
+        <FieldError message={errors.serialNumber?.message} />
       </div>
 
-      {/* Accessories */}
-      <div className="space-y-1">
-        <label htmlFor="accessories" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Accessories Received
-        </label>
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor="accessories">Accessories Received</FieldLabel>
         <Textarea
           id="accessories"
           placeholder="e.g. Charger, protective case, SIM card tray"
           rows={2}
           {...register('accessories')}
           disabled={isPending}
-          className={errors.accessories ? 'border-destructive focus-visible:ring-destructive' : ''}
+          className={
+            errors.accessories ? 'border-destructive focus-visible:ring-destructive' : ''
+          }
         />
-        {errors.accessories && (
-          <p className="text-xs font-medium text-destructive flex items-center gap-1 mt-1">
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            {errors.accessories.message}
-          </p>
-        )}
+        <FieldError message={errors.accessories?.message} />
       </div>
 
-      <div className="flex items-center justify-end gap-2 pt-4 border-t border-border">
+      <div className="flex items-center justify-end gap-2 border-t border-border pt-4">
         <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
           Cancel
         </Button>

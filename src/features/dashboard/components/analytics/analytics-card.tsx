@@ -34,8 +34,8 @@ export function AnalyticsCard<T>({
   const { data, isPending, isError, error, isFetching, refetch } = query
 
   return (
-    <Card className={cn('border-border/80 shadow-xs flex flex-col overflow-hidden', className)}>
-      <CardContent className="p-5 flex flex-col flex-1">
+    <Card className={cn('h-fit border-border/80 shadow-xs overflow-hidden', className)}>
+      <CardContent className="flex flex-col p-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
           <div
@@ -51,7 +51,7 @@ export function AnalyticsCard<T>({
         {isPending && !data ? (
           skeleton ?? <Skeleton className="mt-4 h-10 w-24" />
         ) : isError && !data ? (
-          <div className="mt-4 flex-1">
+          <div className="mt-4">
             <QueryErrorState
               error={error}
               fallback="Failed to load analytics."
@@ -59,12 +59,12 @@ export function AnalyticsCard<T>({
             />
           </div>
         ) : isEmpty ? (
-          <div className="mt-4 flex min-h-20 flex-1 flex-col items-center justify-center text-center">
+          <div className="mt-4 flex min-h-16 flex-col items-center justify-center text-center">
             <BarChart3 className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             <p className="mt-2 text-sm text-muted-foreground">{emptyText}</p>
           </div>
         ) : data ? (
-          <div className="mt-3 flex flex-1 flex-col">{children(data)}</div>
+          <div className="mt-3">{children(data)}</div>
         ) : null}
 
         {data && isError ? (

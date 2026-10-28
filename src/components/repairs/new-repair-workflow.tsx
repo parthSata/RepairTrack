@@ -261,7 +261,7 @@ export function NewRepairWorkflow() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <Wrench className="h-6 w-6 text-primary shrink-0" />
+            <Wrench className="h-6 w-6 shrink-0 text-accent" />
             Create Repair Ticket
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
@@ -286,21 +286,21 @@ export function NewRepairWorkflow() {
           {/* ======================================================= */}
           {/* STEP ①: CUSTOMER SELECTION */}
           {/* ======================================================= */}
-          <Card className={selectedCustomer ? 'border-primary/40 bg-card/60' : 'border-primary shadow-sm'}>
+          <Card className={selectedCustomer ? 'border-border bg-card/60' : 'border-border shadow-sm'}>
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${selectedCustomer
                         ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-primary text-primary-foreground'
+                        : 'bg-accent text-accent-foreground'
                       }`}
                   >
                     {selectedCustomer ? <CheckCircle2 className="h-5 w-5" /> : '1'}
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-foreground">
-                      1. Select Customer
+                      Select Customer
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Search existing shop customers or create a new customer
@@ -329,7 +329,7 @@ export function NewRepairWorkflow() {
                 /* Confirmed Customer State */
                 <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
                       <UserCheck className="h-5 w-5" />
                     </div>
                     <div>
@@ -426,10 +426,10 @@ export function NewRepairWorkflow() {
           <Card
             className={
               !selectedCustomer
-                ? 'opacity-50 pointer-events-none border-border'
+                ? 'pointer-events-none border-border opacity-50'
                 : selectedDevice
-                  ? 'border-primary/40 bg-card/60'
-                  : 'border-primary shadow-sm'
+                  ? 'border-border bg-card/60'
+                  : 'border-border shadow-sm'
             }
           >
             <CardContent className="pt-6 space-y-4">
@@ -439,7 +439,7 @@ export function NewRepairWorkflow() {
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${selectedDevice
                         ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                         : selectedCustomer
-                          ? 'bg-primary text-primary-foreground'
+                          ? 'bg-accent text-accent-foreground'
                           : 'bg-muted text-muted-foreground'
                       }`}
                   >
@@ -447,7 +447,7 @@ export function NewRepairWorkflow() {
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-foreground">
-                      2. Select Device
+                      Select Device
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Choose a device registered to {selectedCustomer ? selectedCustomer.name : 'the customer'}
@@ -478,7 +478,7 @@ export function NewRepairWorkflow() {
                 /* Confirmed Device State */
                 <div className="rounded-lg border border-border bg-muted/30 p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted/40 text-foreground">
                       <DeviceTypeIcon type={selectedDevice.deviceType} />
                     </div>
                     <div>
@@ -513,7 +513,7 @@ export function NewRepairWorkflow() {
 
                   {isLoadingDevices ? (
                     <div className="py-6 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-                      <LoaderCircle className="h-4 w-4 animate-spin text-primary" />
+                      <LoaderCircle className="h-4 w-4 animate-spin text-accent" />
                       Loading customer devices...
                     </div>
                   ) : devicesData?.items?.length ? (
@@ -522,7 +522,7 @@ export function NewRepairWorkflow() {
                         <div
                           key={dev.id}
                           onClick={() => handleSelectDevice(dev)}
-                          className="rounded-lg border border-border bg-card p-3.5 hover:border-primary/50 hover:bg-accent/5 cursor-pointer transition-all space-y-2 flex flex-col justify-between"
+                          className="flex cursor-pointer flex-col justify-between space-y-2 rounded-lg border border-border bg-card p-3.5 transition-all hover:border-accent/40 hover:bg-accent/5"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
@@ -564,22 +564,22 @@ export function NewRepairWorkflow() {
           <Card
             className={
               !selectedDevice
-                ? 'opacity-50 pointer-events-none border-border'
-                : 'border-primary shadow-sm'
+                ? 'pointer-events-none border-border opacity-50'
+                : 'border-border shadow-sm'
             }
           >
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-center justify-between pb-2 border-b border-border">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${selectedDevice ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${selectedDevice ? 'bg-accent text-accent-foreground' : 'bg-muted text-muted-foreground'
                       }`}
                   >
                     3
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-foreground">
-                      3. Repair Details & Diagnostics
+                      Repair Details & Diagnostics
                     </h3>
                     <p className="text-xs text-muted-foreground">
                       Record issue symptoms, initial condition, priority, and technician assignment
@@ -767,7 +767,7 @@ export function NewRepairWorkflow() {
               <CardContent className="pt-6 space-y-4 text-xs">
                 <div className="pb-3 border-b border-border">
                   <h4 className="text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
+                    <FileText className="h-4 w-4 text-accent" />
                     Ticket Intake Summary
                   </h4>
                 </div>
@@ -872,7 +872,7 @@ export function NewRepairWorkflow() {
       <Dialog open={customerDialogOpen} onOpenChange={setCustomerDialogOpen}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
-            <User className="h-5 w-5 text-primary" />
+            <User className="h-5 w-5 text-accent" />
             Create New Customer
           </DialogTitle>
           <DialogDescription>
@@ -896,7 +896,7 @@ export function NewRepairWorkflow() {
       <Dialog open={deviceDialogOpen} onOpenChange={setDeviceDialogOpen}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-semibold">
-            <Smartphone className="h-5 w-5 text-primary" />
+            <Smartphone className="h-5 w-5 text-accent" />
             Add New Device
           </DialogTitle>
           <DialogDescription>

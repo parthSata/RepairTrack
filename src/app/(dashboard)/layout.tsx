@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import Image from 'next/image'
-import { Bell } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { auth } from '@/server/auth'
@@ -46,15 +45,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <span className="text-sm font-medium md:hidden">RepairTrack</span>
             <span className="hidden text-sm text-muted-foreground md:block">Operations overview</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Notifications"
-              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground"
-            >
-              <Bell className="h-4 w-4" />
-            </button>
-            <span className="mx-1 h-5 w-px bg-border" />
+          <div className="flex items-center gap-2 sm:gap-3">
             <HeaderUserIdentity userName={session.user.name} shopName={shopName} role={role} />
             <LogoutButton />
           </div>
