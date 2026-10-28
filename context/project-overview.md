@@ -223,7 +223,7 @@ sign in; they use the public tracking page only.
 | Create repair ticket | yes | yes | no |
 | Assign technician | yes | yes | no |
 | Update repair status | NO* | yes | assigned repairs only |
-| Confirm device model on repair | NO* | yes | assigned repairs only |
+| Confirm device model on repair | NO* | NO* | assigned repairs only |
 | Edit diagnosis, add repair notes | yes | yes | assigned repairs only |
 | Reopen COMPLETED ticket | yes | yes | no |
 | Restore CANCELLED ticket | yes | yes | no |
@@ -242,7 +242,7 @@ sign in; they use the public tracking page only.
 
 Repair photos become customer-visible only when both before and after exist, repair status is `READY_FOR_PICKUP` or `COMPLETED`, and `customer_photos_hidden` is false. There is no per-ticket Share action.
 
-* **Exception:** repair status changes and confirming a device model on a repair are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from those ticket-floor actions and manages the shop by reassigning, not by editing ticket state. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions. OWNER/STAFF can still confirm models from Device Details via device edit.
+* **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from that ticket-floor action and manages the shop by reassigning, not by editing ticket state. Confirming a device model on a repair is assigned-TECHNICIAN only — OWNER and STAFF already edit brand/model from Device Details. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
 * **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.
 * **Action semantics:** Reopen/Restore are actions, not repair statuses. The existing repair status enum remains the source of truth.
 * **History note:** Recovery activity uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
@@ -384,11 +384,11 @@ Users with appropriate permissions can:
 - Mark repairs ready for pickup
 
 
-When a repair moves to `DIAGNOSING` and its linked device has an
-unverified model (see Device Management below), the technician should
-be prompted — non-blocking — to confirm the device's model as part of
-diagnosis, since this is the natural point where the device is
-physically opened/inspected.
+When a repair is in `DIAGNOSING` and its linked device is not yet
+reliably identified (see Device Management below), the assigned
+technician confirms the model from Linked Device (edit → dialog).
+Ticket creation stays unblocked; parts and customer-estimate approval
+are blocked until the model is verified with a model name.
 
 ---
 
@@ -418,19 +418,23 @@ Users can:
 - Store device photos where required
 
 ### Unverified device model
- 
+
 A device's `model` is not always knowable at intake — the device may be
 powered off, dead, or missing its IMEI/serial. To avoid blocking intake:
- 
+
 - `model` is optional when a device is created. If left blank, the
   device is marked **Unverified** and shown with a clear visual
   indicator wherever it appears (Device List, Device Details, Repair
   Details).
-- A device can be confirmed/updated at any time from Device Details, or
-  inline during repair diagnosis (see Repair Management above).
-- Unverified is a normal, expected state for a newly-received device —
-  it is not an error condition and must not block repair-ticket
-  creation or status progression.
+- Confirming/verifying a model **requires a model name** (override is a
+  note, not a way to skip the model). Assigned technicians confirm from
+  Repair Details → Linked Device; OWNER/STAFF may also edit from Device
+  Details.
+- Unverified is a normal intake state and **must not** block
+  repair-ticket creation or ordinary status progression.
+- Unverified **does** block model-dependent work: recording parts on a
+  repair and sending a customer estimate for approval, until the device
+  is reliably identified (`model` present and `modelVerified`).
 
 ---
 

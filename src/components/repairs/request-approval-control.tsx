@@ -4,9 +4,10 @@ import * as React from 'react'
 import { AlertCircle, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RequestApprovalDialog } from '@/components/repairs/request-approval-dialog'
+import { isDeviceModelIdentified } from '@/features/devices/model-verification'
 import { getSendApprovalViolation } from '@/features/repairs/pricing-rules'
 import type { RepairPricingFieldsInput } from '@/features/repairs/pricing-schemas'
-import type { RepairApproval, RepairPartLine } from '@/features/repairs/queries'
+import type { RepairApproval, RepairPartLine, RepairDevice } from '@/features/repairs/queries'
 import { getRepairStatusLabel } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
 
@@ -26,6 +27,7 @@ type RequestApprovalControlProps = {
   /** Rough cost in paise captured on the New Repair form (`repairs.estimated_cost`). */
   intakeEstimatedCost: number | null
   hasIssuedInvoice?: boolean
+  device: Pick<RepairDevice, 'model' | 'modelVerified'>
   onRequested?: () => void
 }
 
@@ -64,6 +66,7 @@ export function RequestApprovalControl({
   estimatedTotal,
   intakeEstimatedCost,
   hasIssuedInvoice = false,
+  device,
   onRequested,
 }: RequestApprovalControlProps) {
   const { data: session } = useSession()
@@ -77,6 +80,7 @@ export function RequestApprovalControl({
     status: currentStatus,
     approvalStatus: approval?.status,
     hasIssuedInvoice,
+    deviceModelIdentified: isDeviceModelIdentified(device),
   })
 
   // 403 = this user never sends estimates; hide the control entirely.
