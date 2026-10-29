@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Check } from 'lucide-react'
+import { AlertCircle, Check, ShieldAlert } from 'lucide-react'
 import { useConfirmRepairModel } from '@/features/repairs/mutations'
 import { confirmRepairModelSchema } from '@/features/repairs/schemas'
 import type { RepairDevice } from '@/features/repairs/queries'
@@ -51,17 +51,29 @@ export function ModelConfirmationCard({
   }
 
   return (
-    <form onSubmit={(e) => void handleConfirm(e)} className="space-y-3">
+    <form onSubmit={(e) => void handleConfirm(e)} className="space-y-3.5">
+      <div className="flex items-start gap-2 rounded-lg border border-amber-200/80 bg-amber-500/5 px-3 py-2.5 dark:border-amber-800/40">
+        <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <p className="text-[11px] leading-snug text-amber-900 dark:text-amber-200">
+          Model is required. Confirm before parts or a customer estimate — wrong models risk wrong
+          parts and repairs.
+        </p>
+      </div>
+
       {error ? (
-        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs font-medium text-destructive">
-          {error}
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/10 px-2.5 py-2 text-xs font-medium text-destructive"
+        >
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{error}</span>
         </div>
       ) : null}
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <div className="space-y-1">
           <label htmlFor="card-brand" className="text-xs font-medium text-muted-foreground">
-            Brand
+            Brand <span className="text-destructive">*</span>
           </label>
           <Input
             id="card-brand"
@@ -70,6 +82,7 @@ export function ModelConfirmationCard({
             placeholder="e.g. Apple"
             disabled={isPending}
             className="h-9 text-xs"
+            autoComplete="off"
           />
         </div>
         <div className="space-y-1">
@@ -84,15 +97,12 @@ export function ModelConfirmationCard({
             disabled={isPending}
             className="h-9 text-xs"
             autoFocus
+            autoComplete="off"
           />
         </div>
       </div>
 
-      <p className="text-[11px] leading-snug text-muted-foreground">
-        Model is required before parts or a customer estimate.
-      </p>
-
-      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+      <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
         {onCancel ? (
           <Button
             type="button"
@@ -111,7 +121,7 @@ export function ModelConfirmationCard({
           className="h-8 gap-1.5 px-3 text-xs"
         >
           <Check className="h-3.5 w-3.5" />
-          {isPending ? 'Saving...' : 'Confirm model'}
+          {isPending ? 'Saving…' : 'Confirm model'}
         </Button>
       </div>
     </form>

@@ -79,6 +79,7 @@ export function DeviceDetails({ id }: DeviceDetailsProps) {
                   {device.brand} {device.model || <span className="text-muted-foreground italic font-normal text-lg">Unconfirmed</span>}
                 </h1>
                 <ModelVerificationBadge
+                  model={device.model}
                   modelVerified={device.modelVerified}
                   modelVerificationOverridden={device.modelVerificationOverridden}
                 />
@@ -166,6 +167,7 @@ export function DeviceDetails({ id }: DeviceDetailsProps) {
             customerId: device.customerId,
             brand: device.brand,
             model: device.model,
+            markUnverified: Boolean(device.model?.trim()) && !device.modelVerified,
             serialNumber: device.serialNumber ?? '',
             deviceType: device.deviceType,
             condition: device.condition,
