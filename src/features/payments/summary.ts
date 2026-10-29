@@ -18,7 +18,16 @@ export function getBillTotal({
   return finalTotal ?? estimatedTotal ?? null
 }
 
-/** All amounts are integer paise. */
+/** All amounts are integer paise. Prefer this when paid is already cycle-scoped. */
+export function summarizePaidAmount(billTotal: number, totalPaid: number): PaymentSummary {
+  const balance = billTotal - totalPaid
+  const status: PaymentStatus =
+    totalPaid <= 0 ? 'UNPAID' : totalPaid >= billTotal ? 'PAID' : 'PARTIAL'
+
+  return { totalPaid, balance, status }
+}
+
+/** All amounts are integer paise. Sums the given payment rows (caller chooses which rows). */
 export function getPaymentSummary({
   billTotal,
   payments,
@@ -27,9 +36,5 @@ export function getPaymentSummary({
   payments: { amount: number }[]
 }): PaymentSummary {
   const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const balance = billTotal - totalPaid
-  const status: PaymentStatus =
-    totalPaid <= 0 ? 'UNPAID' : totalPaid >= billTotal ? 'PAID' : 'PARTIAL'
-
-  return { totalPaid, balance, status }
+  return summarizePaidAmount(billTotal, totalPaid)
 }

@@ -358,6 +358,10 @@ async function testStatusPhases(fixture: Fixture) {
     'Status test failed: RECEIVED/DIAGNOSING must be hidden after customer approval',
   )
   assert(
+    !postApproval.includes('APPROVED'),
+    'Status test failed: APPROVED must not be a manual destination after customer approval',
+  )
+  assert(
     postApproval.includes('IN_REPAIR') && !postApproval.includes('COMPLETED'),
     'Status test failed: repair statuses must unlock after approval, COMPLETED stays gated',
   )

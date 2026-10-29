@@ -17,6 +17,8 @@ export interface RepairPayment {
   note: string | null
   paidAt: string
   receivedByName: string | null
+  /** False for payments from a prior repair cycle after reopen/restore. */
+  countsTowardCurrentBill: boolean
 }
 
 /** Amounts in paise; `balance` and `status` are null until the repair has a bill total. */

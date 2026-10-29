@@ -9,7 +9,7 @@ import {
   sumPartsCharges,
 } from '@/features/repairs/pricing-calc'
 import { getPaymentSummary } from '@/features/payments/summary'
-import { getTotalPaid } from '@/server/services/payment.service'
+import { getCurrentCycleTotalPaid } from '@/server/services/payment.service'
 import { getUpiPayeeName } from '@/features/shop/schemas'
 import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
@@ -187,6 +187,7 @@ async function loadPublicRepairData(repairId: string) {
       shopId: repairs.shopId,
       ticketNumber: repairs.ticketNumber,
       status: repairs.status,
+      workCycleId: repairs.workCycleId,
       problemDescription: repairs.problemDescription,
       estimatedCost: repairs.estimatedCost,
       laborCharges: repairs.laborCharges,
@@ -216,6 +217,8 @@ async function loadPublicRepairData(repairId: string) {
 
   const isFinalized = row.finalTotal != null
   const shouldIncludePayment = isFinalized && row.status !== 'CANCELLED'
+  const approvalCycleFilter =
+    row.workCycleId == null ? undefined : eq(repairApprovals.workCycleId, row.workCycleId)
 
   const [history, latestApprovalRows, photos, partLines, totalPaid] = await Promise.all([
     db
@@ -237,7 +240,12 @@ async function loadPublicRepairData(repairId: string) {
         rejectionReason: repairApprovals.rejectionReason,
       })
       .from(repairApprovals)
-      .where(eq(repairApprovals.repairId, repairId))
+      .where(
+        and(
+          eq(repairApprovals.repairId, repairId),
+          ...(approvalCycleFilter ? [approvalCycleFilter] : []),
+        ),
+      )
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
     getPublicRepairPhotos(row.shopId, repairId, row.status),
@@ -249,7 +257,7 @@ async function loadPublicRepairData(repairId: string) {
       .from(repairParts)
       .where(eq(repairParts.repairId, repairId)),
     shouldIncludePayment
-      ? getTotalPaid({ shopId: row.shopId, repairId })
+      ? getCurrentCycleTotalPaid({ shopId: row.shopId, repairId })
       : Promise.resolve(0),
   ])
 
@@ -312,7 +320,7 @@ async function loadPublicRepairData(repairId: string) {
 
 async function getRepairByActiveTrackingToken(token: string) {
   const [repair] = await db
-    .select({ id: repairs.id, status: repairs.status })
+    .select({ id: repairs.id, status: repairs.status, workCycleId: repairs.workCycleId })
     .from(repairs)
     .where(eq(repairs.trackingToken, token))
     .limit(1)
@@ -368,10 +376,16 @@ export async function decideRepairApprovalByTrackingToken(
 ): Promise<PublicTrackingResponse> {
   const repair = await getRepairByActiveTrackingToken(trackingToken)
 
+  const approvalCycleFilter =
+    repair.workCycleId == null
+      ? undefined
+      : eq(repairApprovals.workCycleId, repair.workCycleId)
+
   const [latestApproval] = await db
     .select({
       id: repairApprovals.id,
       status: repairApprovals.status,
+      workCycleId: repairApprovals.workCycleId,
       diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
       initialEstimatedCost: repairApprovals.initialEstimatedCost,
       additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
@@ -379,7 +393,12 @@ export async function decideRepairApprovalByTrackingToken(
       rejectionReason: repairApprovals.rejectionReason,
     })
     .from(repairApprovals)
-    .where(eq(repairApprovals.repairId, repair.id))
+    .where(
+      and(
+        eq(repairApprovals.repairId, repair.id),
+        ...(approvalCycleFilter ? [approvalCycleFilter] : []),
+      ),
+    )
     .orderBy(desc(repairApprovals.requestedAt))
     .limit(1)
 
@@ -387,6 +406,14 @@ export async function decideRepairApprovalByTrackingToken(
     if (latestApproval && latestApproval.status !== 'PENDING') {
       throw new HTTPException(409, { message: PUBLIC_APPROVAL_ALREADY_DECIDED })
     }
+    throw new HTTPException(404, { message: PUBLIC_TRACKING_NOT_FOUND })
+  }
+
+  // Stale prior-cycle PENDING must never authorize the new cycle.
+  if (
+    repair.workCycleId != null &&
+    latestApproval.workCycleId !== repair.workCycleId
+  ) {
     throw new HTTPException(404, { message: PUBLIC_TRACKING_NOT_FOUND })
   }
 

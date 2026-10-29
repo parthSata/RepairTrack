@@ -3,6 +3,10 @@ import {
   deviceBrandSchema,
   modelVerificationOverrideReasonSchema,
 } from '@/features/devices/schemas'
+import {
+  CANCELLATION_REASON_MAX,
+  CANCELLATION_REASON_MIN,
+} from '@/features/invoices/schemas'
 import { repairPricingFieldsSchema } from '@/features/repairs/pricing-schemas'
 
 export const repairPriorityValues = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const
@@ -121,6 +125,17 @@ export const reopenRepairSchema = z.object({
     .trim()
     .min(1, { message: 'Reason is required' })
     .max(1000, { message: 'Recovery reason cannot exceed 1000 characters' }),
+  /** Required when an unpaid Issued invoice will be cancelled as part of recovery. */
+  invoiceCancellationReason: z
+    .string()
+    .trim()
+    .min(CANCELLATION_REASON_MIN, {
+      message: `Enter an invoice cancellation reason (at least ${CANCELLATION_REASON_MIN} characters)`,
+    })
+    .max(CANCELLATION_REASON_MAX, {
+      message: `Invoice cancellation reason cannot exceed ${CANCELLATION_REASON_MAX} characters`,
+    })
+    .optional(),
 })
 
 export type ReopenRepairInput = z.infer<typeof reopenRepairSchema>

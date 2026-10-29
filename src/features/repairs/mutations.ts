@@ -70,10 +70,13 @@ export function useReopenRepair(repairId: string) {
   const queryClient = useQueryClient()
 
   return useMutation<Repair, Error, ReopenRepairInput & { action?: 'reopen' | 'restore' }>({
-    mutationFn: async ({ reason, action }) => {
+    mutationFn: async ({ reason, action, invoiceCancellationReason }) => {
       const response = await apiClient.post<Repair>(`/repairs/${repairId}/reopen`, {
         reason,
         action,
+        ...(invoiceCancellationReason != null
+          ? { invoiceCancellationReason }
+          : {}),
       })
       return response.data
     },

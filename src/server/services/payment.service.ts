@@ -1,4 +1,18 @@
-import { and, asc, desc, eq, gte, ilike, isNotNull, lte, ne, or, sql, count, type SQL } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  isNotNull,
+  lte,
+  ne,
+  or,
+  sql,
+  count,
+  type SQL,
+} from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { db, type DbClient } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
@@ -21,17 +35,58 @@ import { getShopUpi } from '@/server/services/shop.service'
 
 type RepairScope = { shopId: string; repairId: string }
 
+/**
+ * Sum of payments on a repair.
+ * - `workCycleId` omitted / undefined → all payments (lifetime; used for invoice reconcile gates).
+ * - `workCycleId: null` → unrecovered ticket; all payments count (legacy single cycle).
+ * - `workCycleId: string` → only payments stamped with that cycle (post-recovery COMPLETED gate).
+ */
 export async function getTotalPaid({
   client = db,
   shopId,
   repairId,
-}: RepairScope & { client?: DbClient }): Promise<number> {
+  workCycleId,
+}: RepairScope & {
+  client?: DbClient
+  workCycleId?: string | null
+}): Promise<number> {
+  const cycleFilter =
+    workCycleId === undefined
+      ? undefined
+      : workCycleId === null
+        ? undefined
+        : eq(payments.workCycleId, workCycleId)
+
   const [row] = await client
     .select({ total: sql<string>`coalesce(sum(${payments.amount}), 0)` })
     .from(payments)
-    .where(and(eq(payments.shopId, shopId), eq(payments.repairId, repairId)))
+    .where(
+      and(
+        eq(payments.shopId, shopId),
+        eq(payments.repairId, repairId),
+        ...(cycleFilter ? [cycleFilter] : []),
+      ),
+    )
   // Postgres returns sum() as bigint, which the driver hands back as a string.
   return Number(row?.total ?? 0)
+}
+
+/** Paid-in-full for COMPLETED: current work cycle only when the repair has been recovered. */
+export async function getCurrentCycleTotalPaid({
+  client = db,
+  shopId,
+  repairId,
+}: RepairScope & { client?: DbClient }): Promise<number> {
+  const [repair] = await client
+    .select({ workCycleId: repairs.workCycleId })
+    .from(repairs)
+    .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
+    .limit(1)
+  if (!repair) return 0
+  if (repair.workCycleId == null) {
+    return getTotalPaid({ client, shopId, repairId })
+  }
+  return getTotalPaid({ client, shopId, repairId, workCycleId: repair.workCycleId })
 }
 
 async function findRepairForPayment(
@@ -44,6 +99,7 @@ async function findRepairForPayment(
       status: repairs.status,
       finalTotal: repairs.finalTotal,
       estimatedTotal: repairs.estimatedTotal,
+      workCycleId: repairs.workCycleId,
     })
     .from(repairs)
     .where(and(eq(repairs.id, repairId), eq(repairs.shopId, shopId)))
@@ -63,6 +119,7 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
       reference: payments.reference,
       note: payments.note,
       paidAt: payments.paidAt,
+      workCycleId: payments.workCycleId,
       receivedByName: users.name,
     })
     .from(payments)
@@ -72,11 +129,18 @@ export async function listRepairPayments({ shopId, repairId }: RepairScope) {
   const [rows, upi] = await Promise.all([paymentRows, getShopUpi(shopId)])
 
   const billTotal = getBillTotal(repair)
-  const summary = getPaymentSummary({ billTotal: billTotal ?? 0, payments: rows })
+  // History lists every payment; balance / paid status use the current work cycle only.
+  const paymentsWithCycle = rows.map(({ workCycleId, ...payment }) => ({
+    ...payment,
+    countsTowardCurrentBill:
+      repair.workCycleId == null || workCycleId === repair.workCycleId,
+  }))
+  const cycleRows = paymentsWithCycle.filter((row) => row.countsTowardCurrentBill)
+  const summary = getPaymentSummary({ billTotal: billTotal ?? 0, payments: cycleRows })
   const hasBill = billTotal != null
 
   return {
-    payments: rows,
+    payments: paymentsWithCycle,
     billTotal,
     totalPaid: summary.totalPaid,
     balance: hasBill ? summary.balance : null,
@@ -270,11 +334,17 @@ export async function recordPayment({
     }
 
     const amount = rupeesToPaise(amountRupees)
-    const [totalPaid, context] = await Promise.all([
-      getTotalPaid({ client: tx, shopId, repairId }),
-      findPaymentEmailContext(tx, { shopId, repairId }),
-    ])
-    const balance = repair.finalTotal - totalPaid
+    const cyclePaid =
+      repair.workCycleId == null
+        ? await getTotalPaid({ client: tx, shopId, repairId })
+        : await getTotalPaid({
+            client: tx,
+            shopId,
+            repairId,
+            workCycleId: repair.workCycleId,
+          })
+    const context = await findPaymentEmailContext(tx, { shopId, repairId })
+    const balance = repair.finalTotal - cyclePaid
 
     if (balance <= 0) {
       throw new HTTPException(409, { message: PAYMENT_MESSAGES.exceedsBalance })
@@ -317,6 +387,7 @@ export async function recordPayment({
         reference: method === 'CASH' ? null : reference?.trim() || null,
         note: note || null,
         receivedBy: userId,
+        workCycleId: repair.workCycleId,
       })
       .returning({
         id: payments.id,
@@ -334,7 +405,7 @@ export async function recordPayment({
       ticketNumber: context.ticketNumber,
       payment,
       billTotal: repair.finalTotal,
-      totalPaid: totalPaid + payment.amount,
+      totalPaid: cyclePaid + payment.amount,
       trackingToken: context.trackingToken,
     }
     return { payment, customerEmail: context.customerEmail, email }
@@ -352,19 +423,20 @@ export async function recordPayment({
 }
 
 export async function getPendingPayments(shopId: string) {
-  const paymentsSubquery = db
-    .select({
-      repairId: payments.repairId,
-      totalPaid: sql<number>`coalesce(sum(${payments.amount}), 0)`.mapWith(Number).as('total_paid'),
-    })
-    .from(payments)
-    .where(eq(payments.shopId, shopId))
-    .groupBy(payments.repairId)
-    .as('payments_summary')
+  // Current-cycle paid only (prior-cycle payments after reopen must not clear the balance).
+  const cyclePaidExpr = sql<number>`coalesce((
+    select sum(${payments.amount})
+    from ${payments}
+    where ${payments.shopId} = ${shopId}
+      and ${payments.repairId} = ${repairs.id}
+      and (
+        ${repairs.workCycleId} is null
+        or ${payments.workCycleId} = ${repairs.workCycleId}
+      )
+  ), 0)`
 
   const billTotalExpr = sql<number>`${repairs.finalTotal}`
-  const totalPaidExpr = sql<number>`coalesce(${paymentsSubquery.totalPaid}, 0)`
-  const balanceExpr = sql<number>`(${billTotalExpr} - ${totalPaidExpr})`
+  const balanceExpr = sql<number>`(${billTotalExpr} - ${cyclePaidExpr})`
 
   const [rows, upi] = await Promise.all([
     db
@@ -382,7 +454,6 @@ export async function getPendingPayments(shopId: string) {
       })
       .from(repairs)
       .innerJoin(customers, eq(customers.id, repairs.customerId))
-      .leftJoin(paymentsSubquery, eq(repairs.id, paymentsSubquery.repairId))
       .where(
         and(
           eq(repairs.shopId, shopId),

@@ -253,6 +253,13 @@
       "when": 1792779365629,
       "tag": "0035_dizzy_zombie",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793290623708,
+      "tag": "0036_charming_talon",
+      "breakpoints": true
     }
   ]
 }

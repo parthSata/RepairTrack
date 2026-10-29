@@ -10,6 +10,8 @@ interface AlertDialogProps {
   children: React.ReactNode
   /** Override the inner panel width/spacing (default: max-w-md). */
   contentClassName?: string
+  /** Override the scrim (default: bg-black/50 backdrop-blur-sm). */
+  overlayClassName?: string
 }
 
 const AlertDialogContext = React.createContext<{
@@ -18,7 +20,13 @@ const AlertDialogContext = React.createContext<{
 
 const emptySubscribe = () => () => {}
 
-export function AlertDialog({ open, onOpenChange, children, contentClassName }: AlertDialogProps) {
+export function AlertDialog({
+  open,
+  onOpenChange,
+  children,
+  contentClassName,
+  overlayClassName,
+}: AlertDialogProps) {
   const mounted = React.useSyncExternalStore(
     emptySubscribe,
     () => true,
@@ -49,7 +57,10 @@ export function AlertDialog({ open, onOpenChange, children, contentClassName }: 
     <AlertDialogContext.Provider value={{ onOpenChange }}>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200"
+          className={cn(
+            'fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200',
+            overlayClassName,
+          )}
           onClick={() => onOpenChange(false)}
         />
         <div

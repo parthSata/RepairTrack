@@ -185,17 +185,22 @@ requirement.
    `DIAGNOSING` may be set manually. `APPROVED` is never set by staff —
    it comes only from the customer approval decision. Request Customer
    Approval is available only while the status is `DIAGNOSING` and is the
-   only path into `WAITING_FOR_APPROVAL`. The phase is
-   decided by the latest `repair_approvals.status` (`APPROVED` = post-approval),
-   so reopened/restored tickets land in the correct phase.
+   only path into `WAITING_FOR_APPROVAL`. While the ticket is in
+   `RECEIVED` / `DIAGNOSING` (including after reopen/restore), treat it
+   like a new ticket: a prior `APPROVED` approval row does not unlock
+   post-approval statuses or Finalize Bill — staff must Request Customer
+   Approval again. Outside intake, the latest `repair_approvals.status`
+   (`APPROVED` = post-approval) decides the phase.
 2. **Pending approval** (`WAITING_FOR_APPROVAL`): locked until the
    customer responds.
 3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed
-   destinations are `APPROVED`, `WAITING_FOR_PARTS`, `IN_REPAIR`,
+   manual destinations are `WAITING_FOR_PARTS`, `IN_REPAIR`,
    `QUALITY_CHECK`, `READY_FOR_PICKUP`, `COMPLETED`, and `CANCELLED`.
-   `COMPLETED` requires a finalized bill (`final_total`) that is paid in
-   full (sum of payments ≥ `final_total`); until then the dropdown shows it
-   disabled with the reason and the API returns 409.
+   `APPROVED` is customer-only — not a manual dropdown destination (and
+   the API rejects role sessions setting it). `COMPLETED` requires a
+   finalized bill (`final_total`) that is paid in full (sum of payments ≥
+   `final_total`); until then the dropdown shows it disabled with the
+   reason and the API returns 409.
 4. **Closed** (`COMPLETED`, `CANCELLED`): use the reopen action, not
    the status dropdown.
 
@@ -243,7 +248,10 @@ sign in; they use the public tracking page only.
 Repair photos become customer-visible only when both before and after exist, repair status is `READY_FOR_PICKUP` or `COMPLETED`, and `customer_photos_hidden` is false. There is no per-ticket Share action.
 
 * **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from that ticket-floor action and manages the shop by reassigning, not by editing ticket state. Confirming a device model on a repair is assigned-TECHNICIAN only — OWNER and STAFF already edit brand/model from Device Details. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
-* **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.
+* **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`. Recovery is atomic: clears `final_total`, stamps `work_cycle_id` from the new `repair_status_history` row, and starts a new work cycle on the same ticket (identity, notes, photos, parts, and all historical rows preserved). Prior approvals stay in the DB but are not returned as the current approval until a new Request Customer Approval in this cycle. Status-change customer emails may send again for the new cycle.
+* **Recovery invoices (UI Cases A / B / C):** Eligibility is resolved before confirm from the Issued invoice + lifetime `totalPaid` (not cycle-scoped). **Case A** — no Issued invoice: recovery reason only, then recover. **Case B** — Issued and lifetime paid = 0: dialog requires an invoice cancellation reason and a separate recovery reason; one submit cancels the unpaid Issued invoice (staff-entered cancel reason) and recovers atomically in one transaction. **Case C** — Issued and lifetime paid > 0: blocked dialog (Paid / Balance callout); primary CTA navigates to Review Invoice & Payments; no cancel-and-reopen from here. Server still returns 409 if recovery is attempted while payments exist. Paid invoices are never silently cancelled. Payments are not linked to invoices in the schema; cycle accounting uses `work_cycle_id` on payments.
+* **Recovery payments / COMPLETED:** Pre-cycle payments remain in history (labeled prior cycle) but do not count toward the new cycle’s Paid / Balance, invoice payment totals, pending-payments list, or paid-in-full COMPLETED gate. New payments stamp the current `work_cycle_id`.
+* **Warranty:** Recovery does not invent warranty or free-work classification.
 * **Action semantics:** Reopen/Restore are actions, not repair statuses. The existing repair status enum remains the source of truth.
 * **History note:** Recovery activity uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
 
@@ -475,8 +483,10 @@ Users can:
 - To change the bill, OWNER/STAFF use **Cancel Invoice** (reason required). The cancelled invoice
   stays on record, and its number is never reused. Then Finalize Bill → **Generate New Invoice**
   (next number).
-- Reopened repair: the Issued invoice stays valid if nothing changes. If new work is billed,
-  cancel the invoice, finalize the bill again and generate a new invoice.
+- Reopen/restore: Cases A/B/C (see Recovery invoices above). Case B cancels unpaid Issued
+  invoices with an explicit staff cancellation reason in the same recover transaction.
+  Case C blocks until staff Cancel Invoice / reconcile from Invoice / Payments. After a
+  new finalize, Generate New Invoice as usual.
 
 ---
 

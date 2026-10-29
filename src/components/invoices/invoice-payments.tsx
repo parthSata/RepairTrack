@@ -5,7 +5,7 @@ import { PaymentTotals } from '@/components/payments/payment-totals'
 import { RepairPaymentsLoader } from '@/components/payments/repair-payments-loader'
 import { UpiGate } from '@/components/payments/upi-gate'
 import { UpiPayCard } from '@/components/payments/upi-pay-card'
-import { getPaymentSummary } from '@/features/payments/summary'
+import { summarizePaidAmount } from '@/features/payments/summary'
 import type { InvoiceStatus } from '@/features/invoices/schemas'
 
 type InvoicePaymentsProps = {
@@ -20,8 +20,10 @@ type InvoicePaymentsProps = {
 export function InvoicePayments({ repairId, ticketNumber, invoiceTotal, invoiceStatus, userRole }: InvoicePaymentsProps) {
   return (
     <RepairPaymentsLoader repairId={repairId}>
-      {({ payments, upi, repairStatus }) => {
-        const summary = getPaymentSummary({ billTotal: invoiceTotal, payments })
+      {({ payments, upi, repairStatus, totalPaid }) => {
+        // Cycle-scoped paid from the API — prior-cycle payments must not mark a new invoice Paid.
+        const summary = summarizePaidAmount(invoiceTotal, totalPaid)
+        const hasPriorCyclePayments = payments.some((payment) => !payment.countsTowardCurrentBill)
 
         return (
           <div className="space-y-6">
@@ -45,6 +47,11 @@ export function InvoicePayments({ repairId, ticketNumber, invoiceTotal, invoiceS
               </div>
               <div className="sm:ml-auto sm:w-full sm:max-w-xs print:ml-auto print:w-full print:max-w-xs">
                 <PaymentTotals {...summary} />
+                {hasPriorCyclePayments ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Earlier payments stay on history and do not apply to this bill.
+                  </p>
+                ) : null}
               </div>
             </div>
 

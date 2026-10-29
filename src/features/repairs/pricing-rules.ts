@@ -49,8 +49,23 @@ export const PRICING_MESSAGES = {
 
 const CLOSED_STATUSES = new Set(['COMPLETED', 'CANCELLED'])
 
+/** Intake after create or reopen/restore — prior APPROVED does not count until a new estimate cycle. */
+const INTAKE_STATUSES = new Set(['RECEIVED', 'DIAGNOSING'])
+
 function isShopManager(userRole: string): boolean {
   return userRole === 'OWNER' || userRole === 'STAFF'
+}
+
+/**
+ * True when the latest customer approval still governs this ticket.
+ * Reopen/restore lands on DIAGNOSING like a new ticket, so an older APPROVED row is ignored.
+ */
+export function hasActiveCustomerApproval(
+  status: string,
+  approvalStatus: string | null | undefined,
+): boolean {
+  if (INTAKE_STATUSES.has(status)) return false
+  return approvalStatus === 'APPROVED'
 }
 
 function forbidden(message: string): PricingRuleViolation {
@@ -77,7 +92,7 @@ export function getPricingPanelMode({
 }): PricingPanelMode {
   if (isShopManager(userRole)) {
     if (status === 'COMPLETED' || hasIssuedInvoice) return hasEstimate ? 'view' : 'hidden'
-    return approvalStatus === 'APPROVED' ? 'finalize' : 'editEstimate'
+    return hasActiveCustomerApproval(status, approvalStatus) ? 'finalize' : 'editEstimate'
   }
   return hasEstimate ? 'view' : 'hidden'
 }
@@ -98,7 +113,9 @@ export function getEstimateEditViolation({
   if (!isShopManager(userRole)) return forbidden(PRICING_MESSAGES.estimateForbidden)
   if (status === 'COMPLETED') return conflict(PRICING_MESSAGES.completedLocked)
   if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
-  if (approvalStatus === 'APPROVED') return conflict(PRICING_MESSAGES.estimateApproved)
+  if (hasActiveCustomerApproval(status, approvalStatus)) {
+    return conflict(PRICING_MESSAGES.estimateApproved)
+  }
   return null
 }
 
@@ -117,7 +134,9 @@ export function getFinalizeBillViolation({
   if (!isShopManager(userRole)) return forbidden(PRICING_MESSAGES.finalizeForbidden)
   if (status === 'COMPLETED') return conflict(PRICING_MESSAGES.completedLocked)
   if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
-  if (approvalStatus !== 'APPROVED') return conflict(PRICING_MESSAGES.finalizeNeedsApproval)
+  if (!hasActiveCustomerApproval(status, approvalStatus)) {
+    return conflict(PRICING_MESSAGES.finalizeNeedsApproval)
+  }
   return null
 }
 
@@ -154,12 +173,12 @@ export function getSendApprovalViolation({
   if (CLOSED_STATUSES.has(status)) return conflict(PRICING_MESSAGES.approvalClosed)
   if (hasIssuedInvoice) return conflict(PRICING_MESSAGES.invoiceIssued)
   if (approvalStatus === 'PENDING') return conflict(PRICING_MESSAGES.approvalPending)
-  if (userRole === 'TECHNICIAN' && approvalStatus === 'APPROVED') {
+  if (userRole === 'TECHNICIAN' && hasActiveCustomerApproval(status, approvalStatus)) {
     return conflict(PRICING_MESSAGES.technicianAfterApproval)
   }
   if (status !== 'DIAGNOSING') {
     return conflict(
-      approvalStatus === 'APPROVED'
+      hasActiveCustomerApproval(status, approvalStatus)
         ? PRICING_MESSAGES.approvalAlreadyApproved
         : PRICING_MESSAGES.approvalNeedsDiagnosing,
     )

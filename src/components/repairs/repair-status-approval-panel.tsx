@@ -2,7 +2,7 @@
 
 import { RequestApprovalControl } from '@/components/repairs/request-approval-control'
 import { StatusChangeControl } from '@/components/repairs/status-change-control'
-import type { Repair } from '@/features/repairs/queries'
+import { getIssuedInvoice, type Repair } from '@/features/repairs/queries'
 import type { ApprovalStatus } from '@/features/repairs/pricing-rules'
 
 type SavedPricing = {
@@ -40,6 +40,8 @@ export function RepairStatusApprovalPanel({
         finalTotal={repair.finalTotal}
         isPaidInFull={repair.isPaidInFull}
         approvalStatus={approvalStatus}
+        issuedInvoice={getIssuedInvoice(repair)}
+        lifetimeTotalPaid={repair.lifetimeTotalPaid ?? 0}
         onStatusUpdated={onRefetch}
       />
       <div className="h-px w-full bg-border/70" />
