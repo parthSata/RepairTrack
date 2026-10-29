@@ -61,6 +61,11 @@ export function PaymentSummaryCard({
                       Bill not finalized yet. Finalize the bill in the Pricing section to record payment.
                     </p>
                   ) : null}
+                  {data.payments.some((payment) => !payment.countsTowardCurrentBill) ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Earlier payments stay on history and do not apply to this bill.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">

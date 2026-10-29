@@ -107,6 +107,8 @@ export interface Repair {
   isOverdue?: boolean
   /** Payments cover the finalized bill (detail endpoint only). */
   isPaidInFull?: boolean
+  /** Lifetime payment sum in paise (detail); recovery invoice eligibility, not cycle-scoped. */
+  lifetimeTotalPaid?: number
   assignedTechnicianId: string | null
   createdBy: string | null
   createdAt: string

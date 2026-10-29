@@ -470,7 +470,7 @@ export async function getRepairById({
     repair.workCycleId == null ? undefined : eq(repairApprovals.workCycleId, repair.workCycleId)
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
-  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid] =
+  const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid, lifetimeTotalPaid] =
     await Promise.all([
     repair.createdBy
       ? db
@@ -578,6 +578,8 @@ export async function getRepairById({
     repair.finalTotal != null
       ? getCurrentCycleTotalPaid({ shopId, repairId: id })
       : Promise.resolve(0),
+    // Lifetime sum for recovery eligibility (Issued invoice + payments), not cycle-scoped.
+    getTotalPaid({ shopId, repairId: id }),
   ])
 
   const creator = creatorResult[0] || null
@@ -649,6 +651,8 @@ export async function getRepairById({
     ),
     // A flag, not the amount: technicians need it for the COMPLETED gate but can't read payments.
     isPaidInFull: isBillPaidInFull(repair.finalTotal, totalPaid),
+    /** All-time payments on this repair (paise); used for reopen/restore invoice gating. */
+    lifetimeTotalPaid,
     creator,
     assignedTechnician,
     notes,
@@ -1054,8 +1058,6 @@ export async function requestCustomerApproval({
   return getRepairById({ shopId, userRole, userId, id })
 }
 
-const RECOVERY_INVOICE_REASON = 'Ticket reopened/restored — new repair cycle'
-
 const RECOVERY_PAID_INVOICE_MESSAGE =
   'This repair has an issued invoice with recorded payments. Cancel the invoice (and reconcile payments) before reopening or restoring, then try again.'
 
@@ -1066,6 +1068,7 @@ async function recoverRepair({
   id,
   reason,
   action,
+  invoiceCancellationReason,
 }: {
   shopId: string
   userRole: string
@@ -1073,6 +1076,7 @@ async function recoverRepair({
   id: string
   reason?: string
   action?: 'reopen' | 'restore'
+  invoiceCancellationReason?: string
 }) {
   if (!['OWNER', 'STAFF'].includes(userRole)) {
     throw new HTTPException(403, {
@@ -1109,8 +1113,9 @@ async function recoverRepair({
   const actionVerb = action === 'restore' ? 'restored' : 'reopened'
   const historyNote = `Repair ${actionVerb}. Previous status: ${existing.status}. New status: ${nextStatus}. Reason: ${trimmedReason}. Actor: ${userRole}.`
 
-  // Lifetime payments (any cycle) gate whether an Issued invoice can be auto-cancelled.
+  // Lifetime payments (any cycle) gate whether an Issued invoice can be cancelled with recovery.
   const lifetimePaid = await getTotalPaid({ shopId, repairId: id })
+  const trimmedInvoiceCancelReason = invoiceCancellationReason?.trim() ?? ''
 
   const updated = await db.transaction(async (tx) => {
     const now = new Date()
@@ -1129,11 +1134,16 @@ async function recoverRepair({
       if (lifetimePaid > 0) {
         throw new HTTPException(409, { message: RECOVERY_PAID_INVOICE_MESSAGE })
       }
+      if (trimmedInvoiceCancelReason.length < 3) {
+        throw new HTTPException(400, {
+          message: 'Invoice cancellation reason is required when an outstanding invoice will be cancelled.',
+        })
+      }
       await tx
         .update(invoices)
         .set({
           status: 'CANCELLED',
-          cancellationReason: RECOVERY_INVOICE_REASON,
+          cancellationReason: trimmedInvoiceCancelReason,
           cancelledAt: now,
           cancelledBy: userId,
           updatedAt: now,
@@ -1183,6 +1193,7 @@ export async function reopenRepairTicket({
   id,
   reason,
   action,
+  invoiceCancellationReason,
 }: {
   shopId: string
   userRole: string
@@ -1190,6 +1201,7 @@ export async function reopenRepairTicket({
   id: string
   reason?: string
   action?: 'reopen' | 'restore'
+  invoiceCancellationReason?: string
 }) {
   return recoverRepair({
     shopId,
@@ -1198,6 +1210,7 @@ export async function reopenRepairTicket({
     id,
     reason,
     action,
+    invoiceCancellationReason,
   })
 }
 
