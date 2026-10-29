@@ -26,6 +26,8 @@ export const repairApprovals = pgTable(
     requestedAt: timestamp('requested_at', { withTimezone: true }).notNull(),
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     rejectionReason: text('rejection_reason'),
+    /** Matches repairs.work_cycle_id for the cycle this approval belongs to; null = pre-recovery. */
+    workCycleId: text('work_cycle_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .defaultNow()
@@ -35,6 +37,7 @@ export const repairApprovals = pgTable(
   (table) => [
     index('repair_approvals_repair_id_idx').on(table.repairId),
     index('repair_approvals_repair_id_requested_at_idx').on(table.repairId, table.requestedAt),
+    index('repair_approvals_work_cycle_id_idx').on(table.workCycleId),
     uniqueIndex('repair_approvals_one_pending_per_repair_idx')
       .on(table.repairId)
       .where(sql`${table.status} = 'PENDING'`),

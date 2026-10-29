@@ -17,7 +17,7 @@ import { buildInvoiceGeneratedEmail, type InvoiceGeneratedEmailData } from '@/se
 import { toContainsPattern } from '@/server/lib/sql-search'
 import { queueShopEmail } from '@/server/services/email.service'
 import { hasIssuedInvoice } from '@/server/services/invoice-lock.helpers'
-import { getTotalPaid } from '@/server/services/payment.service'
+import { getCurrentCycleTotalPaid } from '@/server/services/payment.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
 
 const INVOICE_NUMBER_PREFIX = 'INV-'
@@ -121,7 +121,7 @@ export async function createInvoiceFromRepair({
     const invoiceId = crypto.randomUUID()
     const [invoiceNumber, totalPaid] = await Promise.all([
       generateInvoiceNumber(tx, shopId),
-      getTotalPaid({ client: tx, shopId, repairId }),
+      getCurrentCycleTotalPaid({ client: tx, shopId, repairId }),
     ])
     const charges = {
       laborCharges: repair.laborCharges,

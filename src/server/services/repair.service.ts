@@ -35,7 +35,10 @@ import {
 import { getRepairPhotosForDetail } from '@/server/services/repair-photo.service'
 import { listRepairParts } from '@/server/services/repair-parts.service'
 import { hasIssuedInvoice } from '@/server/services/invoice-lock.helpers'
-import { getTotalPaid } from '@/server/services/payment.service'
+import {
+  getCurrentCycleTotalPaid,
+  getTotalPaid,
+} from '@/server/services/payment.service'
 import { PAYMENT_MESSAGES } from '@/features/payments/schemas'
 import {
   calculateRepairTotal,
@@ -416,6 +419,7 @@ export async function getRepairById({
       expectedCompletionDate: repairs.expectedCompletionDate,
       assignedTechnicianId: repairs.assignedTechnicianId,
       customerPhotosHidden: repairs.customerPhotosHidden,
+      workCycleId: repairs.workCycleId,
       createdBy: repairs.createdBy,
       createdAt: repairs.createdAt,
       updatedAt: repairs.updatedAt,
@@ -444,6 +448,26 @@ export async function getRepairById({
 
   const repair = result[0]
   if (!repair) throw new HTTPException(404, { message: 'Repair ticket not found' })
+
+  const approvalSelect = {
+    id: repairApprovals.id,
+    status: repairApprovals.status,
+    initialEstimatedCost: repairApprovals.initialEstimatedCost,
+    additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
+    diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
+    requestedAt: repairApprovals.requestedAt,
+    decidedAt: repairApprovals.decidedAt,
+    rejectionReason: repairApprovals.rejectionReason,
+    requestedBy: {
+      id: users.id,
+      name: users.name,
+      role: users.role,
+    },
+  } as const
+
+  // After recover, only approvals stamped with the current work_cycle_id are "current".
+  const approvalCycleFilter =
+    repair.workCycleId == null ? undefined : eq(repairApprovals.workCycleId, repair.workCycleId)
 
   // Fetch creator info, assignment context, notes, status history, approval, and photos concurrently
   const [creatorResult, techResult, notes, statusHistory, pendingApprovalResult, latestApprovalResult, currentAssignmentResult, photos, parts, invoiceResult, totalPaid] =
@@ -496,44 +520,27 @@ export async function getRepairById({
       .where(eq(repairStatusHistory.repairId, id))
       .orderBy(asc(repairStatusHistory.createdAt)),
     db
-      .select({
-        id: repairApprovals.id,
-        status: repairApprovals.status,
-        initialEstimatedCost: repairApprovals.initialEstimatedCost,
-        additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
-        diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
-        requestedAt: repairApprovals.requestedAt,
-        decidedAt: repairApprovals.decidedAt,
-        rejectionReason: repairApprovals.rejectionReason,
-        requestedBy: {
-          id: users.id,
-          name: users.name,
-          role: users.role,
-        },
-      })
+      .select(approvalSelect)
       .from(repairApprovals)
       .leftJoin(users, eq(users.id, repairApprovals.requestedBy))
-      .where(and(eq(repairApprovals.repairId, id), eq(repairApprovals.status, 'PENDING')))
+      .where(
+        and(
+          eq(repairApprovals.repairId, id),
+          eq(repairApprovals.status, 'PENDING'),
+          ...(approvalCycleFilter ? [approvalCycleFilter] : []),
+        ),
+      )
       .limit(1),
     db
-      .select({
-        id: repairApprovals.id,
-        status: repairApprovals.status,
-        initialEstimatedCost: repairApprovals.initialEstimatedCost,
-        additionalEstimatedCost: repairApprovals.additionalEstimatedCost,
-        diagnosisSnapshot: repairApprovals.diagnosisSnapshot,
-        requestedAt: repairApprovals.requestedAt,
-        decidedAt: repairApprovals.decidedAt,
-        rejectionReason: repairApprovals.rejectionReason,
-        requestedBy: {
-          id: users.id,
-          name: users.name,
-          role: users.role,
-        },
-      })
+      .select(approvalSelect)
       .from(repairApprovals)
       .leftJoin(users, eq(users.id, repairApprovals.requestedBy))
-      .where(eq(repairApprovals.repairId, id))
+      .where(
+        and(
+          eq(repairApprovals.repairId, id),
+          ...(approvalCycleFilter ? [approvalCycleFilter] : []),
+        ),
+      )
       .orderBy(desc(repairApprovals.requestedAt))
       .limit(1),
     db
@@ -568,7 +575,9 @@ export async function getRepairById({
       .from(invoices)
       .where(and(eq(invoices.repairId, id), eq(invoices.shopId, shopId)))
       .orderBy(desc(invoices.createdAt)),
-    repair.finalTotal != null ? getTotalPaid({ shopId, repairId: id }) : Promise.resolve(0),
+    repair.finalTotal != null
+      ? getCurrentCycleTotalPaid({ shopId, repairId: id })
+      : Promise.resolve(0),
   ])
 
   const creator = creatorResult[0] || null
@@ -628,8 +637,11 @@ export async function getRepairById({
       ? photos
       : await getRepairPhotosForDetail({ shopId, userRole, userId, repairId: id })
 
+  const { workCycleId, ...repairPublic } = repair
+  void workCycleId
+
   return {
-    ...repair,
+    ...repairPublic,
     status: resolvedStatus,
     isOverdue: computeIsRepairOverdue(
       repair.expectedCompletionDate,
@@ -680,6 +692,7 @@ export async function findRepairEmailContext(shopId: string, id: string) {
       status: repairs.status,
       assignedTechnicianId: repairs.assignedTechnicianId,
       finalTotal: repairs.finalTotal,
+      workCycleId: repairs.workCycleId,
       ticketNumber: repairs.ticketNumber,
       trackingToken: repairs.trackingToken,
       expectedCompletionDate: repairs.expectedCompletionDate,
@@ -834,10 +847,13 @@ export async function updateRepairStatus({
   }
 
   const emailType = STATUS_EMAIL_TYPES[status]
-  const needsTotalPaid = emailType === 'READY_FOR_PICKUP' || emailType === 'REPAIR_COMPLETED'
+  const needsTotalPaid =
+    emailType === 'READY_FOR_PICKUP' ||
+    emailType === 'REPAIR_COMPLETED' ||
+    status === 'COMPLETED'
   const [latestApproval, totalPaid] = await Promise.all([
-    getLatestApproval(id),
-    needsTotalPaid ? getTotalPaid({ shopId, repairId: id }) : 0,
+    getLatestApproval(id, existing.workCycleId),
+    needsTotalPaid ? getCurrentCycleTotalPaid({ shopId, repairId: id }) : 0,
   ])
 
   if (latestApproval?.status === 'PENDING' || existing.status === 'WAITING_FOR_APPROVAL') {
@@ -928,6 +944,7 @@ export async function requestCustomerApproval({
       id: repairs.id,
       status: repairs.status,
       assignedTechnicianId: repairs.assignedTechnicianId,
+      workCycleId: repairs.workCycleId,
       ticketNumber: repairs.ticketNumber,
       trackingToken: repairs.trackingToken,
       customerName: customers.name,
@@ -946,7 +963,7 @@ export async function requestCustomerApproval({
   const existing = assertRepairFound(row)
 
   const [latestApproval, invoiced] = await Promise.all([
-    getLatestApproval(id),
+    getLatestApproval(id, existing.workCycleId),
     hasIssuedInvoice({ shopId, repairId: id }),
   ])
   throwIfViolation(
@@ -1000,6 +1017,7 @@ export async function requestCustomerApproval({
         additionalEstimatedCost: 0,
         requestedBy: userId,
         requestedAt: now,
+        workCycleId: existing.workCycleId,
       })
       .returning({ id: repairApprovals.id })
 
@@ -1035,6 +1053,11 @@ export async function requestCustomerApproval({
 
   return getRepairById({ shopId, userRole, userId, id })
 }
+
+const RECOVERY_INVOICE_REASON = 'Ticket reopened/restored — new repair cycle'
+
+const RECOVERY_PAID_INVOICE_MESSAGE =
+  'This repair has an issued invoice with recorded payments. Cancel the invoice (and reconcile payments) before reopening or restoring, then try again.'
 
 async function recoverRepair({
   shopId,
@@ -1086,15 +1109,56 @@ async function recoverRepair({
   const actionVerb = action === 'restore' ? 'restored' : 'reopened'
   const historyNote = `Repair ${actionVerb}. Previous status: ${existing.status}. New status: ${nextStatus}. Reason: ${trimmedReason}. Actor: ${userRole}.`
 
-  // Same intake as a new ticket: clear the final bill so COMPLETED requires a fresh finalize.
-  // Approval history rows stay; DIAGNOSING ignores a prior APPROVED for phase / Request Approval.
+  // Lifetime payments (any cycle) gate whether an Issued invoice can be auto-cancelled.
+  const lifetimePaid = await getTotalPaid({ shopId, repairId: id })
+
   const updated = await db.transaction(async (tx) => {
     const now = new Date()
+    const historyId = crypto.randomUUID()
+
+    const [issued] = await tx
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(
+        and(eq(invoices.repairId, id), eq(invoices.shopId, shopId), eq(invoices.status, 'ISSUED')),
+      )
+      .for('update')
+      .limit(1)
+
+    if (issued) {
+      if (lifetimePaid > 0) {
+        throw new HTTPException(409, { message: RECOVERY_PAID_INVOICE_MESSAGE })
+      }
+      await tx
+        .update(invoices)
+        .set({
+          status: 'CANCELLED',
+          cancellationReason: RECOVERY_INVOICE_REASON,
+          cancelledAt: now,
+          cancelledBy: userId,
+          updatedAt: now,
+        })
+        .where(and(eq(invoices.id, issued.id), eq(invoices.shopId, shopId)))
+    }
+
+    await tx.insert(repairStatusHistory).values({
+      id: historyId,
+      repairId: id,
+      fromStatus: existing.status,
+      toStatus: nextStatus,
+      changedBy: userId,
+      actorType,
+      note: historyNote,
+      createdAt: now,
+    })
+
     const [res] = await tx
       .update(repairs)
       .set({
         status: nextStatus,
         finalTotal: null,
+        finalCost: null,
+        workCycleId: historyId,
         updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId), eq(repairs.status, existing.status)))
@@ -1105,17 +1169,6 @@ async function recoverRepair({
         message: `This repair ticket was already ${actionVerb} or changed by another request.`,
       })
     }
-
-    await tx.insert(repairStatusHistory).values({
-      id: crypto.randomUUID(),
-      repairId: id,
-      fromStatus: existing.status,
-      toStatus: nextStatus,
-      changedBy: userId,
-      actorType,
-      note: historyNote,
-      createdAt: now,
-    })
 
     return res
   })
@@ -1449,14 +1502,23 @@ function throwIfViolation(violation: PricingRuleViolation | null) {
   if (violation) throw new HTTPException(violation.status, { message: violation.message })
 }
 
-/** Latest approval request (a pending one is always the newest). Caller must scope the repair to the shop first. */
+/**
+ * Latest approval for the repair's current work cycle.
+ * After reopen/restore, prior-cycle approvals are ignored until a new request is created.
+ */
 async function getLatestApproval(
   repairId: string,
+  workCycleId?: string | null,
 ): Promise<{ id: string; status: ApprovalStatus } | null> {
   const [latest] = await db
     .select({ id: repairApprovals.id, status: repairApprovals.status })
     .from(repairApprovals)
-    .where(eq(repairApprovals.repairId, repairId))
+    .where(
+      and(
+        eq(repairApprovals.repairId, repairId),
+        ...(workCycleId != null ? [eq(repairApprovals.workCycleId, workCycleId)] : []),
+      ),
+    )
     .orderBy(desc(repairApprovals.requestedAt))
     .limit(1)
   return latest ?? null
@@ -1464,12 +1526,12 @@ async function getLatestApproval(
 
 async function getRepairPricingContext({ shopId, id }: { shopId: string; id: string }) {
   const [row] = await db
-    .select({ id: repairs.id, status: repairs.status })
+    .select({ id: repairs.id, status: repairs.status, workCycleId: repairs.workCycleId })
     .from(repairs)
     .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId)))
   const repair = assertRepairFound(row)
   const [latestApproval, invoiced] = await Promise.all([
-    getLatestApproval(id),
+    getLatestApproval(id, repair.workCycleId),
     hasIssuedInvoice({ shopId, repairId: id }),
   ])
   return { ...repair, latestApproval, hasIssuedInvoice: invoiced }
@@ -1609,7 +1671,7 @@ export async function updateRepairFinalTotal({
   await db.transaction(async (tx) => {
     await tx.select({ id: repairs.id }).from(repairs).where(repairScope).for('update')
 
-    if (total < (await getTotalPaid({ client: tx, shopId, repairId: id }))) {
+    if (total < (await getCurrentCycleTotalPaid({ client: tx, shopId, repairId: id }))) {
       throw new HTTPException(409, { message: PAYMENT_MESSAGES.finalBelowPaid })
     }
 

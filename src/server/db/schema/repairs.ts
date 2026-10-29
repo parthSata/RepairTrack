@@ -109,6 +109,11 @@ export const repairs = pgTable(
       onDelete: 'set null',
     }),
     customerPhotosHidden: boolean('customer_photos_hidden').default(false).notNull(),
+    /**
+     * Current work cycle after reopen/restore — equals the recovery status-history row id.
+     * Null means the ticket has never been recovered (legacy single cycle).
+     */
+    workCycleId: text('work_cycle_id'),
     createdBy: text('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -120,6 +125,7 @@ export const repairs = pgTable(
     index('repairs_status_idx').on(table.status),
     index('repairs_assigned_technician_id_idx').on(table.assignedTechnicianId),
     index('repairs_tracking_token_idx').on(table.trackingToken),
+    index('repairs_work_cycle_id_idx').on(table.workCycleId),
   ],
 )
 

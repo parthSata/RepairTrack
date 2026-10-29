@@ -26,6 +26,8 @@ export const payments = pgTable(
     note: text('note'),
     receivedBy: text('received_by').references(() => users.id, { onDelete: 'set null' }),
     paidAt: timestamp('paid_at', { withTimezone: true }).defaultNow().notNull(),
+    /** Matches repairs.work_cycle_id for the cycle this payment applies to; null = pre-recovery. */
+    workCycleId: text('work_cycle_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -33,6 +35,7 @@ export const payments = pgTable(
     index('payments_shop_id_idx').on(table.shopId),
     index('payments_repair_id_idx').on(table.repairId),
     index('payments_paid_at_idx').on(table.paidAt),
+    index('payments_work_cycle_id_idx').on(table.workCycleId),
     check('payments_amount_positive', sql`${table.amount} > 0`),
   ],
 )
