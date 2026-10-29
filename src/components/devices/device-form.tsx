@@ -113,6 +113,13 @@ export function DeviceForm({
   const hasModel = Boolean(watchedModel?.trim())
   const serialLabel = currentDeviceType === 'PHONE' ? 'IMEI / Serial Number' : 'Serial Number'
 
+  // Checkbox is hidden when model is blank — clear stale low-confidence flag.
+  React.useEffect(() => {
+    if (!hasModel && markUnverified) {
+      setValue('markUnverified', false)
+    }
+  }, [hasModel, markUnverified, setValue])
+
   const onSubmit = async (data: DeviceFormInput) => {
     try {
       let savedDevice: Device | undefined

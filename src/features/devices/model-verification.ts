@@ -6,12 +6,69 @@ export type ModelVerificationResult = {
   modelVerificationNote: string | null
 }
 
+export type ModelVerificationBadgeKind =
+  | 'verified'
+  | 'blank'
+  | 'lowConfidence'
+  | 'override'
+
 /** True when the device has a model name and has been verified (or overridden with a model). */
 export function isDeviceModelIdentified(device: {
   model: string | null | undefined
   modelVerified: boolean
 }): boolean {
   return device.modelVerified && Boolean(device.model?.trim())
+}
+
+/** Badge kind for list/detail/repair surfaces (blank model vs low-confidence guess). */
+export function getModelVerificationBadgeKind(device: {
+  model: string | null | undefined
+  modelVerified: boolean
+  modelVerificationOverridden?: boolean
+}): ModelVerificationBadgeKind {
+  if (device.modelVerificationOverridden) return 'override'
+  const hasModel = Boolean(device.model?.trim())
+  if (!hasModel) return 'blank'
+  if (!device.modelVerified) return 'lowConfidence'
+  return 'verified'
+}
+
+type DeviceModelVerificationInput = {
+  model: string | null | undefined
+  markUnverified?: boolean
+  overrideReason?: string | null
+}
+
+/**
+ * Resolves model + verification flags for device create/update.
+ * Override is a note only — a model name is still required to be identified.
+ */
+export function resolveDeviceModelVerification({
+  model,
+  markUnverified = false,
+  overrideReason,
+}: DeviceModelVerificationInput): Pick<
+  ModelVerificationResult,
+  'model' | 'modelVerified' | 'modelVerificationOverridden' | 'modelVerificationNote'
+> {
+  const modelVal = model?.trim() || null
+  const note = overrideReason?.trim() || null
+
+  if (note) {
+    return {
+      model: modelVal,
+      modelVerified: Boolean(modelVal),
+      modelVerificationOverridden: true,
+      modelVerificationNote: note,
+    }
+  }
+
+  return {
+    model: modelVal,
+    modelVerified: Boolean(modelVal) && !markUnverified,
+    modelVerificationOverridden: false,
+    modelVerificationNote: null,
+  }
 }
 
 type ExistingDeviceModel = {
@@ -37,20 +94,17 @@ export function applyConfirmModelVerification({
   data: ConfirmModelPayload
 }): ModelVerificationResult {
   const overrideReason = data.modelVerificationOverrideReason?.trim() || null
-  const isOverride = Boolean(overrideReason)
-
   const brand = (data.brand?.trim() || existing.brand).trim()
   const model =
     data.model !== undefined ? data.model?.trim() || null : existing.model
 
-  if (isOverride) {
-    return {
-      brand,
-      model,
-      modelVerified: Boolean(model),
-      modelVerificationOverridden: true,
-      modelVerificationNote: overrideReason,
-    }
+  const verification = resolveDeviceModelVerification({
+    model,
+    overrideReason,
+  })
+
+  if (overrideReason) {
+    return { brand, ...verification }
   }
 
   return {

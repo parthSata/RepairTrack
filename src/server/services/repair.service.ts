@@ -14,7 +14,10 @@ import { buildRepairCompletedEmail } from '@/server/email/templates/repair-compl
 import { buildRepairReceivedEmail } from '@/server/email/templates/repair-received'
 import { buildRepairStartedEmail } from '@/server/email/templates/repair-started'
 import { queueShopEmail } from '@/server/services/email.service'
-import { applyConfirmModelVerification } from '@/features/devices/model-verification'
+import {
+  applyConfirmModelVerification,
+  isDeviceModelIdentified,
+} from '@/features/devices/model-verification'
 import type { ConfirmRepairModelInput, CreateRepairInput } from '@/features/repairs/schemas'
 import {
   normalizeStoredCostToPaise,
@@ -978,8 +981,10 @@ export async function requestCustomerApproval({
       status: existing.status,
       approvalStatus: latestApproval?.status,
       hasIssuedInvoice: invoiced,
-      deviceModelIdentified:
-        existing.deviceModelVerified && Boolean(existing.deviceModel?.trim()),
+      deviceModelIdentified: isDeviceModelIdentified({
+        model: existing.deviceModel,
+        modelVerified: existing.deviceModelVerified,
+      }),
     }),
   )
 
