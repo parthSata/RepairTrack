@@ -66,7 +66,7 @@ export function DebouncedSearchInput({
             setSearchTerm('')
             onChange('')
           }}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
           aria-label="Clear search"
         >
           <X className="h-4 w-4" />

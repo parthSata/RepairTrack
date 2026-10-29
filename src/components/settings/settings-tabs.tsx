@@ -26,7 +26,7 @@ export function SettingsTabs() {
             href={href}
             aria-current={isActive ? 'page' : undefined}
             className={cn(
-              'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'inline-flex cursor-pointer items-center justify-center whitespace-nowrap rounded-md px-3.5 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               isActive
                 ? 'bg-background font-semibold text-foreground shadow-xs'
                 : 'hover:bg-background/50 hover:text-foreground',

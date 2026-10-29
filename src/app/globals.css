@@ -40,6 +40,27 @@ body {
   font-family: var(--font-geist-sans), sans-serif;
 }
 
+/* Action affordance: edit / view / delete / save / role change / tabs / menus */
+button:not(:disabled),
+[role='button']:not([aria-disabled='true']),
+[role='tab']:not(:disabled),
+[role='menuitem'],
+[role='option'],
+[role='combobox']:not([aria-disabled='true']),
+[role='switch']:not([aria-disabled='true']),
+[role='checkbox']:not([aria-disabled='true']),
+summary,
+label[for],
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled='true'],
+[disabled] {
+  cursor: not-allowed;
+}
+
 ::selection {
   background: var(--accent);
   color: var(--accent-foreground);

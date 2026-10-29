@@ -70,7 +70,7 @@ export function TechnicianCombobox({
           aria-label={ariaLabel}
           aria-expanded={open}
           className={cn(
-            'inline-flex h-11 w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm font-normal text-foreground shadow-xs transition-colors hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:pointer-events-none disabled:opacity-50',
+            'inline-flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-border bg-background px-3 text-sm font-normal text-foreground shadow-xs transition-colors hover:bg-muted focus:outline-none focus:ring-1 focus:ring-ring disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
             className,
           )}
         >
