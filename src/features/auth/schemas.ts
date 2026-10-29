@@ -50,6 +50,11 @@ export const registrationTokenSchema = z.object({
 export const registrationResendSchema = z.object({ email: emailSchema })
 export const forgotPasswordSchema = z.object({ email: emailSchema })
 
+/** Display name only — email stays read-only in the profile dialog. */
+export const updateProfileSchema = z.object({
+  name: nameSchema('Name'),
+})
+
 /** Shared password + confirmPassword object (no match refine yet). */
 export const passwordConfirmObject = z.object({
   password: passwordSchema,
@@ -85,3 +90,4 @@ export type LoginInput = z.infer<typeof loginSchema>
 export type RegisterInput = z.infer<typeof registerSchema>
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
