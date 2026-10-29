@@ -10,7 +10,7 @@ export function Button({ className, variant = 'default', size = 'default', ...pr
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center rounded-md font-medium transition-colors duration-200 disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex cursor-pointer items-center justify-center rounded-md font-medium transition-colors duration-200 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         size === 'default' && 'h-11 px-4 text-sm',
         size === 'sm' && 'h-9 px-3 text-xs',
         size === 'lg' && 'h-12 px-8 text-base',

@@ -12,6 +12,10 @@ interface AlertDialogProps {
   contentClassName?: string
 }
 
+const AlertDialogContext = React.createContext<{
+  onOpenChange: (open: boolean) => void
+} | null>(null)
+
 const emptySubscribe = () => () => {}
 
 export function AlertDialog({ open, onOpenChange, children, contentClassName }: AlertDialogProps) {
@@ -42,22 +46,24 @@ export function AlertDialog({ open, onOpenChange, children, contentClassName }: 
   if (!open || !mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200"
-        onClick={() => onOpenChange(false)}
-      />
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        className={cn(
-          'relative z-50 w-full max-w-md max-h-[min(90vh,900px)] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter',
-          contentClassName,
-        )}
-      >
-        {children}
+    <AlertDialogContext.Provider value={{ onOpenChange }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200"
+          onClick={() => onOpenChange(false)}
+        />
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          className={cn(
+            'relative z-50 w-full max-w-md max-h-[min(90vh,900px)] overflow-y-auto rounded-xl border border-border bg-card p-6 shadow-xl transition-all duration-200 page-enter',
+            contentClassName,
+          )}
+        >
+          {children}
+        </div>
       </div>
-    </div>,
+    </AlertDialogContext.Provider>,
     document.body,
   )
 }
@@ -82,7 +88,7 @@ export function AlertDialogAction({ className, ...props }: React.ButtonHTMLAttri
   return (
     <button
       className={cn(
-        'inline-flex h-10 items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-white transition-colors hover:bg-destructive/90 focus:outline-none disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex h-10 cursor-pointer items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-white transition-colors hover:bg-destructive/90 focus:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
@@ -90,13 +96,24 @@ export function AlertDialogAction({ className, ...props }: React.ButtonHTMLAttri
   )
 }
 
-export function AlertDialogCancel({ className, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+export function AlertDialogCancel({
+  className,
+  onClick,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const dialog = React.useContext(AlertDialogContext)
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={(event) => {
+        onClick?.(event)
+        if (!event.defaultPrevented) {
+          dialog?.onOpenChange(false)
+        }
+      }}
       className={cn(
-        'inline-flex h-10 items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus:outline-none disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus:outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
       {...props}
