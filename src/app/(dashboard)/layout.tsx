@@ -46,7 +46,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <span className="hidden text-sm text-muted-foreground md:block">Operations overview</span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <HeaderUserIdentity userName={session.user.name} shopName={shopName} role={role} />
+            <HeaderUserIdentity
+              userName={session.user.name}
+              email={session.user.email}
+              shopName={shopName}
+              role={role}
+            />
             <LogoutButton />
           </div>
         </header>
