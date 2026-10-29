@@ -253,17 +253,16 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
         </AnalyticsCard>
       </div>
 
-      {/* Analytics Charts Grid: Large Revenue Trend + Repair Status Breakdown */}
+      {/* Revenue full-width, then status — avoids tall/short side-by-side blank gap */}
       <div
         key={`charts-${period}`}
-        className="grid gap-4 lg:grid-cols-12 items-start motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
+        className="grid gap-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 motion-reduce:animate-none"
       >
         <AnalyticsCard
           title={`Revenue trend · ${ANALYTICS_PERIOD_LABELS[period]}`}
           icon={BarChart3}
           iconContainerClassName="bg-accent/10 text-accent"
           query={revenueQuery}
-          className="lg:col-span-7 xl:col-span-8"
           emptyText="No revenue data recorded"
         >
           {(data) => (
@@ -293,7 +292,6 @@ export function AnalyticsSection({ shopId }: AnalyticsSectionProps = {}) {
           icon={Layers}
           iconContainerClassName="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
           query={repairsQuery}
-          className="lg:col-span-5 xl:col-span-4"
           emptyText="No active repairs in queue"
         >
           {(data) => (
