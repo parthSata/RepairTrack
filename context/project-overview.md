@@ -185,17 +185,22 @@ requirement.
    `DIAGNOSING` may be set manually. `APPROVED` is never set by staff —
    it comes only from the customer approval decision. Request Customer
    Approval is available only while the status is `DIAGNOSING` and is the
-   only path into `WAITING_FOR_APPROVAL`. The phase is
-   decided by the latest `repair_approvals.status` (`APPROVED` = post-approval),
-   so reopened/restored tickets land in the correct phase.
+   only path into `WAITING_FOR_APPROVAL`. While the ticket is in
+   `RECEIVED` / `DIAGNOSING` (including after reopen/restore), treat it
+   like a new ticket: a prior `APPROVED` approval row does not unlock
+   post-approval statuses or Finalize Bill — staff must Request Customer
+   Approval again. Outside intake, the latest `repair_approvals.status`
+   (`APPROVED` = post-approval) decides the phase.
 2. **Pending approval** (`WAITING_FOR_APPROVAL`): locked until the
    customer responds.
 3. **Post-approval** (`APPROVED` through `READY_FOR_PICKUP`): allowed
-   destinations are `APPROVED`, `WAITING_FOR_PARTS`, `IN_REPAIR`,
+   manual destinations are `WAITING_FOR_PARTS`, `IN_REPAIR`,
    `QUALITY_CHECK`, `READY_FOR_PICKUP`, `COMPLETED`, and `CANCELLED`.
-   `COMPLETED` requires a finalized bill (`final_total`) that is paid in
-   full (sum of payments ≥ `final_total`); until then the dropdown shows it
-   disabled with the reason and the API returns 409.
+   `APPROVED` is customer-only — not a manual dropdown destination (and
+   the API rejects role sessions setting it). `COMPLETED` requires a
+   finalized bill (`final_total`) that is paid in full (sum of payments ≥
+   `final_total`); until then the dropdown shows it disabled with the
+   reason and the API returns 409.
 4. **Closed** (`COMPLETED`, `CANCELLED`): use the reopen action, not
    the status dropdown.
 
@@ -243,7 +248,7 @@ sign in; they use the public tracking page only.
 Repair photos become customer-visible only when both before and after exist, repair status is `READY_FOR_PICKUP` or `COMPLETED`, and `customer_photos_hidden` is false. There is no per-ticket Share action.
 
 * **Exception:** repair status changes are restricted to STAFF and the assigned TECHNICIAN; OWNER is intentionally excluded from that ticket-floor action and manages the shop by reassigning, not by editing ticket state. Confirming a device model on a repair is assigned-TECHNICIAN only — OWNER and STAFF already edit brand/model from Device Details. OWNER and STAFF may recover eligible closed tickets via the explicit reopen/restore actions.
-* **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`.
+* **Recovery actions:** OWNER and STAFF may reopen `COMPLETED` tickets or restore `CANCELLED` tickets, must provide a reason, and the explicit transition is `COMPLETED -> DIAGNOSING` or `CANCELLED -> DIAGNOSING`. Recovery clears `final_total` and returns the ticket to the same pre-approval intake flow as a new repair (Request Customer Approval again on `DIAGNOSING`). Prior approval rows are kept for history. Status-change customer emails (repair started / ready for pickup / completed) may send again for the new recovery cycle.
 * **Action semantics:** Reopen/Restore are actions, not repair statuses. The existing repair status enum remains the source of truth.
 * **History note:** Recovery activity uses `repair_status_history`; a generic Activity/Audit Log remains deferred to Sprint 4.
 

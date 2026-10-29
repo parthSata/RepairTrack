@@ -1,5 +1,6 @@
 import {
   getCompletedTransitionError,
+  hasActiveCustomerApproval,
   isFinalBillConfirmed,
 } from '@/features/repairs/pricing-rules'
 
@@ -37,9 +38,11 @@ const LOCKED_SOURCE_STATUSES = new Set<string>(['COMPLETED', 'CANCELLED', 'WAITI
 /** Before the customer approves; the ticket moves forward only through Request Customer Approval. */
 const PRE_APPROVAL_STATUSES: readonly RepairStatus[] = ['RECEIVED', 'DIAGNOSING']
 
-/** After the customer approves; intake statuses are hidden. */
+/**
+ * After the customer approves; intake statuses are hidden.
+ * APPROVED is customer-only — never a manual destination.
+ */
 const POST_APPROVAL_STATUSES: readonly RepairStatus[] = [
-  'APPROVED',
   'WAITING_FOR_PARTS',
   'IN_REPAIR',
   'QUALITY_CHECK',
@@ -51,6 +54,9 @@ const POST_APPROVAL_STATUSES: readonly RepairStatus[] = [
 export const WAITING_FOR_APPROVAL_MANUAL_MESSAGE =
   'Use Request Customer Approval to send an estimate for approval.'
 
+export const APPROVED_MANUAL_MESSAGE =
+  'Approved is set when the customer accepts the estimate on their tracking page.'
+
 const NEEDS_APPROVAL_MESSAGE =
   'Send the estimate with Request Customer Approval. Repair statuses unlock after the customer approves.'
 
@@ -61,12 +67,20 @@ export function isCustomerApproved(approvalStatus: string | null | undefined): b
   return approvalStatus === 'APPROVED'
 }
 
+/** Post-approval work phase; false on RECEIVED/DIAGNOSING after create or reopen/restore. */
+export function isPostApprovalPhase(
+  currentStatus: string,
+  approvalStatus: string | null | undefined,
+): boolean {
+  return hasActiveCustomerApproval(currentStatus, approvalStatus)
+}
+
 function baseAllowedDestinations(
   currentStatus: string,
   approvalStatus: string | null | undefined,
 ): readonly RepairStatus[] {
   if (LOCKED_SOURCE_STATUSES.has(currentStatus)) return []
-  const phaseStatuses = isCustomerApproved(approvalStatus)
+  const phaseStatuses = isPostApprovalPhase(currentStatus, approvalStatus)
     ? POST_APPROVAL_STATUSES
     : PRE_APPROVAL_STATUSES
   return phaseStatuses.filter((status) => status !== currentStatus)
@@ -89,6 +103,26 @@ export function getAllowedManualStatusDestinations(
   return base.filter((status) => status !== 'COMPLETED')
 }
 
+/**
+ * Dropdown values: current status (as selected) plus allowed destinations.
+ * Dedupes so current / locked COMPLETED never appear twice.
+ * APPROVED is customer-only — omitted even when it is the current status.
+ */
+export function getManualStatusSelectOptions(
+  currentStatus: string,
+  options?: StatusTransitionOptions,
+): readonly RepairStatus[] {
+  const destinations = getAllowedManualStatusDestinations(currentStatus, options)
+  const showLockedCompleted = getCompletedLockHint(currentStatus, options) !== null
+  const includeCurrent = currentStatus !== 'APPROVED'
+  const ordered: RepairStatus[] = [
+    ...(includeCurrent ? [currentStatus as RepairStatus] : []),
+    ...destinations,
+    ...(showLockedCompleted ? (['COMPLETED'] as const) : []),
+  ]
+  return [...new Set(ordered)]
+}
+
 /** Why COMPLETED is shown but disabled; null when it is selectable or not offered at all. */
 export function getCompletedLockHint(
   currentStatus: string,
@@ -105,11 +139,12 @@ export function getManualStatusTransitionError(
   options?: StatusTransitionOptions,
 ): string | null {
   if (nextStatus === 'WAITING_FOR_APPROVAL') return WAITING_FOR_APPROVAL_MANUAL_MESSAGE
+  if (nextStatus === 'APPROVED') return APPROVED_MANUAL_MESSAGE
 
-  const isApproved = isCustomerApproved(options?.approvalStatus)
+  const inPostApproval = isPostApprovalPhase(currentStatus, options?.approvalStatus)
   const next = nextStatus as RepairStatus
-  if (!isApproved && !PRE_APPROVAL_STATUSES.includes(next)) return NEEDS_APPROVAL_MESSAGE
-  if (isApproved && !POST_APPROVAL_STATUSES.includes(next)) return INTAKE_AFTER_APPROVAL_MESSAGE
+  if (!inPostApproval && !PRE_APPROVAL_STATUSES.includes(next)) return NEEDS_APPROVAL_MESSAGE
+  if (inPostApproval && !POST_APPROVAL_STATUSES.includes(next)) return INTAKE_AFTER_APPROVAL_MESSAGE
 
   if (nextStatus === 'COMPLETED') {
     const error = completedError(options)

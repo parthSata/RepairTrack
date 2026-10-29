@@ -27,10 +27,10 @@ import { getApiErrorMessage } from '@/lib/api-error'
 import { useReopenRepair } from '@/features/repairs/mutations'
 import { TicketSummaryGrid } from '@/components/repairs/ticket-summary-grid'
 import {
-  getAllowedManualStatusDestinations,
   getCompletedLockHint,
+  getManualStatusSelectOptions,
   getManualStatusTransitionError,
-  isCustomerApproved,
+  isPostApprovalPhase,
 } from '@/features/repairs/status-transitions'
 import { getRepairStatusLabel, getRepairStatusTone } from '@/features/repairs/status-ui'
 import { useSession } from '@/lib/auth-client'
@@ -109,14 +109,14 @@ export function StatusChangeControl({
     selectedStatus === 'WAITING_FOR_APPROVAL' && currentStatus !== 'WAITING_FOR_APPROVAL'
 
   const transitionOptions = { finalTotal, isPaidInFull, approvalStatus }
-  const isApproved = isCustomerApproved(approvalStatus)
-  const selectableStatuses = getAllowedManualStatusDestinations(currentStatus, transitionOptions)
+  const inPostApproval = isPostApprovalPhase(currentStatus, approvalStatus)
   const completedLockHint = getCompletedLockHint(currentStatus, transitionOptions)
-  const statusOptions = [
-    currentStatus,
-    ...selectableStatuses,
-    ...(completedLockHint ? ['COMPLETED'] : []),
-  ]
+  const statusOptions = getManualStatusSelectOptions(currentStatus, transitionOptions)
+  const selectValue = statusOptions.includes(
+    selectedStatus as (typeof statusOptions)[number],
+  )
+    ? selectedStatus
+    : undefined
 
   const handleStatusSelect = (newStatus: string) => {
     setSelectedStatus(newStatus)
@@ -259,12 +259,12 @@ export function StatusChangeControl({
           </Label>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
             <Select
-              value={selectedStatus}
+              value={selectValue}
               onValueChange={handleStatusSelect}
               disabled={isUpdating}
             >
               <SelectTrigger id={`status-select-${repairId}`} className="flex-1 text-sm">
-                <SelectValue placeholder="Select status" />
+                <SelectValue placeholder="Select next status" />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((status) => {
@@ -297,7 +297,7 @@ export function StatusChangeControl({
           </div>
         </div>
 
-        {!isApproved && (
+        {!inPostApproval && (
           <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
             <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>Repair statuses unlock after the customer approves the estimate.</span>

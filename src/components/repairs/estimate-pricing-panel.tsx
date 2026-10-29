@@ -34,9 +34,19 @@ type EstimatePricingPanelProps = {
   onUnlockedChange?: (unlocked: boolean) => void
 }
 
-function getPricingState(isFinalized: boolean, approvalStatus: ApprovalStatus | null): PricingState | null {
+function getPricingState({
+  status,
+  isFinalized,
+  approvalStatus,
+}: {
+  status: string
+  isFinalized: boolean
+  approvalStatus: ApprovalStatus | null
+}): PricingState | null {
   if (isFinalized) return 'final'
   if (approvalStatus === 'PENDING') return 'awaiting'
+  // Reopen/restore returns to DIAGNOSING; ignore a prior APPROVED until a new cycle
+  if (status === 'RECEIVED' || status === 'DIAGNOSING') return null
   if (approvalStatus === 'APPROVED') return 'approved'
   return null
 }
@@ -115,7 +125,7 @@ export function EstimatePricingPanel({
       : pricing.savedTotals
   const comparedTotal = isEditing ? (pricing.liveTotals?.total ?? null) : finalTotal
   const showEstimateDiff = mode !== 'editEstimate' && differsFromEstimate(estimatedTotal, comparedTotal)
-  const pricingState = getPricingState(isFinalized, approvalStatus)
+  const pricingState = getPricingState({ status, isFinalized, approvalStatus })
   const totalLabel = isFinalized || (mode === 'finalize' && isEditing) ? 'Final total' : 'Estimated total'
 
   const handleCancel = () => {

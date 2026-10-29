@@ -287,6 +287,7 @@ async function testOwnerCanReopenCompleted(fixture: Fixture, repairId: string) {
     JSON.stringify(after.approvals) === JSON.stringify(before.approvals),
     'Test 15 failed: customer approval rows should remain unchanged after OWNER reopen',
   )
+  assert(after.repair?.finalTotal == null, 'Test 16 failed: reopen should clear final_total for a fresh intake cycle')
 
   console.log('Test 1 passed: OWNER can reopen a COMPLETED ticket')
   console.log('Test 10 passed: successful reopen changes COMPLETED -> DIAGNOSING')
@@ -294,6 +295,7 @@ async function testOwnerCanReopenCompleted(fixture: Fixture, repairId: string) {
   console.log('Test 12 passed: previous history remains untouched')
   console.log('Test 14 passed: existing technician assignment is preserved')
   console.log('Test 15 passed: existing Customer Approval data remains unchanged')
+  console.log('Test 16 passed: reopen clears final_total')
 }
 
 async function testStaffCanReopenCompleted(fixture: Fixture, repairId: string) {

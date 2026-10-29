@@ -742,13 +742,43 @@ export function buildStatusEmail(type: StatusEmailType, repair: RepairEmailConte
   }
 }
 
-function queueRepairStatusEmail(shopId: string, type: StatusEmailType, repair: RepairEmailContext, totalPaid: number) {
+/**
+ * Status emails dedupe per recovery cycle: after reopen/restore the same type can send again.
+ * Cycle key is the latest COMPLETED|CANCELLED → DIAGNOSING history row (or `0` if never recovered).
+ */
+async function getStatusEmailCycleKey(repairId: string): Promise<string> {
+  const [row] = await db
+    .select({ id: repairStatusHistory.id })
+    .from(repairStatusHistory)
+    .where(
+      and(
+        eq(repairStatusHistory.repairId, repairId),
+        inArray(repairStatusHistory.fromStatus, ['COMPLETED', 'CANCELLED']),
+        eq(repairStatusHistory.toStatus, 'DIAGNOSING'),
+      ),
+    )
+    .orderBy(desc(repairStatusHistory.createdAt))
+    .limit(1)
+  return row?.id ?? '0'
+}
+
+async function queueRepairStatusEmail(
+  shopId: string,
+  type: StatusEmailType,
+  repair: RepairEmailContext,
+  totalPaid: number,
+) {
+  const cycleKey = await getStatusEmailCycleKey(repair.id)
+  // Unrecovered tickets keep `<TYPE>:<repairId>` so existing SENT logs still dedupe.
+  // After reopen/restore, append the recovery history id so the cycle can email again.
+  const dedupeKey =
+    cycleKey === '0' ? `${type}:${repair.id}` : `${type}:${repair.id}:${cycleKey}`
   queueShopEmail({
     shopId,
     repairId: repair.id,
     type,
     to: repair.customerEmail,
-    dedupeKey: `${type}:${repair.id}`,
+    dedupeKey,
     email: () => buildStatusEmail(type, repair, totalPaid),
   })
 }
@@ -865,7 +895,7 @@ export async function updateRepairStatus({
     return res
   })
 
-  if (emailType) queueRepairStatusEmail(shopId, emailType, existing, totalPaid)
+  if (emailType) await queueRepairStatusEmail(shopId, emailType, existing, totalPaid)
 
   return updated
 }
@@ -1056,12 +1086,15 @@ async function recoverRepair({
   const actionVerb = action === 'restore' ? 'restored' : 'reopened'
   const historyNote = `Repair ${actionVerb}. Previous status: ${existing.status}. New status: ${nextStatus}. Reason: ${trimmedReason}. Actor: ${userRole}.`
 
+  // Same intake as a new ticket: clear the final bill so COMPLETED requires a fresh finalize.
+  // Approval history rows stay; DIAGNOSING ignores a prior APPROVED for phase / Request Approval.
   const updated = await db.transaction(async (tx) => {
     const now = new Date()
     const [res] = await tx
       .update(repairs)
       .set({
         status: nextStatus,
+        finalTotal: null,
         updatedAt: now,
       })
       .where(and(eq(repairs.id, id), eq(repairs.shopId, shopId), eq(repairs.status, existing.status)))

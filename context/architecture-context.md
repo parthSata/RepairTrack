@@ -717,8 +717,10 @@ Rules:
   are queued from `updateRepairStatus` after its transaction commits, through
   one `STATUS_EMAIL_TYPES` map (`IN_REPAIR` → `REPAIR_STARTED`,
   `READY_FOR_PICKUP` → `READY_FOR_PICKUP`, `COMPLETED` → `REPAIR_COMPLETED`)
-  with `dedupeKey` `<TYPE>:<repairId>`, so each is sent at most once per repair
-  (a reopened repair does not get them again). Invoice Generated is queued from
+  with `dedupeKey` `<TYPE>:<repairId>` before any recovery, or
+  `<TYPE>:<repairId>:<recoveryHistoryId>` after reopen/restore, so each type
+  sends at most once per recovery cycle (a reopened repair can email again).
+  Invoice Generated is queued from
   `createInvoiceFromRepair` after its transaction commits, with `dedupeKey`
   `INVOICE_GENERATED:<invoiceId>` (a cancelled-and-reissued invoice has a new id,
   so it is emailed again). The whole invoice is in the body; no PDF attachment.
