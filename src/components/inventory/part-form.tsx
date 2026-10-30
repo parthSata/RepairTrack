@@ -119,7 +119,7 @@ export function PartForm({
       stockAlert: values.stockAlert,
       purchasePrice: values.purchasePrice,
       sellingPrice: values.sellingPrice,
-      supplier: values.supplier.trim() ? values.supplier.trim() : null,
+      supplier: values.supplier.trim(),
     }
 
     try {
@@ -314,13 +314,10 @@ export function PartForm({
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="supplier" className="flex items-center gap-2 text-sm font-medium">
-                <Truck className="h-4 w-4 text-muted-foreground" />
-                Supplier
-              </Label>
-              <span className="text-[11px] text-muted-foreground">Optional</span>
-            </div>
+            <Label htmlFor="supplier" className="flex items-center gap-2 text-sm font-medium">
+              <Truck className="h-4 w-4 text-muted-foreground" />
+              Supplier <span className="font-bold text-destructive">*</span>
+            </Label>
             <Controller
               name="supplier"
               control={control}
