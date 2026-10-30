@@ -24,10 +24,8 @@ export const partDetailsSchema = z.object({
   supplier: z
     .string()
     .trim()
-    .max(200, { message: 'Supplier cannot exceed 200 characters' })
-    .optional()
-    .nullable()
-    .transform((v) => (v == null || v === '' ? null : v)),
+    .min(1, { message: 'Supplier is required' })
+    .max(200, { message: 'Supplier cannot exceed 200 characters' }),
 })
 
 /** Form values — supplier kept as string in the UI; null is applied on submit. */
