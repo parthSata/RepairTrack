@@ -4,6 +4,7 @@ import { db } from '@/server/db'
 import { customers } from '@/server/db/schema/customers'
 import { devices, repairs } from '@/server/db/schema/repairs'
 import { applyTechnicianRepairScope } from '@/server/services/repair.service'
+import { resolveDeviceModelVerification } from '@/features/devices/model-verification'
 import type { DeviceFilterInput, DeviceFormInput, DeviceType } from '@/features/devices/schemas'
 
 export async function listDevices({
@@ -155,10 +156,10 @@ export async function createDevice({
     })
   }
 
-  const modelVal = data.model?.trim() || null
-  const isModelProvided = Boolean(modelVal)
-  const markUnverified = Boolean(data.markUnverified)
-  const modelVerified = isModelProvided && !markUnverified
+  const verification = resolveDeviceModelVerification({
+    model: data.model,
+    markUnverified: Boolean(data.markUnverified),
+  })
 
   const id = crypto.randomUUID()
   const [created] = await db
@@ -168,14 +169,14 @@ export async function createDevice({
       shopId,
       customerId: data.customerId,
       brand: data.brand,
-      model: modelVal,
+      model: verification.model,
       serialNumber: data.serialNumber ?? null,
       deviceType: data.deviceType,
       condition: data.condition,
       accessories: data.accessories ?? null,
-      modelVerified,
-      modelVerificationOverridden: false,
-      modelVerificationNote: null,
+      modelVerified: verification.modelVerified,
+      modelVerificationOverridden: verification.modelVerificationOverridden,
+      modelVerificationNote: verification.modelVerificationNote,
     })
     .returning()
 
@@ -213,38 +214,26 @@ export async function updateDevice({
     })
   }
 
-  const isOverride = Boolean(data.modelVerificationOverrideReason)
-  const modelVal = data.model !== undefined ? (data.model?.trim() || null) : existing.model
-
-  let modelVerified = existing.modelVerified
-  let modelVerificationOverridden = existing.modelVerificationOverridden
-  let modelVerificationNote = existing.modelVerificationNote
-
-  if (isOverride) {
-    modelVerified = true
-    modelVerificationOverridden = true
-    modelVerificationNote = data.modelVerificationOverrideReason!.trim()
-  } else {
-    const isModelProvided = Boolean(modelVal)
-    const markUnverified = Boolean(data.markUnverified)
-    modelVerified = isModelProvided && !markUnverified
-    modelVerificationOverridden = false
-    modelVerificationNote = null
-  }
+  const modelVal = data.model !== undefined ? data.model : existing.model
+  const verification = resolveDeviceModelVerification({
+    model: modelVal,
+    markUnverified: Boolean(data.markUnverified),
+    overrideReason: data.modelVerificationOverrideReason,
+  })
 
   const [updated] = await db
     .update(devices)
     .set({
       customerId: data.customerId,
       brand: data.brand,
-      model: modelVal,
+      model: verification.model,
       serialNumber: data.serialNumber ?? null,
       deviceType: data.deviceType,
       condition: data.condition,
       accessories: data.accessories ?? null,
-      modelVerified,
-      modelVerificationOverridden,
-      modelVerificationNote,
+      modelVerified: verification.modelVerified,
+      modelVerificationOverridden: verification.modelVerificationOverridden,
+      modelVerificationNote: verification.modelVerificationNote,
       updatedAt: new Date(),
     })
     .where(and(eq(devices.id, id), eq(devices.shopId, shopId)))

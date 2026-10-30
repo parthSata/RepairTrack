@@ -11,38 +11,12 @@ import {
   Monitor,
   Pencil,
   Plus,
+  ShieldAlert,
   Smartphone,
   Tablet,
   Trash2,
 } from 'lucide-react'
-
-export function ModelVerificationBadge({
-  modelVerified,
-  modelVerificationOverridden,
-}: {
-  modelVerified: boolean
-  modelVerificationOverridden?: boolean
-}) {
-  if (modelVerificationOverridden) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 border border-amber-500/20 shrink-0">
-        <MessageSquareWarning className="h-3 w-3 shrink-0 text-amber-600" />
-        Model Unconfirmed (Override)
-      </span>
-    )
-  }
-
-  if (!modelVerified) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600 border border-amber-500/20 shrink-0">
-        <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" />
-        Unverified
-      </span>
-    )
-  }
-
-  return null
-}
+import { getModelVerificationBadgeKind } from '@/features/devices/model-verification'
 import { useDevices, type Device, type LinkedCustomer } from '@/features/devices/queries'
 import {
   DEVICE_TYPES,
@@ -67,6 +41,51 @@ import { TableEmptyState } from '@/components/ui/table-empty-state'
 import { DeviceForm } from './device-form'
 import { DeviceDeleteDialog } from './device-delete-dialog'
 import { DeviceGroupHeader } from './device-group-header'
+
+export function ModelVerificationBadge({
+  model,
+  modelVerified,
+  modelVerificationOverridden,
+}: {
+  model?: string | null
+  modelVerified: boolean
+  modelVerificationOverridden?: boolean
+}) {
+  const kind = getModelVerificationBadgeKind({
+    model,
+    modelVerified,
+    modelVerificationOverridden,
+  })
+
+  if (kind === 'override') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600">
+        <MessageSquareWarning className="h-3 w-3 shrink-0 text-amber-600" />
+        Model Unconfirmed (Override)
+      </span>
+    )
+  }
+
+  if (kind === 'blank') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600">
+        <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" />
+        Unverified
+      </span>
+    )
+  }
+
+  if (kind === 'lowConfidence') {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-amber-600">
+        <ShieldAlert className="h-3 w-3 shrink-0 text-amber-600" />
+        Low confidence
+      </span>
+    )
+  }
+
+  return null
+}
 
 export function DeviceTypeIcon({ type }: { type: DeviceType }) {
   switch (type) {
@@ -306,6 +325,7 @@ export function DeviceTable() {
                                       </span>
                                     )}
                                     <ModelVerificationBadge
+                                      model={device.model}
                                       modelVerified={device.modelVerified}
                                       modelVerificationOverridden={device.modelVerificationOverridden}
                                     />
@@ -458,6 +478,8 @@ export function DeviceTable() {
               customerId: editDevice.customerId,
               brand: editDevice.brand,
               model: editDevice.model,
+              markUnverified:
+                Boolean(editDevice.model?.trim()) && !editDevice.modelVerified,
               serialNumber: editDevice.serialNumber ?? '',
               deviceType: editDevice.deviceType,
               condition: editDevice.condition,

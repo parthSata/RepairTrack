@@ -434,13 +434,17 @@ powered off, dead, or missing its IMEI/serial. To avoid blocking intake:
   device is marked **Unverified** and shown with a clear visual
   indicator wherever it appears (Device List, Device Details, Repair
   Details).
+- Staff may also enter a guessed model and mark **Low confidence**
+  (`modelVerified = false`). Blank model and low-confidence guessed
+  model use the **same gate**: parts and Request Customer Approval stay
+  blocked until the model is confirmed.
 - Confirming/verifying a model **requires a model name** (override is a
   note, not a way to skip the model). Assigned technicians confirm from
   Repair Details → Linked Device; OWNER/STAFF may also edit from Device
-  Details.
-- Unverified is a normal intake state and **must not** block
-  repair-ticket creation or ordinary status progression.
-- Unverified **does** block model-dependent work: recording parts on a
+  Details (editing other fields must not silently clear low confidence).
+- Unverified / low confidence is a normal intake state and **must not**
+  block repair-ticket creation or ordinary status progression.
+- Both states **do** block model-dependent work: recording parts on a
   repair and sending a customer estimate for approval, until the device
   is reliably identified (`model` present and `modelVerified`).
 

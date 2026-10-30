@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { HardDrive, Pencil } from 'lucide-react'
+import { HardDrive, ShieldAlert } from 'lucide-react'
 import {
   ConditionBadge,
   DeviceTypeIcon,
@@ -15,7 +15,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { getModelVerificationBadgeKind } from '@/features/devices/model-verification'
 import type { Repair } from '@/features/repairs/queries'
+import { cn } from '@/lib/utils'
 
 type Props = {
   device: Repair['device']
@@ -31,10 +33,19 @@ export function RepairLinkedDeviceCard({
   onModelConfirmed,
 }: Props) {
   const [confirmOpen, setConfirmOpen] = React.useState(false)
+  const badgeKind = getModelVerificationBadgeKind(device)
+  const needsConfirm = canConfirmModel && badgeKind !== 'verified'
 
   return (
     <>
-      <div className="flex h-fit min-w-0 flex-col gap-3 self-start rounded-xl border border-border/70 bg-background/60 p-4 transition-colors duration-200 hover:bg-muted/20">
+      <div
+        className={cn(
+          'flex h-fit min-w-0 flex-col gap-3 self-start rounded-xl border bg-background/60 p-4 transition-colors duration-200',
+          needsConfirm
+            ? 'border-amber-300/70 bg-amber-50/40 dark:border-amber-800/50 dark:bg-amber-950/20'
+            : 'border-border/70 hover:bg-muted/20',
+        )}
+      >
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
             <HardDrive className="h-3.5 w-3.5" />
@@ -43,14 +54,14 @@ export function RepairLinkedDeviceCard({
           {canConfirmModel ? (
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => setConfirmOpen(true)}
-              className="h-7 gap-1 px-2 text-xs text-amber-700 hover:bg-amber-500/10 hover:text-amber-800 dark:text-amber-400"
+              className="h-7 gap-1 border-amber-300/80 bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-800 hover:bg-amber-500/15 dark:border-amber-700/60 dark:text-amber-300"
               aria-label="Confirm device model"
             >
-              <Pencil className="h-3.5 w-3.5" />
-              Confirm
+              <ShieldAlert className="h-3.5 w-3.5" />
+              Confirm model
             </Button>
           ) : null}
         </div>
@@ -65,10 +76,13 @@ export function RepairLinkedDeviceCard({
               {device.model ? (
                 <span>{device.model}</span>
               ) : (
-                <span className="text-xs font-normal italic text-muted-foreground">Unknown model</span>
+                <span className="text-xs font-normal italic text-muted-foreground">
+                  Unknown model
+                </span>
               )}
               <ModelVerificationBadge
-                modelVerified={device.modelVerified && Boolean(device.model?.trim())}
+                model={device.model}
+                modelVerified={device.modelVerified}
                 modelVerificationOverridden={device.modelVerificationOverridden}
               />
             </span>
@@ -83,6 +97,12 @@ export function RepairLinkedDeviceCard({
             ) : null}
           </div>
         </div>
+
+        {needsConfirm ? (
+          <p className="rounded-md border border-amber-200/80 bg-amber-500/5 px-2.5 py-2 text-[11px] leading-snug text-amber-800 dark:border-amber-800/40 dark:text-amber-300">
+            Confirm the exact model before adding parts or sending a customer estimate.
+          </p>
+        ) : null}
       </div>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen} className="max-w-md">

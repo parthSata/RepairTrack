@@ -152,7 +152,7 @@ export function getSendApprovalViolation({
   status,
   approvalStatus,
   hasIssuedInvoice = false,
-  deviceModelIdentified = true,
+  deviceModelIdentified,
 }: {
   userRole: string
   userId: string | null | undefined
@@ -161,7 +161,7 @@ export function getSendApprovalViolation({
   approvalStatus: ApprovalStatus | null | undefined
   hasIssuedInvoice?: boolean
   /** Ticket creation may omit model; estimate/parts work must not. */
-  deviceModelIdentified?: boolean
+  deviceModelIdentified: boolean
 }): PricingRuleViolation | null {
   if (userRole === 'OWNER') return forbidden(PRICING_MESSAGES.approvalOwnerForbidden)
   if (userRole === 'TECHNICIAN' && assignedTechnicianId !== userId) {

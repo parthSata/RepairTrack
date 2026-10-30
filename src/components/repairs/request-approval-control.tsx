@@ -5,7 +5,10 @@ import { AlertCircle, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { RequestApprovalDialog } from '@/components/repairs/request-approval-dialog'
 import { isDeviceModelIdentified } from '@/features/devices/model-verification'
-import { getSendApprovalViolation } from '@/features/repairs/pricing-rules'
+import {
+  getSendApprovalViolation,
+  PRICING_MESSAGES,
+} from '@/features/repairs/pricing-rules'
 import type { RepairPricingFieldsInput } from '@/features/repairs/pricing-schemas'
 import type { RepairApproval, RepairPartLine, RepairDevice } from '@/features/repairs/queries'
 import { getRepairStatusLabel } from '@/features/repairs/status-ui'
@@ -87,6 +90,7 @@ export function RequestApprovalControl({
   if (violation?.status === 403) return null
 
   const disabledReason = violation?.message ?? null
+  const modelBlocked = disabledReason === PRICING_MESSAGES.modelNotIdentified
   const startingPricing = getDialogStartingPricing({
     savedPricing,
     estimatedTotal,
@@ -107,9 +111,20 @@ export function RequestApprovalControl({
         Request Customer Approval
       </Button>
 
-      <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground">
+      <p
+        className={
+          modelBlocked
+            ? 'flex items-start gap-1.5 rounded-md border border-amber-200/80 bg-amber-500/5 px-2.5 py-2 text-[11px] leading-relaxed font-medium text-amber-800 dark:border-amber-800/40 dark:text-amber-300'
+            : 'flex items-start gap-1.5 text-[11px] leading-relaxed text-muted-foreground'
+        }
+      >
         {disabledReason ? <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
-        <span>{disabledReason ?? 'Enter the diagnosis and charges, then send them to the customer.'}</span>
+        <span>
+          {modelBlocked
+            ? 'Confirm the device model first — then you can send the estimate for approval.'
+            : (disabledReason ??
+              'Enter the diagnosis and charges, then send them to the customer.')}
+        </span>
       </p>
 
       <RequestApprovalDialog
